@@ -10,7 +10,7 @@ import {
   ChevronDown, Settings2, Timer, Check, CreditCard,
   Banknote, Receipt, ArrowRight, Printer, CheckCircle,
   Monitor, Maximize2, Bell, Truck, UserMinus, Navigation, ShieldCheck,
-  History, Wallet, ArrowUpRight, Store, Utensils, Zap, Save, UserCheck, Scan, Shield
+  History, Wallet, ArrowUpRight, Store, Utensils, Zap, Save, UserCheck, Scan, Shield, Sun, Moon
 } from 'lucide-react';
 import { MenuItem, Category, TabId, Order, OrderItem, OrderStatus, Customer, AdminSection, DeliveryDriver, VehicleType, PaymentMethod, PaymentStatus, TransferStatus, Staff, StaffRole } from '../types';
 import Sidebar from '../components/Sidebar';
@@ -879,11 +879,20 @@ export default function AdminView({
             <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px] mt-2">Monitoreo de cocina</p>
           </div>
           <div className="flex items-center space-x-4">
-            <div className="px-6 py-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center space-x-3">
+            <button
+              onClick={() => playUISound('kitchen')}
+              className="px-6 py-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center space-x-3 hover:bg-gray-50 active:scale-95 transition-all"
+            >
               <Bell className="w-5 h-5 text-amber-500 animate-swing" />
               <span className="font-black dark:text-white uppercase text-xs">{activeOrders.length} Pendientes</span>
-            </div>
-            <button title="Pantalla completa" className="p-4 bg-gray-900 text-white rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all"><Maximize2 className="w-5 h-5" /></button>
+            </button>
+            <button
+              title={isDarkMode ? "Modo Claro" : "Modo Oscuro"}
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="p-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all"
+            >
+              {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
           </div>
         </div>
 
@@ -937,7 +946,7 @@ export default function AdminView({
                   </div>
                   <div className="p-8 pt-0">
                     <button
-                      onClick={() => updateOrderStatus(order.id, 'ready')}
+                      onClick={() => { updateOrderStatus(order.id, 'ready'); playUISound('kitchen'); }}
                       className={`w-full py-8 rounded-[32px] font-black text-xl uppercase tracking-widest shadow-2xl transition-all active:scale-95 flex items-center justify-center space-x-3 bg-emerald-500 text-white shadow-emerald-500/30 hover:bg-emerald-600`}
                     >
                       <CheckCircle className="w-8 h-8" />
