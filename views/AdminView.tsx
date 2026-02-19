@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Plus, Info, X, CheckCircle2, AlertCircle,
   Trash2, Clock, MapPin, Phone, User,
@@ -167,43 +167,58 @@ export default function AdminView({
   }, []);
 
   const SOUND_MAP = useMemo(() => ({
-    click: 'https://assets.mixkit.co/active_storage/sfx/2577/2577-preview.mp3',
-    success: 'https://assets.mixkit.co/active_storage/sfx/924/924-preview.mp3',
-    error: 'https://assets.mixkit.co/active_storage/sfx/953/953-preview.mp3',
-    kitchen: 'https://assets.mixkit.co/active_storage/sfx/2566/2566-preview.mp3', // Digital Alert Sharp
+    click: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
+    success: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
+    error: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3',
+    kitchen: 'https://assets.mixkit.co/active_storage/sfx/2567/2567-preview.mp3', // Very short digital blip
     delivery: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
     local: 'https://assets.mixkit.co/active_storage/sfx/2570/2570-preview.mp3',
-    notification: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', // High Tech Alert
-    addToCart: 'https://assets.mixkit.co/active_storage/sfx/2577/2577-preview.mp3'
+    notification: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
+    addToCart: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'
   }), []);
 
-  const lastSoundPlayedAt = React.useRef<number>(0);
-  const audioInstance = React.useRef<HTMLAudioElement | null>(null);
+  // Professional sound manager: pre-load and avoid overlaps
+  const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
+
+  useEffect(() => {
+    // Lazy pre-load and singleton instances to prevent multiple Audio tags of same sound
+    Object.entries(SOUND_MAP).forEach(([key, url]) => {
+      if (!audioRefs.current[key]) {
+        const audio = new Audio(url as string);
+        audio.volume = 0.12;
+        audio.preload = 'auto';
+        audioRefs.current[key] = audio;
+      }
+    });
+  }, [SOUND_MAP]);
+
+  const lastSoundPlayedAt = useRef<number>(0);
 
   const playUISound = useCallback((type: keyof typeof SOUND_MAP) => {
     const now = Date.now();
-    // Cooldown of 150ms to prevent "monster" / granular distortion
-    if (now - lastSoundPlayedAt.current < 150) return;
+    // High-safety cooldown of 500ms to avoid audio hardware stuttering
+    if (now - lastSoundPlayedAt.current < 500) return;
 
     try {
-      if (!audioInstance.current) {
-        audioInstance.current = new Audio();
-        audioInstance.current.volume = 0.15; // Adjusted for digital sounds
+      const audio = audioRefs.current[type];
+      if (audio) {
+        // Senior fix: Only reset if it was already playing, otherwise just play
+        if (!audio.paused) {
+          audio.pause();
+          audio.currentTime = 0;
+        }
+        lastSoundPlayedAt.current = now;
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            // Silently ignore: usually browser policy preventing auto-play before interaction
+          });
+        }
       }
-
-      const audio = audioInstance.current;
-      audio.src = SOUND_MAP[type];
-
-      // Force immediate reset
-      audio.pause();
-      audio.currentTime = 0;
-
-      lastSoundPlayedAt.current = now;
-      audio.play().catch(() => { });
     } catch (e) {
       console.warn('Sound manager error', e);
     }
-  }, [SOUND_MAP]);
+  }, []);
 
   const addNotification = useCallback((message: string, type: 'success' | 'error' | 'info' | 'kitchen' = 'success') => {
     // Prevent duplicate messages in the current view to avoid stacking
@@ -223,11 +238,11 @@ export default function AdminView({
       return [...prev, newNotif];
     });
 
-    // Ring bell for kitchen or errors, otherwise check if in TPV
-    if (type === 'kitchen' || type === 'error' || activeSection !== 'tpv') {
-      playUISound(type === 'kitchen' ? 'kitchen' : type === 'error' ? 'error' : 'notification');
+    // Sound is handled by the data effect (badges) to avoid redundant "monster" sounds
+    if (type === 'error') {
+      playUISound('error');
     }
-  }, [playUISound, activeSection]);
+  }, [playUISound]);
 
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
