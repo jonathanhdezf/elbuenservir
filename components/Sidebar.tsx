@@ -1,12 +1,11 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   LayoutDashboard,
   UtensilsCrossed,
   ShoppingBasket,
   Users,
   BarChart3,
-  Settings,
   Moon,
   Sun,
   LogOut,
@@ -17,7 +16,9 @@ import {
   Monitor,
   Truck,
   Store,
-  Shield
+  Shield,
+  ChevronDown,
+  Package
 } from 'lucide-react';
 import { AdminSection } from '../types';
 
@@ -29,7 +30,14 @@ interface SidebarProps {
   onExitToSite?: () => void;
   activeSection: AdminSection;
   onSectionChange: (section: AdminSection) => void;
-  isFullScreen?: boolean; // New prop
+  isFullScreen?: boolean;
+}
+
+interface NavGroup {
+  title: string;
+  icon: any;
+  items: { icon: any; label: string; id: AdminSection; badge?: number }[];
+  collapsible?: boolean;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -41,22 +49,52 @@ const Sidebar: React.FC<SidebarProps> = ({
   activeSection,
   onSectionChange,
   badges = {} as Partial<Record<AdminSection, number>>,
-  isFullScreen = false // Default
+  isFullScreen = false
 }) => {
-  const menuItems: { icon: any; label: string; id: AdminSection; badge?: number }[] = [
+  const [logisticsOpen, setLogisticsOpen] = useState(true);
+
+  const mainItems: { icon: any; label: string; id: AdminSection; badge?: number }[] = [
     { icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard' },
     { icon: Monitor, label: 'En Directo TPV', id: 'tpv' },
-    { icon: Store, label: 'Despacho Local', id: 'local_dispatch', badge: badges['local_dispatch'] },
-    { icon: UtensilsCrossed, label: 'Comandas', id: 'kds', badge: badges['kds'] },
-    { icon: Truck, label: 'Reparto', id: 'dds', badge: badges['dds'] },
-    { icon: Bike, label: 'Panel Repartidores', id: 'driver_dashboard' },
     { icon: ShoppingBasket, label: 'Pedidos', id: 'orders', badge: badges['orders'] },
+  ];
+
+  const logisticsItems: { icon: any; label: string; id: AdminSection; badge?: number }[] = [
+    { icon: ChefHat, label: 'Monitor KDS', id: 'kds', badge: badges['kds'] },
+    { icon: Truck, label: 'Repartos', id: 'dds', badge: badges['dds'] },
+    { icon: Store, label: 'Despacho Local', id: 'local_dispatch', badge: badges['local_dispatch'] },
+    { icon: Bike, label: 'Panel Repartidores', id: 'driver_dashboard' },
+  ];
+
+  const managementItems: { icon: any; label: string; id: AdminSection; badge?: number }[] = [
     { icon: UtensilsCrossed, label: 'Editor de Menú', id: 'menu' },
     { icon: Users, label: 'Clientes', id: 'customers' },
     { icon: BarChart3, label: 'Reportes', id: 'reports' },
     { icon: Shield, label: 'Gestión Personal', id: 'staff_management' },
   ];
 
+  const isLogisticsActive = logisticsItems.some(item => item.id === activeSection);
+
+  const renderNavItem = (item: { icon: any; label: string; id: AdminSection; badge?: number }) => (
+    <button
+      key={item.id}
+      onClick={() => onSectionChange(item.id)}
+      className={`
+        w-full flex items-center px-4 py-3.5 rounded-2xl transition-all group
+        ${activeSection === item.id
+          ? 'bg-primary-500 text-white shadow-lg shadow-primary-200 dark:shadow-none font-semibold'
+          : 'text-gray-500 dark:text-gray-400 hover:bg-primary-50 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-primary-400'}
+      `}
+    >
+      <item.icon className={`w-5 h-5 mr-3.5 ${activeSection === item.id ? 'text-white' : 'text-gray-400 group-hover:text-primary-500'}`} />
+      <span>{item.label}</span>
+      {item.badge ? (
+        <span className={`ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full ring-2 ring-white dark:ring-gray-900 ${activeSection === item.id ? 'bg-white text-primary-600 ring-primary-400' : ''}`}>
+          {item.badge}
+        </span>
+      ) : null}
+    </button>
+  );
 
   return (
     <aside className={`
@@ -86,29 +124,37 @@ const Sidebar: React.FC<SidebarProps> = ({
         <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-2 uppercase tracking-[0.2em] font-bold">Panel de Administrador</p>
       </div>
 
-      <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto custom-scrollbar">
-        {menuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => onSectionChange(item.id)}
-            className={`
-              w-full flex items-center px-4 py-3.5 rounded-2xl transition-all group
-              ${activeSection === item.id
-                ? 'bg-primary-500 text-white shadow-lg shadow-primary-200 dark:shadow-none font-semibold'
-                : 'text-gray-500 dark:text-gray-400 hover:bg-primary-50 dark:hover:bg-gray-800 hover:text-primary-600 dark:hover:text-primary-400'}
-            `}
-          >
-            <item.icon className={`w-5 h-5 mr-3.5 ${activeSection === item.id ? 'text-white' : 'text-gray-400 group-hover:text-primary-500'}`} />
-            <span>{item.label}</span>
-            {item.badge ? (
-              <span className={`ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full ring-2 ring-white dark:ring-gray-900 ${activeSection === item.id ? 'bg-white text-primary-600 ring-primary-400' : ''}`}>
-                {item.badge}
-              </span>
-            ) : null}
-          </button>
-        ))}
+      <nav className="flex-1 px-4 py-6 overflow-y-auto custom-scrollbar space-y-1">
+        {/* Operaciones */}
+        <p className="text-[9px] font-black text-gray-300 dark:text-gray-600 uppercase tracking-[0.2em] px-4 mb-2 mt-2">Operaciones</p>
+        {mainItems.map(renderNavItem)}
 
-        <div className="pt-6 mt-6 border-t border-gray-50 dark:border-gray-800 space-y-2">
+        {/* Logística */}
+        <div className="pt-4">
+          <button
+            onClick={() => setLogisticsOpen(!logisticsOpen)}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all group ${isLogisticsActive ? 'bg-blue-50 dark:bg-blue-950/30' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}
+          >
+            <div className="flex items-center">
+              <Package className={`w-5 h-5 mr-3.5 ${isLogisticsActive ? 'text-blue-500' : 'text-gray-400'}`} />
+              <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${isLogisticsActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>Logística</span>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${logisticsOpen ? 'rotate-180' : ''}`} />
+          </button>
+          <div className={`overflow-hidden transition-all duration-300 ${logisticsOpen ? 'max-h-[500px] opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+            <div className="pl-2 space-y-1">
+              {logisticsItems.map(renderNavItem)}
+            </div>
+          </div>
+        </div>
+
+        {/* Gestión */}
+        <div className="pt-4">
+          <p className="text-[9px] font-black text-gray-300 dark:text-gray-600 uppercase tracking-[0.2em] px-4 mb-2">Gestión</p>
+          {managementItems.map(renderNavItem)}
+        </div>
+
+        <div className="pt-6 mt-4 border-t border-gray-50 dark:border-gray-800 space-y-2">
           {onExitToSite && (
             <button
               onClick={onExitToSite}

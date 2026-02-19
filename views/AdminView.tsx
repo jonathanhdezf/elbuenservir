@@ -110,7 +110,15 @@ export default function AdminView({
 }: AdminViewProps) {
   const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
   const [activeTab, setActiveTab] = useState<TabId>(categories[0]?.id || '');
-  const isFullScreen = ['kds'].includes(activeSection);
+  const isFullScreen = ['kds', 'dds', 'local_dispatch', 'driver_dashboard'].includes(activeSection);
+
+  // Logistics password protection
+  const LOGISTICS_PASSWORD = '1234';
+  const LOGISTICS_SECTIONS: AdminSection[] = ['kds', 'dds', 'local_dispatch', 'driver_dashboard'];
+  const [unlockedSections, setUnlockedSections] = useState<Set<AdminSection>>(new Set());
+  const [logisticsPasswordInput, setLogisticsPasswordInput] = useState('');
+  const [logisticsPasswordError, setLogisticsPasswordError] = useState(false);
+  const [pendingLogisticsSection, setPendingLogisticsSection] = useState<AdminSection | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -886,7 +894,7 @@ export default function AdminView({
         </div>
 
         {activeOrders.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 pb-20">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10 pb-20">
             {activeOrders.map(order => {
               const waitTime = Math.floor((currentTime.getTime() - new Date(order.createdAt).getTime()) / 60000);
               const isUrgent = waitTime > 12;
@@ -969,7 +977,7 @@ export default function AdminView({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
             {activeDrivers.map(driver => (
               <button
                 key={driver.id}
@@ -1264,7 +1272,7 @@ export default function AdminView({
         </div>
 
         {readyOrders.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pb-20">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 pb-20">
             {readyOrders.map(order => {
               const driver = drivers.find(d => d.id === order.assignedDriverId);
               const waitTime = Math.floor((currentTime.getTime() - new Date(order.createdAt).getTime()) / 60000);
@@ -2702,6 +2710,13 @@ export default function AdminView({
         isDarkMode={isDarkMode} toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
         onExitToSite={onExit} activeSection={activeSection}
         onSectionChange={(s) => {
+          if (LOGISTICS_SECTIONS.includes(s) && !unlockedSections.has(s)) {
+            setPendingLogisticsSection(s);
+            setLogisticsPasswordInput('');
+            setLogisticsPasswordError(false);
+            setIsSidebarOpen(false);
+            return;
+          }
           setActiveSection(s);
           setIsSidebarOpen(false);
           playUISound('click');
@@ -2734,7 +2749,7 @@ export default function AdminView({
         />
 
         <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar bg-[#F8FAFC] dark:bg-gray-950/20 relative">
-          <div className="max-w-7xl mx-auto h-full">
+          <div className="mx-auto h-full">
             {activeSection === 'dashboard' && renderDashboard()}
             {activeSection === 'tpv' && renderTPVSection()}
             {activeSection === 'local_dispatch' && (
@@ -2846,6 +2861,81 @@ export default function AdminView({
             <button title="Cerrar vista previa" onClick={() => setShowPreview(false)} className="bg-white/10 backdrop-blur-md text-white p-4 rounded-full hover:bg-white/20 transition-all border border-white/20 shadow-2xl"><X className="w-8 h-8" /></button>
           </div>
           <PublicView categories={categories} menuItems={menuItems} isPreview />
+        </div>
+      )}
+      {/* Logistics Password Gate Modal */}
+      {pendingLogisticsSection && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-6 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={() => setPendingLogisticsSection(null)}></div>
+          <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[40px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="relative p-10 flex flex-col items-center text-center">
+              <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+              <div className="w-20 h-20 rounded-[24px] bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-6 shadow-xl shadow-blue-500/30">
+                <Shield className="w-10 h-10 text-white" />
+              </div>
+              <h4 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase mb-1">Acceso Restringido</h4>
+              <p className="text-sm text-gray-500 font-medium mb-2">
+                {pendingLogisticsSection === 'kds' ? 'Monitor KDS' :
+                  pendingLogisticsSection === 'dds' ? 'Repartos' :
+                    pendingLogisticsSection === 'local_dispatch' ? 'Despacho Local' :
+                      'Panel Repartidores'}
+              </p>
+              <p className="text-xs text-gray-400 mb-8">Ingresa la contraseña de logística para continuar</p>
+
+              <input
+                type="password"
+                value={logisticsPasswordInput}
+                onChange={(e) => { setLogisticsPasswordInput(e.target.value); setLogisticsPasswordError(false); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    if (logisticsPasswordInput === LOGISTICS_PASSWORD) {
+                      setUnlockedSections(prev => new Set([...prev, pendingLogisticsSection!]));
+                      setActiveSection(pendingLogisticsSection!);
+                      setPendingLogisticsSection(null);
+                      playUISound('success');
+                    } else {
+                      setLogisticsPasswordError(true);
+                      playUISound('error');
+                    }
+                  }
+                }}
+                placeholder="Contraseña"
+                className={`w-full bg-gray-50 dark:bg-gray-800 border-2 rounded-2xl px-6 py-5 font-black text-center text-lg uppercase tracking-[0.3em] mb-4 focus:border-blue-500 outline-none transition-all ${logisticsPasswordError ? 'border-red-400 animate-shake' : 'border-gray-100 dark:border-gray-700'}`}
+                autoFocus
+              />
+
+              {logisticsPasswordError && (
+                <p className="text-xs font-bold text-red-500 mb-4 flex items-center bg-red-50 dark:bg-red-950/30 px-4 py-2 rounded-xl">
+                  <AlertCircle className="w-3.5 h-3.5 mr-2" /> Contraseña incorrecta
+                </p>
+              )}
+
+              <div className="flex space-x-3 w-full">
+                <button
+                  onClick={() => setPendingLogisticsSection(null)}
+                  className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-500 rounded-2xl font-black uppercase tracking-widest text-xs transition-all hover:bg-gray-200 dark:hover:bg-gray-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    if (logisticsPasswordInput === LOGISTICS_PASSWORD) {
+                      setUnlockedSections(prev => new Set([...prev, pendingLogisticsSection!]));
+                      setActiveSection(pendingLogisticsSection!);
+                      setPendingLogisticsSection(null);
+                      playUISound('success');
+                    } else {
+                      setLogisticsPasswordError(true);
+                      playUISound('error');
+                    }
+                  }}
+                  className="flex-1 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-blue-500/20 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-95"
+                >
+                  Ingresar
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
