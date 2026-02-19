@@ -167,14 +167,14 @@ export default function AdminView({
   }, []);
 
   const SOUND_MAP = useMemo(() => ({
-    click: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
-    success: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
-    error: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3',
-    kitchen: 'https://assets.mixkit.co/active_storage/sfx/1070/1070-preview.mp3',
+    click: 'https://assets.mixkit.co/active_storage/sfx/2577/2577-preview.mp3',
+    success: 'https://assets.mixkit.co/active_storage/sfx/924/924-preview.mp3',
+    error: 'https://assets.mixkit.co/active_storage/sfx/953/953-preview.mp3',
+    kitchen: 'https://assets.mixkit.co/active_storage/sfx/2566/2566-preview.mp3', // Digital Alert Sharp
     delivery: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
     local: 'https://assets.mixkit.co/active_storage/sfx/2570/2570-preview.mp3',
-    notification: 'https://assets.mixkit.co/active_storage/sfx/2575/2575-preview.mp3',
-    addToCart: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3' // Switched to blip for clarity
+    notification: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', // High Tech Alert
+    addToCart: 'https://assets.mixkit.co/active_storage/sfx/2577/2577-preview.mp3'
   }), []);
 
   const lastSoundPlayedAt = React.useRef<number>(0);
@@ -188,7 +188,7 @@ export default function AdminView({
     try {
       if (!audioInstance.current) {
         audioInstance.current = new Audio();
-        audioInstance.current.volume = 0.08; // Even lower to be super safe
+        audioInstance.current.volume = 0.15; // Adjusted for digital sounds
       }
 
       const audio = audioInstance.current;
