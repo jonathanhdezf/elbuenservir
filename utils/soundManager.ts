@@ -4,19 +4,19 @@
  * Categorizes sounds by section and action type.
  */
 
-export type AudioAction = 'confirm' | 'alert' | 'notification' | 'error' | 'navigation' | 'click';
+export type AudioAction = 'confirm' | 'alert' | 'notification' | 'error' | 'navigation' | 'click' | 'recycle';
 export type AdminSection = 'dashboard' | 'orders' | 'menu' | 'customers' | 'staff' | 'configuration' | 'kds' | 'dds' | 'local_dispatch' | 'driver_panel' | 'reports' | 'tpv';
 
 const SOUNDS = {
     // Navigation (Stays as is, requested by user)
-    navigation: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
+    navigation: '/elbuenservir/sonidos/navigation.mp3',
 
     // Section-specific confirmation sounds
-    confirm_kds: '/sonidos/confirm_kds.mp3', // CAMPANA PERSONALIZADA (Boxing Bell)
-    confirm_dds: 'https://assets.mixkit.co/active_storage/sfx/2569/2569-preview.mp3', // Engine-like blip
-    confirm_local: 'https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3', // High-pitch chime
-    confirm_tpv: 'https://assets.mixkit.co/active_storage/sfx/2575/2575-preview.mp3', // Register sound-ish
-    confirm_generic: 'https://pixabay.com/es/sound-effects/pel%C3%ADculas-y-efectos-especiales-descent-whoosh-long-cinematic-sound-effect-405921/',
+    confirm_kds: '/elbuenservir/sonidos/confirm_kds.mp3', // CAMPANA PERSONALIZADA (Boxing Bell)
+    confirm_dds: '/elbuenservir/sonidos/confirm-dds.mp3', // Engine-like blip
+    confirm_local_dispatch: '/elbuenservir/sonidos/confirm-local.mp3', // High-pitch chime
+    confirm_tpv: '/elbuenservir/sonidos/confirm-tpv.mp3', // Register sound-ish
+    confirm_generic: '/elbuenservir/sonidos/confirm-generic.mp3',
 
     // Alerts for new items
     alert_kds: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', // Tech Alert
@@ -24,8 +24,9 @@ const SOUNDS = {
     alert_local: 'https://assets.mixkit.co/active_storage/sfx/2577/2577-preview.mp3', // Notification
 
     // System
-    error: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3',
-    click: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
+    error: '/elbuenservir/sonidos/error.wav',
+    click: '/elbuenservir/sonidos/click.mp3',
+    recycle: '/elbuenservir/sonidos/confirm-recycle.mp3',
 };
 
 class SoundManager {
@@ -49,7 +50,7 @@ class SoundManager {
         Object.entries(SOUNDS).forEach(([key, url]) => {
             const audio = new Audio(url);
             audio.preload = 'auto';
-            audio.volume = 0.12;
+            audio.volume = 0.20;
             this.audioRefs[key] = audio;
         });
     }

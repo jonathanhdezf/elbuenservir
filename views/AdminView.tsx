@@ -28,6 +28,10 @@ interface AdminViewProps {
   setCategories: React.Dispatch<React.SetStateAction<Category[]>>;
   menuItems: MenuItem[];
   setMenuItems: React.Dispatch<React.SetStateAction<MenuItem[]>>;
+  orders: Order[];
+  setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
+  drivers: DeliveryDriver[];
+  setDrivers: React.Dispatch<React.SetStateAction<DeliveryDriver[]>>;
   isDarkMode: boolean;
   setIsDarkMode: (val: boolean) => void;
   onExit: () => void;
@@ -40,25 +44,11 @@ interface Notification {
   timestamp: string;
 }
 
-const INITIAL_ORDERS: Order[] = [
-  { id: 'ORD-101', customerName: 'Juan Pérez', customerPhone: '555-0101', address: 'Mostrador: General', items: [{ id: 'i1', name: 'Platanos Fritos', variationLabel: 'Sencillo', price: 35, quantity: 2 }], total: 70, status: 'kitchen', paymentMethod: 'efectivo', paymentStatus: 'pending', createdAt: new Date(Date.now() - 1200000).toISOString(), source: 'tpv' },
-  { id: 'ORD-102', customerName: 'María García', customerPhone: '555-0102', address: 'Av. Reforma 200', items: [{ id: 'i2', name: 'Fresas con Crema', variationLabel: 'Vaso Grande', price: 65, quantity: 1 }], total: 65, status: 'delivery', assignedDriverId: 'D-002', paymentMethod: 'tarjeta', paymentStatus: 'paid', paidAt: new Date(Date.now() - 3000000).toISOString(), operationNumber: 'TX-9922', ticketNumber: 'TK-001', createdAt: new Date(Date.now() - 3600000).toISOString() },
-  { id: 'ORD-103', customerName: 'Carlos López', customerPhone: '555-0103', address: 'Fracc. Los Pinos 5', items: [{ id: 'i3', name: 'Enchiladas Suizas', variationLabel: 'Orden', price: 120, quantity: 1 }], total: 120, status: 'delivered', paymentMethod: 'transferencia', paymentStatus: 'paid', paidAt: new Date(Date.now() - 6500000).toISOString(), operationNumber: 'BANK-7721', transferStatus: 'recibido', createdAt: new Date(Date.now() - 7200000).toISOString() },
-  { id: 'ORD-104', customerName: 'Ana Martínez', customerPhone: '555-0104', address: 'Mesa: 5', items: [{ id: 'i1', name: 'Platanos Fritos', variationLabel: 'Con Leche', price: 45, quantity: 1 }], total: 45, status: 'kitchen', paymentMethod: 'efectivo', paymentStatus: 'pending', createdAt: new Date(Date.now() - 300000).toISOString(), source: 'tpv' },
-  { id: 'ORD-105', customerName: 'Pedro Sola', customerPhone: '555-0105', address: 'Calle Mayor 22', items: [{ id: 'i2', name: 'Fresas con Crema', variationLabel: 'Vaso Chico', price: 40, quantity: 3 }], total: 120, status: 'ready', paymentMethod: 'tarjeta', paymentStatus: 'pending', createdAt: new Date(Date.now() - 400000).toISOString() },
-  { id: 'ORD-107', customerName: 'Héctor Ruiz', customerPhone: '555-0107', address: 'Privada Los Álamos #14', items: [{ id: 'i1', name: 'Platanos Fritos', variationLabel: 'Sencillo', price: 35, quantity: 4 }], total: 140, status: 'ready', paymentMethod: 'efectivo', paymentStatus: 'paid', paidAt: new Date(Date.now() - 50000).toISOString(), createdAt: new Date(Date.now() - 100000).toISOString() },
-];
+
 
 const INITIAL_CUSTOMERS: Customer[] = [
   { id: 'cust-1', name: 'Juan Pérez', phone: '555-0101', email: 'juan@example.com', totalOrders: 15, totalSpent: 1250.50, lastOrderDate: new Date(Date.now() - 86400000).toISOString(), addresses: ['Calle 10, Col. Centro', 'Av. Juárez 45'] },
   { id: 'cust-2', name: 'María García', phone: '555-0102', email: 'maria@example.com', totalOrders: 8, totalSpent: 740.00, lastOrderDate: new Date(Date.now() - 172800000).toISOString(), addresses: ['Av. Reforma 200'] },
-];
-
-const INITIAL_DRIVERS: DeliveryDriver[] = [
-  { id: 'D-001', name: 'Roberto Sánchez', phone: '555-0201', status: 'active', vehicleType: 'moto', deliveriesCompleted: 154, rating: 4.8 },
-  { id: 'D-002', name: 'Elena Torres', phone: '555-0202', status: 'busy', vehicleType: 'bici', deliveriesCompleted: 89, rating: 4.9 },
-  { id: 'D-003', name: 'Marco Ruíz', phone: '555-0203', status: 'offline', vehicleType: 'auto', deliveriesCompleted: 210, rating: 4.7 },
-  { id: 'D-004', name: 'Lucía Méndez', phone: '555-0204', status: 'active', vehicleType: 'walking', deliveriesCompleted: 45, rating: 4.9 },
 ];
 
 const INITIAL_STAFF: Staff[] = [
@@ -107,6 +97,10 @@ export default function AdminView({
   setMenuItems,
   isDarkMode,
   setIsDarkMode,
+  orders,
+  setOrders,
+  drivers,
+  setDrivers,
   onExit
 }: AdminViewProps) {
   const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
@@ -117,8 +111,6 @@ export default function AdminView({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
-  const [drivers, setDrivers] = useState<DeliveryDriver[]>(INITIAL_DRIVERS);
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
   const [staff, setStaff] = useState<Staff[]>(INITIAL_STAFF);
   const [notificationHistory, setNotificationHistory] = useState<Notification[]>([]);
@@ -856,7 +848,7 @@ export default function AdminView({
             </button>
             <button
               title={isDarkMode ? "Modo Claro" : "Modo Oscuro"}
-              onClick={() => setIsDarkMode(!isDarkMode)}
+              onClick={() => { setIsDarkMode(!isDarkMode); playUISound.playt('alert'); }}
               className="p-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all"
             >
               {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -1238,8 +1230,8 @@ export default function AdminView({
       <div className="h-full flex flex-col space-y-8 animate-in fade-in duration-500">
         <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter uppercase flex items-center"><Truck className="w-10 h-10 mr-4 text-blue-500" />PANTALLA DE REPARTO (DDS)</h2>
-            <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px] mt-2">Logística y Despachos</p>
+            <h2 className="text-[clamp(1.5rem,4vw,2.5rem)] font-black text-gray-900 dark:text-white tracking-tighter uppercase flex items-center"><Truck className="w-8 h-8 md:w-10 md:h-10 mr-4 text-blue-500" />REPARTO (DDS)</h2>
+            <p className="text-gray-500 font-bold uppercase tracking-widest text-[9px] md:text-[10px] mt-2">Logística y Despachos</p>
           </div>
         </div>
 
@@ -1315,12 +1307,12 @@ export default function AdminView({
                       )}
                     </div>
                   </div>
-                  <div className="p-8 pt-0">
+                  <div className="p-6 md:p-8 pt-0">
                     <button
                       onClick={() => driver ? setVerifyingDispatchOrderId(order.id) : setAssigningOrderId(order.id)}
-                      className={`w-full py-8 rounded-[32px] font-black text-xl uppercase tracking-widest shadow-2xl transition-all active:scale-95 flex items-center justify-center space-x-3 ${driver ? 'bg-blue-500 text-white shadow-blue-500/30 hover:bg-blue-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'}`}
+                      className={`w-full py-5 md:py-8 rounded-[24px] md:rounded-[32px] font-black text-base md:text-xl uppercase tracking-widest shadow-xl md:shadow-2xl transition-all active:scale-95 flex items-center justify-center space-x-3 ${driver ? 'bg-blue-500 text-white shadow-blue-500/30 hover:bg-blue-600' : 'bg-gray-100 dark:bg-gray-700 text-gray-400'}`}
                     >
-                      {driver ? <Send className="w-8 h-8" /> : <UserPlus className="w-8 h-8" />}
+                      {driver ? <Send className="w-6 h-6 md:w-8 md:h-8" /> : <UserPlus className="w-6 h-6 md:w-8 md:h-8" />}
                       <span>{driver ? 'Despachar' : 'Asignar'}</span>
                     </button>
                   </div>
@@ -2174,6 +2166,7 @@ export default function AdminView({
               onClick={() => {
                 if (!searchPhone.trim()) {
                   addNotification('Ingrese un número para buscar', 'error');
+                  playUISound('click');
                   return;
                 }
 
@@ -2190,10 +2183,12 @@ export default function AdminView({
                   setRegAddress('');
                   setIsRegisteringCustomer(true);
                   addNotification('Cliente no registrado. Iniciando registro...', 'info');
+                  playUISound('click');
                 }
 
                 setIsSearchingCustomer(false);
                 setSearchPhone('');
+                playUISound('click');
               }}
               className="w-full py-5 bg-primary-500 text-white rounded-3xl font-black uppercase tracking-[0.2em] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-primary-500/25 flex items-center justify-center space-x-3"
             >
@@ -2232,6 +2227,7 @@ export default function AdminView({
                     setTpvDeliveryType('store');
                     setFoundCustomer(null);
                     addNotification('Pedido en mostrador', 'info');
+                    playUISound('click');
                   }}
                   className="w-full p-6 bg-gray-50 dark:bg-gray-900 border-2 border-transparent hover:border-primary-500 rounded-[32px] text-left transition-all active:scale-[0.98] group"
                 >
@@ -2254,6 +2250,7 @@ export default function AdminView({
                       setTpvDeliveryType('delivery');
                       setFoundCustomer(null);
                       addNotification('Dirección cargada', 'success');
+                      playUISound('click');
                     }}
                     className="w-full p-6 bg-gray-50 dark:bg-gray-900 border-2 border-transparent hover:border-emerald-500 rounded-[32px] text-left transition-all active:scale-[0.98] group"
                   >
@@ -2275,6 +2272,7 @@ export default function AdminView({
                     setTpvDeliveryType('delivery');
                     setFoundCustomer(null);
                     addNotification('Ingrese la nueva dirección', 'info');
+                    playUISound('click');
                   }}
                   className="w-full p-6 border-2 border-dashed border-gray-200 dark:border-gray-700 hover:border-blue-500 rounded-[32px] text-center transition-all bg-transparent group"
                 >
@@ -2291,7 +2289,7 @@ export default function AdminView({
             </button>
           </div>
         </div>
-      </div>
+      </div >
     );
   };
 
@@ -2422,7 +2420,16 @@ export default function AdminView({
           <div className="p-8 border-b border-gray-50 dark:border-gray-700 space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
-                <h3 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase leading-none">En Directo TPV</h3>
+                <h3 className="text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase leading-none flex items-center gap-4">
+                  En Directo TPV
+                  <button
+                    title={isDarkMode ? "Modo Claro" : "Modo Oscuro"}
+                    onClick={() => { setIsDarkMode(!isDarkMode); playUISound('click'); }}
+                    className="p-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl shadow-lg hover:scale-105 active:scale-95 transition-all"
+                  >
+                    {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  </button>
+                </h3>
                 <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mt-2">Punto de venta integrado</p>
               </div>
               <div className="relative w-full md:w-72">
@@ -2456,8 +2463,8 @@ export default function AdminView({
                     {item.variations.map((v, idx) => (
                       <button
                         key={v.id}
-                        onClick={() => addToCart(item, idx)}
-                        className="w-full flex justify-between items-center p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 hover:bg-primary-500 hover:text-white transition-all group"
+                        onClick={() => { playUISound('click'); addToCart(item, idx); }}
+                        className="w-full flex justify-between items-center p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 hover:bg-primary-500 dark:hover:bg-primary-500 hover:text-white dark:hover:text-white hover:border-primary-500 dark:hover:border-primary-500 transition-all group"
                       >
                         <span className="text-[10px] font-black uppercase tracking-widest">{v.label}</span>
                         <span className="text-xs font-black">${v.price.toFixed(2)}</span>
@@ -2493,7 +2500,7 @@ export default function AdminView({
           <div className="p-8 border-b border-gray-50 dark:border-gray-700 bg-gray-900 text-white">
             <div className="flex items-center justify-between mb-2">
               <h4 className="text-xl font-black tracking-tighter uppercase">Nueva Orden</h4>
-              <button onClick={() => setTpvCart([])} title="Vaciar carrito" className="p-2 hover:bg-white/10 rounded-xl transition-colors text-gray-400 hover:text-white"><Trash2 className="w-5 h-5" /></button>
+              <button onClick={() => { setTpvCart([]); playUISound('recycle'); }} title="Vaciar carrito" className="p-2 hover:bg-white/10 rounded-xl transition-colors text-gray-400 hover:text-white"><Trash2 className="w-5 h-5" /></button>
             </div>
             <p className="text-[10px] font-black text-primary-400 uppercase tracking-[0.2em]">Resumen de Comanda</p>
           </div>
@@ -2533,6 +2540,7 @@ export default function AdminView({
                   setTpvCustomerPhone('-');
                   setTpvDeliveryType('store');
                   setTpvAddress('Mostrador');
+                  playUISound('click');
                 }}
                 className="flex-1 bg-amber-100 hover:bg-amber-200 text-amber-700 py-3 rounded-xl flex items-center justify-center space-x-2 transition-all"
               >
@@ -2544,6 +2552,7 @@ export default function AdminView({
                 onClick={() => {
                   setSearchPhone('');
                   setIsSearchingCustomer(true);
+                  playUISound('click');
                 }}
                 className="flex-1 bg-purple-100 hover:bg-purple-200 text-purple-700 py-3 rounded-xl flex items-center justify-center space-x-2 transition-all"
               >
@@ -2557,6 +2566,7 @@ export default function AdminView({
                   setRegPhone(tpvCustomerPhone);
                   setRegAddress(tpvAddress === 'Mostrador' ? '' : tpvAddress);
                   setIsRegisteringCustomer(true);
+                  playUISound('click');
                 }}
                 className="flex-1 bg-blue-100 hover:bg-blue-200 text-blue-700 py-3 rounded-xl flex items-center justify-center space-x-2 transition-all"
               >

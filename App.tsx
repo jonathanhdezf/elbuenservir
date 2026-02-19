@@ -1,8 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { MenuItem, Category, TabId } from './types';
+import { MenuItem, Category, TabId, Order, Customer, DeliveryDriver, Staff } from './types';
 import AdminView from './views/AdminView';
 import PublicView from './views/PublicView';
+import MonitorCocina from './views/MonitorCocina';
+import LogisticaDespachos from './views/LogisticaDespachos';
+import TPVView from './views/TPVView';
+import LocalDispatchView from './views/LocalDispatchView.tsx';
+import ControlPanelView from './views/ControlPanelView';
 
 const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-3', name: 'Menú del Día' },
@@ -268,10 +273,41 @@ const INITIAL_ITEMS: MenuItem[] = [
   }
 ];
 
+const INITIAL_ORDERS: Order[] = [
+  { id: 'ORD-101', customerName: 'Juan Pérez', customerPhone: '555-0101', address: 'Mostrador: General', items: [{ id: 'i1', name: 'Platanos Fritos', variationLabel: 'Sencillo', price: 35, quantity: 2 }], total: 70, status: 'kitchen', paymentMethod: 'efectivo', paymentStatus: 'pending', createdAt: new Date(Date.now() - 1200000).toISOString(), source: 'tpv' },
+  { id: 'ORD-102', customerName: 'María García', customerPhone: '555-0102', address: 'Av. Reforma 200', items: [{ id: 'i2', name: 'Fresas con Crema', variationLabel: 'Vaso Grande', price: 65, quantity: 1 }], total: 65, status: 'delivery', assignedDriverId: 'D-002', paymentMethod: 'tarjeta', paymentStatus: 'paid', paidAt: new Date(Date.now() - 3000000).toISOString(), operationNumber: 'TX-9922', ticketNumber: 'TK-001', createdAt: new Date(Date.now() - 3600000).toISOString() },
+  { id: 'ORD-103', customerName: 'Carlos López', customerPhone: '555-0103', address: 'Fracc. Los Pinos 5', items: [{ id: 'i3', name: 'Enchiladas Suizas', variationLabel: 'Orden', price: 120, quantity: 1 }], total: 120, status: 'delivered', paymentMethod: 'transferencia', paymentStatus: 'paid', paidAt: new Date(Date.now() - 6500000).toISOString(), operationNumber: 'BANK-7721', transferStatus: 'recibido', createdAt: new Date(Date.now() - 7200000).toISOString() },
+  { id: 'ORD-104', customerName: 'Ana Martínez', customerPhone: '555-0104', address: 'Mesa: 5', items: [{ id: 'i1', name: 'Platanos Fritos', variationLabel: 'Con Leche', price: 45, quantity: 1 }], total: 45, status: 'kitchen', paymentMethod: 'efectivo', paymentStatus: 'pending', createdAt: new Date(Date.now() - 300000).toISOString(), source: 'tpv' },
+  { id: 'ORD-105', customerName: 'Pedro Sola', customerPhone: '555-0105', address: 'Calle Mayor 22', items: [{ id: 'i2', name: 'Fresas con Crema', variationLabel: 'Vaso Chico', price: 40, quantity: 3 }], total: 120, status: 'ready', paymentMethod: 'tarjeta', paymentStatus: 'pending', createdAt: new Date(Date.now() - 400000).toISOString() },
+  { id: 'ORD-107', customerName: 'Héctor Ruiz', customerPhone: '555-0107', address: 'Privada Los Álamos #14', items: [{ id: 'i1', name: 'Platanos Fritos', variationLabel: 'Sencillo', price: 35, quantity: 4 }], total: 140, status: 'ready', paymentMethod: 'efectivo', paymentStatus: 'paid', paidAt: new Date(Date.now() - 50000).toISOString(), createdAt: new Date(Date.now() - 100000).toISOString() },
+];
+
+const INITIAL_DRIVERS: DeliveryDriver[] = [
+  { id: 'D-001', name: 'Roberto Sánchez', phone: '555-0201', status: 'active', vehicleType: 'moto', deliveriesCompleted: 154, rating: 4.8 },
+  { id: 'D-002', name: 'Elena Torres', phone: '555-0202', status: 'busy', vehicleType: 'bici', deliveriesCompleted: 89, rating: 4.9 },
+  { id: 'D-003', name: 'Marco Ruíz', phone: '555-0203', status: 'offline', vehicleType: 'auto', deliveriesCompleted: 210, rating: 4.7 },
+  { id: 'D-004', name: 'Lucía Méndez', phone: '555-0204', status: 'active', vehicleType: 'walking', deliveriesCompleted: 45, rating: 4.9 },
+];
+const INITIAL_CUSTOMERS: Customer[] = [
+  { id: 'cust-1', name: 'Juan Pérez', phone: '555-0101', email: 'juan@example.com', totalOrders: 15, totalSpent: 1250.50, lastOrderDate: new Date(Date.now() - 86400000).toISOString(), addresses: ['Calle 10, Col. Centro', 'Av. Juárez 45'] },
+  { id: 'cust-2', name: 'María García', phone: '555-0102', email: 'maria@example.com', totalOrders: 8, totalSpent: 740.00, lastOrderDate: new Date(Date.now() - 172800000).toISOString(), addresses: ['Av. Reforma 200'] },
+];
+
+const INITIAL_STAFF: Staff[] = [
+  { id: 'S-000', name: 'Miguel', phone: '555-0300', role: 'admin', status: 'active', password: '123' },
+  { id: 'S-001', name: 'Chef Mario', phone: '555-0301', role: 'cook', status: 'active', password: '456' },
+  { id: 'S-002', name: 'Ana Mesera', phone: '555-0302', role: 'waiter', status: 'active', password: '789' },
+  { id: 'S-003', name: 'Carlos Mesero', phone: '555-0303', role: 'waiter', status: 'active', password: '321' },
+];
 export default function App() {
-  const [view, setView] = useState<'admin' | 'public'>('public');
+  const [view, setView] = useState<'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch' | 'control_panel'>('public');
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(INITIAL_ITEMS);
+  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [drivers, setDrivers] = useState<DeliveryDriver[]>(INITIAL_DRIVERS);
+  const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
+  const [staff, setStaff] = useState<Staff[]>(INITIAL_STAFF);
+  const [tpvEditOrder, setTpvEditOrder] = useState<Order | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
   useEffect(() => {
@@ -282,6 +318,41 @@ export default function App() {
     }
   }, [isDarkMode]);
 
+  if (view === 'control_panel') {
+    return (
+      <ControlPanelView
+        onNavigate={(newView) => setView(newView)}
+        onExit={() => setView('public')}
+        isDarkMode={isDarkMode}
+      />
+    );
+  }
+
+  if (view === 'kitchen') {
+    return (
+      <MonitorCocina
+        orders={orders}
+        setOrders={setOrders}
+        isDarkMode={isDarkMode}
+        setIsDarkMode={setIsDarkMode}
+        onExit={() => setView('control_panel')}
+      />
+    );
+  }
+  if (view === 'logistics') {
+    return (
+      <LogisticaDespachos
+        orders={orders}
+        setOrders={setOrders}
+        drivers={drivers}
+        setDrivers={setDrivers}
+        isDarkMode={isDarkMode}
+        setIsDarkMode={setIsDarkMode}
+        onExit={() => setView('control_panel')}
+      />
+    );
+  }
+
   if (view === 'admin') {
     return (
       <AdminView
@@ -289,9 +360,66 @@ export default function App() {
         setCategories={setCategories}
         menuItems={menuItems}
         setMenuItems={setMenuItems}
+        orders={orders}
+        setOrders={setOrders}
+        drivers={drivers}
+        setDrivers={setDrivers}
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
-        onExit={() => setView('public')}
+        onExit={() => setView('control_panel')}
+      />
+    );
+  }
+
+  if (view === 'tpv') {
+    return (
+      <TPVView
+        categories={categories}
+        menuItems={menuItems}
+        staff={INITIAL_STAFF}
+        customers={customers}
+        orders={orders}
+        onAddCustomer={(customer) => setCustomers(prev => [...prev, customer])}
+        onAddOrder={(order) => {
+          const fullOrder: Order = {
+            ...order,
+            id: order.id || `ORD-${Date.now().toString().slice(-4)}`,
+            createdAt: order.createdAt || new Date().toISOString(),
+            status: order.status || 'kitchen',
+            paymentStatus: order.paymentStatus || 'pending',
+            paymentMethod: order.paymentMethod || 'efectivo',
+            source: 'tpv'
+          } as Order;
+          setOrders(prev => [fullOrder, ...prev]);
+          setTpvEditOrder(null);
+        }}
+        onUpdateOrder={(order) => {
+          setOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...order } : o));
+          setTpvEditOrder(null);
+          setView('local_dispatch');
+        }}
+        initialOrder={tpvEditOrder}
+        isDarkMode={isDarkMode}
+        setIsDarkMode={setIsDarkMode}
+        onExit={() => {
+          setTpvEditOrder(null);
+          setView('control_panel');
+        }}
+      />
+    )
+  }
+
+  if (view === 'local_dispatch') {
+    return (
+      <LocalDispatchView
+        orders={orders}
+        staff={staff}
+        onUpdateOrder={(updated) => setOrders(orders.map(o => o.id === updated.id ? { ...o, ...updated } : o))}
+        onEditOrder={(order) => {
+          setTpvEditOrder(order);
+          setView('tpv');
+        }}
+        setView={setView}
       />
     );
   }
@@ -300,7 +428,8 @@ export default function App() {
     <PublicView
       categories={categories}
       menuItems={menuItems}
-      onEnterAdmin={() => setView('admin')}
+      onEnterControlPanel={() => setView('control_panel')}
     />
   );
 }
+

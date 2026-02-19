@@ -62,11 +62,11 @@ export interface Order {
 export interface Customer {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phone: string;
-  totalOrders: number;
-  totalSpent: number;
-  lastOrderDate: string;
+  totalOrders?: number;
+  totalSpent?: number;
+  lastOrderDate?: string;
   addresses: string[];
 }
 
@@ -90,6 +90,7 @@ export interface Staff {
   phone: string;
   role: StaffRole;
   status: 'active' | 'offline';
+  password?: string;
 }
 
 export type AdminSection = 'dashboard' | 'kitchen' | 'kds' | 'dds' | 'menu' | 'orders' | 'customers' | 'reports' | 'driver_dashboard' | 'tpv' | 'local_dispatch' | 'staff_management';

@@ -164,8 +164,8 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({ orders, drivers, custom
                             return (
                                 <div key={i} className="flex-1 flex flex-col items-center group">
                                     <div
-                                        className={`w-full rounded-t-xl transition-all duration-500 group-hover:opacity-80 relative ${isMax ? 'bg-primary-500' : 'bg-gray-100 dark:bg-gray-700'} h-[var(--bar-height)]`}
-                                        style={{ '--bar-height': `${height}%` } as React.CSSProperties}
+                                        className={`w-full rounded-t-xl transition-all duration-500 group-hover:opacity-80 relative ${isMax ? 'bg-primary-500' : 'bg-gray-100 dark:bg-gray-700'}`}
+                                        style={{ height: `${height}%` }}
                                     >
                                         <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 font-bold">
                                             ${(height * 100).toFixed(0)}
@@ -197,8 +197,8 @@ const ReportsSection: React.FC<ReportsSectionProps> = ({ orders, drivers, custom
                                         <div
                                             className={`h-full rounded-full transition-all duration-1000 ${method === 'efectivo' ? 'bg-emerald-500' :
                                                 method === 'tarjeta' ? 'bg-blue-500' : 'bg-purple-500'
-                                                } w-[var(--bar-width)]`}
-                                            style={{ '--bar-width': `${percentage}%` } as React.CSSProperties}
+                                                }`}
+                                            style={{ width: `${percentage}%` }}
                                         ></div>
                                     </div>
                                 </div>
