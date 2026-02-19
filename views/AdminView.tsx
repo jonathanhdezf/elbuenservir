@@ -170,7 +170,7 @@ export default function AdminView({
     click: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
     success: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
     error: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3',
-    kitchen: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
+    kitchen: 'https://assets.mixkit.co/active_storage/sfx/1070/1070-preview.mp3',
     delivery: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
     local: 'https://assets.mixkit.co/active_storage/sfx/2570/2570-preview.mp3',
     notification: 'https://assets.mixkit.co/active_storage/sfx/2575/2575-preview.mp3',
@@ -225,7 +225,7 @@ export default function AdminView({
 
     // Ring bell for kitchen or errors, otherwise check if in TPV
     if (type === 'kitchen' || type === 'error' || activeSection !== 'tpv') {
-      playUISound(type === 'kitchen' ? 'notification' : type === 'error' ? 'error' : 'notification');
+      playUISound(type === 'kitchen' ? 'kitchen' : type === 'error' ? 'error' : 'notification');
     }
   }, [playUISound, activeSection]);
 
