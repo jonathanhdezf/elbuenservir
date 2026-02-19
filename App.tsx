@@ -7,6 +7,12 @@ import PublicView from './views/PublicView';
 const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-3', name: 'Menú del Día' },
   { id: 'cat-5', name: 'Para Acompañar' },
+  { id: 'cat-caldos', name: 'Caldos' },
+  { id: 'cat-cerdo', name: 'Cerdo' },
+  { id: 'cat-pollo', name: 'Pollo' },
+  { id: 'cat-carnes', name: 'Carnes' },
+  { id: 'cat-mariscos', name: 'Mariscos' },
+  { id: 'cat-desayunos', name: 'Desayunos' },
   { id: 'cat-1', name: 'Postres' },
   { id: 'cat-2', name: 'Bebidas' },
 ];
@@ -14,7 +20,7 @@ const INITIAL_CATEGORIES: Category[] = [
 const INITIAL_ITEMS: MenuItem[] = [
   // MENÚ DEL DÍA
   {
-    id: 'm1', categoryId: 'cat-3', name: 'Fresas con crema',
+    id: 'm1', categoryId: 'cat-1', name: 'Fresas con crema',
     description: 'Fresas frescas con crema especial de la casa.',
     isActive: true,
     variations: [
@@ -23,7 +29,7 @@ const INITIAL_ITEMS: MenuItem[] = [
     ]
   },
   {
-    id: 'm2', categoryId: 'cat-3', name: 'Jugo de naranja 🍊',
+    id: 'm2', categoryId: 'cat-2', name: 'Jugo de naranja 🍊',
     description: 'Jugo 100% natural recién exprimido.',
     isActive: true,
     variations: [
@@ -32,13 +38,13 @@ const INITIAL_ITEMS: MenuItem[] = [
     ]
   },
   {
-    id: 'm3', categoryId: 'cat-3', name: 'Chilpozo de res',
+    id: 'm3', categoryId: 'cat-caldos', name: 'Chilpozo de res',
     description: 'Caldo de res tradicional con verduras y un toque de picante.',
     isActive: true,
     variations: [{ id: 'm3v1', label: 'Platillo', price: 95 }]
   },
   {
-    id: 'm4', categoryId: 'cat-3', name: 'Pancita',
+    id: 'm4', categoryId: 'cat-caldos', name: 'Pancita',
     description: 'Tradicional pancita de res bien sazonada.',
     isActive: true,
     variations: [
@@ -47,31 +53,31 @@ const INITIAL_ITEMS: MenuItem[] = [
     ]
   },
   {
-    id: 'm5', categoryId: 'cat-3', name: 'Chicharrón maciza en salsa verde',
+    id: 'm5', categoryId: 'cat-cerdo', name: 'Chicharrón maciza en salsa verde',
     description: 'Chicharrón de cerdo en salsa verde casera.',
     isActive: true,
     variations: [{ id: 'm5v1', label: 'Platillo', price: 90 }]
   },
   {
-    id: 'm6', categoryId: 'cat-3', name: 'Pipian rojo de pollo',
+    id: 'm6', categoryId: 'cat-pollo', name: 'Pipian rojo de pollo',
     description: 'Pollo en salsa de pipián rojo tradicional (Pierna o muslo).',
     isActive: true,
     variations: [{ id: 'm6v1', label: 'Platillo', price: 90 }]
   },
   {
-    id: 'm7', categoryId: 'cat-3', name: 'Costilla enchipotlada',
+    id: 'm7', categoryId: 'cat-cerdo', name: 'Costilla enchipotlada',
     description: 'Costillas de cerdo bañadas en salsa de chipotle.',
     isActive: true,
     variations: [{ id: 'm7v1', label: 'Platillo', price: 90 }]
   },
   {
-    id: 'm8', categoryId: 'cat-3', name: 'Pechuga a la diabla',
+    id: 'm8', categoryId: 'cat-pollo', name: 'Pechuga a la diabla',
     description: 'Pechuga de pollo rellena de queso panela en salsa diabla.',
     isActive: true,
     variations: [{ id: 'm8v1', label: 'Platillo', price: 90 }]
   },
   {
-    id: 'm9', categoryId: 'cat-3', name: 'Pozole (pollo)',
+    id: 'm9', categoryId: 'cat-caldos', name: 'Pozole (pollo)',
     description: 'Pozole blanco de pollo con sus complementos tradicionales.',
     isActive: true,
     variations: [
@@ -80,13 +86,22 @@ const INITIAL_ITEMS: MenuItem[] = [
     ]
   },
   {
-    id: 'm10', categoryId: 'cat-3', name: 'Pechuga en chiltepin',
+    id: 'm-pozole-puerco', categoryId: 'cat-caldos', name: 'Pozole (puerco)',
+    description: 'Pozole rojo de puerco con sus complementos tradicionales.',
+    isActive: true,
+    variations: [
+      { id: 'm-pozole-puerco-v1', label: 'Medio', price: 70 },
+      { id: 'm-pozole-puerco-v2', label: 'Litro', price: 90 }
+    ]
+  },
+  {
+    id: 'm10', categoryId: 'cat-pollo', name: 'Pechuga en chiltepin',
     description: 'Pechuga rellena de queso panela en salsa de chiltepin.',
     isActive: true,
     variations: [{ id: 'm10v1', label: 'Platillo', price: 90 }]
   },
   {
-    id: 'm11', categoryId: 'cat-3', name: 'Filete de pescado',
+    id: 'm11', categoryId: 'cat-mariscos', name: 'Filete de pescado',
     description: 'Filete de pescado fresco preparado al gusto.',
     isActive: true,
     variations: [
@@ -95,7 +110,7 @@ const INITIAL_ITEMS: MenuItem[] = [
     ]
   },
   {
-    id: 'm12', categoryId: 'cat-3', name: 'Camarones al gusto',
+    id: 'm12', categoryId: 'cat-mariscos', name: 'Camarones al gusto',
     description: 'Orden con 6 piezas. Preparados al gusto.',
     isActive: true,
     variations: [
@@ -106,13 +121,13 @@ const INITIAL_ITEMS: MenuItem[] = [
     ]
   },
   {
-    id: 'm13', categoryId: 'cat-3', name: 'Longaniza frita con papas',
+    id: 'm13', categoryId: 'cat-cerdo', name: 'Longaniza frita con papas',
     description: 'Longaniza frita acompañada de papas cambray.',
     isActive: true,
     variations: [{ id: 'm13v1', label: 'Platillo', price: 90 }]
   },
   {
-    id: 'm14', categoryId: 'cat-3', name: 'Chuleta ahumada frita',
+    id: 'm14', categoryId: 'cat-cerdo', name: 'Chuleta ahumada frita',
     description: 'Deliciosa chuleta ahumada frita.',
     isActive: true,
     variations: [
@@ -121,7 +136,7 @@ const INITIAL_ITEMS: MenuItem[] = [
     ]
   },
   {
-    id: 'm15', categoryId: 'cat-3', name: 'Pechugas rellenas de jamón y queso',
+    id: 'm15', categoryId: 'cat-pollo', name: 'Pechugas rellenas de jamón y queso',
     description: 'Pechugas de pollo rellenas de jamón y queso amarillo.',
     isActive: true,
     variations: [
@@ -130,7 +145,7 @@ const INITIAL_ITEMS: MenuItem[] = [
     ]
   },
   {
-    id: 'm16', categoryId: 'cat-3', name: 'Queso asado',
+    id: 'm16', categoryId: 'cat-desayunos', name: 'Queso asado',
     description: 'Queso asado de alta calidad.',
     isActive: true,
     variations: [
@@ -139,19 +154,19 @@ const INITIAL_ITEMS: MenuItem[] = [
     ]
   },
   {
-    id: 'm17', categoryId: 'cat-3', name: 'Chuleta ahumada',
+    id: 'm17', categoryId: 'cat-cerdo', name: 'Chuleta ahumada',
     description: 'Chuleta ahumada al natural.',
     isActive: true,
     variations: [{ id: 'm17v1', label: 'Platillo', price: 85 }]
   },
   {
-    id: 'm18', categoryId: 'cat-3', name: 'Omelette',
+    id: 'm18', categoryId: 'cat-desayunos', name: 'Omelette',
     description: 'Omelette de huevo al gusto (Jamón, Pollo o Salchicha).',
     isActive: true,
     variations: [{ id: 'm18v1', label: 'Platillo', price: 90 }]
   },
   {
-    id: 'm19', categoryId: 'cat-3', name: 'Tampiqueñas',
+    id: 'm19', categoryId: 'cat-carnes', name: 'Tampiqueñas',
     description: 'Servido con arroz, frijoles, 3 enchiladas rojas y papas francesas. (Sin tortillas)',
     isActive: true,
     variations: [
@@ -161,19 +176,19 @@ const INITIAL_ITEMS: MenuItem[] = [
     ]
   },
   {
-    id: 'm20', categoryId: 'cat-3', name: 'Dedos de queso',
+    id: 'm20', categoryId: 'cat-desayunos', name: 'Dedos de queso',
     description: '4 piezas rellenas de queso panela.',
     isActive: true,
     variations: [{ id: 'm20v1', label: 'Orden', price: 100 }]
   },
   {
-    id: 'm21', categoryId: 'cat-3', name: 'Mole con pollo',
+    id: 'm21', categoryId: 'cat-pollo', name: 'Mole con pollo',
     description: 'Tradicional mole poblano con pollo (Pierna o muslo).',
     isActive: true,
     variations: [{ id: 'm21v1', label: 'Platillo', price: 90 }]
   },
   {
-    id: 'm22', categoryId: 'cat-3', name: 'Milanesa de pollo',
+    id: 'm22', categoryId: 'cat-pollo', name: 'Milanesa de pollo',
     description: 'Milanesa de pollo dorada.',
     isActive: true,
     variations: [
@@ -182,7 +197,7 @@ const INITIAL_ITEMS: MenuItem[] = [
     ]
   },
   {
-    id: 'm23', categoryId: 'cat-3', name: 'Chilaquiles',
+    id: 'm23', categoryId: 'cat-desayunos', name: 'Chilaquiles',
     description: 'Con pollo deshebrado, queso, crema, aguacate y cebolla. (Sin guarnición)',
     isActive: true,
     variations: [
@@ -193,7 +208,7 @@ const INITIAL_ITEMS: MenuItem[] = [
     ]
   },
   {
-    id: 'm24', categoryId: 'cat-3', name: 'Enchiladas suizas',
+    id: 'm24', categoryId: 'cat-desayunos', name: 'Enchiladas suizas',
     description: '5 piezas en salsa verde cremosa. (Sin guarnición)',
     isActive: true,
     variations: [{ id: 'm24v1', label: 'Orden', price: 90 }]
@@ -228,6 +243,28 @@ const INITIAL_ITEMS: MenuItem[] = [
     description: 'Arroz rojo tradicional mexicano.',
     isActive: true,
     variations: [{ id: 'a5v1', label: 'Orden', price: 0 }]
+  },
+  // BEBIDAS
+  {
+    id: 'b1', categoryId: 'cat-2', name: 'Ponche de fruta',
+    description: 'Tradicional ponche de frutas calientito.',
+    isActive: true,
+    variations: [
+      { id: 'b1v1', label: 'Chico', price: 25 },
+      { id: 'b1v2', label: 'Medio', price: 30 },
+      { id: 'b1v3', label: 'Litro', price: 70 }
+    ]
+  },
+  {
+    id: 'b2', categoryId: 'cat-2', name: 'Coca Cola',
+    description: 'Refresco bien frío.',
+    isActive: true,
+    variations: [
+      { id: 'b2v1', label: '200 ml', price: 15 },
+      { id: 'b2v2', label: '350 ml', price: 20 },
+      { id: 'b2v3', label: '400 ml', price: 25 },
+      { id: 'b2v4', label: '600 ml', price: 30 }
+    ]
   }
 ];
 

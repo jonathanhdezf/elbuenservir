@@ -15,7 +15,9 @@ import {
   Bike,
   ChefHat,
   Monitor,
-  Truck
+  Truck,
+  Store,
+  Shield
 } from 'lucide-react';
 import { AdminSection } from '../types';
 
@@ -27,6 +29,7 @@ interface SidebarProps {
   onExitToSite?: () => void;
   activeSection: AdminSection;
   onSectionChange: (section: AdminSection) => void;
+  isFullScreen?: boolean; // New prop
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
@@ -36,20 +39,22 @@ const Sidebar: React.FC<SidebarProps> = ({
   toggleDarkMode,
   onExitToSite,
   activeSection,
-  onSectionChange
+  onSectionChange,
+  badges = {} as Partial<Record<AdminSection, number>>,
+  isFullScreen = false // Default
 }) => {
   const menuItems: { icon: any; label: string; id: AdminSection; badge?: number }[] = [
     { icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard' },
     { icon: Monitor, label: 'En Directo TPV', id: 'tpv' },
-    { icon: UtensilsCrossed, label: 'Comandas', id: 'kds', badge: 3 },
-    { icon: Truck, label: 'Reparto', id: 'dds' },
+    { icon: Store, label: 'Despacho Local', id: 'local_dispatch', badge: badges['local_dispatch'] },
+    { icon: UtensilsCrossed, label: 'Comandas', id: 'kds', badge: badges['kds'] },
+    { icon: Truck, label: 'Reparto', id: 'dds', badge: badges['dds'] },
     { icon: Bike, label: 'Panel Repartidores', id: 'driver_dashboard' },
-    { icon: ShoppingBasket, label: 'Pedidos', id: 'orders' },
-    { icon: ChefHat, label: 'Logística Cocina', id: 'kitchen' },
+    { icon: ShoppingBasket, label: 'Pedidos', id: 'orders', badge: badges['orders'] },
     { icon: UtensilsCrossed, label: 'Editor de Menú', id: 'menu' },
-    { icon: Users, label: 'Equipo Reparto', id: 'delivery_drivers' },
     { icon: Users, label: 'Clientes', id: 'customers' },
     { icon: BarChart3, label: 'Reportes', id: 'reports' },
+    { icon: Shield, label: 'Gestión Personal', id: 'staff_management' },
   ];
 
 
@@ -57,13 +62,13 @@ const Sidebar: React.FC<SidebarProps> = ({
     <aside className={`
       fixed inset-y-0 left-0 w-72 bg-white dark:bg-[#0f172a] border-r border-gray-100 dark:border-gray-800
       transform transition-transform duration-300 ease-in-out z-50 flex flex-col
-      lg:relative lg:translate-x-0
+      ${!isFullScreen ? 'lg:relative lg:translate-x-0' : ''}
       ${isOpen ? 'translate-x-0' : '-translate-x-full'}
     `}>
       <button
         onClick={onClose}
         title="Cerrar menú"
-        className="lg:hidden absolute top-4 right-4 p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg"
+        className={`${!isFullScreen ? 'lg:hidden' : ''} absolute top-4 right-4 p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg`}
       >
         <X className="w-6 h-6" />
       </button>
@@ -74,11 +79,11 @@ const Sidebar: React.FC<SidebarProps> = ({
           <img
             alt="El Buen Servir Logo"
             className="relative w-24 h-24 rounded-full shadow-xl mb-4 object-cover border-4 border-white dark:border-gray-800"
-            src="https://picsum.photos/seed/restaurant/200"
+            src={`${(import.meta as any).env.BASE_URL}logo.png`}
           />
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-gray-800 dark:text-white">El Buen Servir</h1>
-        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-2 uppercase tracking-[0.2em] font-bold">Admin Panel</p>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-2 uppercase tracking-[0.2em] font-bold">Panel de Administrador</p>
       </div>
 
       <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto custom-scrollbar">
@@ -95,11 +100,11 @@ const Sidebar: React.FC<SidebarProps> = ({
           >
             <item.icon className={`w-5 h-5 mr-3.5 ${activeSection === item.id ? 'text-white' : 'text-gray-400 group-hover:text-primary-500'}`} />
             <span>{item.label}</span>
-            {item.badge && activeSection !== item.id && (
-              <span className="ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full ring-2 ring-white dark:ring-gray-900">
+            {item.badge ? (
+              <span className={`ml-auto bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full ring-2 ring-white dark:ring-gray-900 ${activeSection === item.id ? 'bg-white text-primary-600 ring-primary-400' : ''}`}>
                 {item.badge}
               </span>
-            )}
+            ) : null}
           </button>
         ))}
 

@@ -33,6 +33,7 @@ export interface OrderItem {
   variationLabel: string;
   price: number;
   quantity: number;
+  isOld?: boolean;
 }
 
 export interface Order {
@@ -53,6 +54,9 @@ export interface Order {
   transferStatus?: TransferStatus;
   dispatchedAt?: string;
   source?: 'online' | 'tpv';
+  waiterId?: string;
+  cashReceived?: number;
+  change?: number;
 }
 
 export interface Customer {
@@ -63,6 +67,7 @@ export interface Customer {
   totalOrders: number;
   totalSpent: number;
   lastOrderDate: string;
+  addresses: string[];
 }
 
 export type VehicleType = 'moto' | 'bici' | 'auto' | 'walking';
@@ -77,4 +82,14 @@ export interface DeliveryDriver {
   rating: number;
 }
 
-export type AdminSection = 'dashboard' | 'kitchen' | 'kds' | 'dds' | 'menu' | 'orders' | 'customers' | 'delivery_drivers' | 'reports' | 'driver_dashboard' | 'tpv';
+export type StaffRole = 'waiter' | 'cook' | 'admin' | 'cashier' | 'driver';
+
+export interface Staff {
+  id: string;
+  name: string;
+  phone: string;
+  role: StaffRole;
+  status: 'active' | 'offline';
+}
+
+export type AdminSection = 'dashboard' | 'kitchen' | 'kds' | 'dds' | 'menu' | 'orders' | 'customers' | 'reports' | 'driver_dashboard' | 'tpv' | 'local_dispatch' | 'staff_management';
