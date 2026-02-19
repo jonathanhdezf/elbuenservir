@@ -112,13 +112,7 @@ export default function AdminView({
   const [activeTab, setActiveTab] = useState<TabId>(categories[0]?.id || '');
   const isFullScreen = true;
 
-  // Logistics password protection
-  const LOGISTICS_PASSWORD = '1234';
-  const LOGISTICS_SECTIONS: AdminSection[] = ['kds', 'dds', 'local_dispatch', 'driver_dashboard'];
-  const [unlockedSections, setUnlockedSections] = useState<Set<AdminSection>>(new Set());
-  const [logisticsPasswordInput, setLogisticsPasswordInput] = useState('');
-  const [logisticsPasswordError, setLogisticsPasswordError] = useState(false);
-  const [pendingLogisticsSection, setPendingLogisticsSection] = useState<AdminSection | null>(null);
+  // Modal states
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -2710,13 +2704,6 @@ export default function AdminView({
         isDarkMode={isDarkMode} toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
         onExitToSite={onExit} activeSection={activeSection}
         onSectionChange={(s) => {
-          if (LOGISTICS_SECTIONS.includes(s) && !unlockedSections.has(s)) {
-            setPendingLogisticsSection(s);
-            setLogisticsPasswordInput('');
-            setLogisticsPasswordError(false);
-            setIsSidebarOpen(false);
-            return;
-          }
           setActiveSection(s);
           setIsSidebarOpen(false);
           playUISound('click');
@@ -2863,81 +2850,7 @@ export default function AdminView({
           <PublicView categories={categories} menuItems={menuItems} isPreview />
         </div>
       )}
-      {/* Logistics Password Gate Modal */}
-      {pendingLogisticsSection && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-6 animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-xl" onClick={() => setPendingLogisticsSection(null)}></div>
-          <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[40px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="relative p-10 flex flex-col items-center text-center">
-              <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
-              <div className="w-20 h-20 rounded-[24px] bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mb-6 shadow-xl shadow-blue-500/30">
-                <Shield className="w-10 h-10 text-white" />
-              </div>
-              <h4 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase mb-1">Acceso Restringido</h4>
-              <p className="text-sm text-gray-500 font-medium mb-2">
-                {pendingLogisticsSection === 'kds' ? 'Monitor KDS' :
-                  pendingLogisticsSection === 'dds' ? 'Repartos' :
-                    pendingLogisticsSection === 'local_dispatch' ? 'Despacho Local' :
-                      'Panel Repartidores'}
-              </p>
-              <p className="text-xs text-gray-400 mb-8">Ingresa la contraseña de logística para continuar</p>
 
-              <input
-                type="password"
-                value={logisticsPasswordInput}
-                onChange={(e) => { setLogisticsPasswordInput(e.target.value); setLogisticsPasswordError(false); }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    if (logisticsPasswordInput === LOGISTICS_PASSWORD) {
-                      setUnlockedSections(prev => new Set([...prev, pendingLogisticsSection!]));
-                      setActiveSection(pendingLogisticsSection!);
-                      setPendingLogisticsSection(null);
-                      playUISound('success');
-                    } else {
-                      setLogisticsPasswordError(true);
-                      playUISound('error');
-                    }
-                  }
-                }}
-                placeholder="Contraseña"
-                className={`w-full bg-gray-50 dark:bg-gray-800 border-2 rounded-2xl px-6 py-5 font-black text-center text-lg uppercase tracking-[0.3em] mb-4 focus:border-blue-500 outline-none transition-all ${logisticsPasswordError ? 'border-red-400 animate-shake' : 'border-gray-100 dark:border-gray-700'}`}
-                autoFocus
-              />
-
-              {logisticsPasswordError && (
-                <p className="text-xs font-bold text-red-500 mb-4 flex items-center bg-red-50 dark:bg-red-950/30 px-4 py-2 rounded-xl">
-                  <AlertCircle className="w-3.5 h-3.5 mr-2" /> Contraseña incorrecta
-                </p>
-              )}
-
-              <div className="flex space-x-3 w-full">
-                <button
-                  onClick={() => setPendingLogisticsSection(null)}
-                  className="flex-1 py-4 bg-gray-100 dark:bg-gray-800 text-gray-500 rounded-2xl font-black uppercase tracking-widest text-xs transition-all hover:bg-gray-200 dark:hover:bg-gray-700"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => {
-                    if (logisticsPasswordInput === LOGISTICS_PASSWORD) {
-                      setUnlockedSections(prev => new Set([...prev, pendingLogisticsSection!]));
-                      setActiveSection(pendingLogisticsSection!);
-                      setPendingLogisticsSection(null);
-                      playUISound('success');
-                    } else {
-                      setLogisticsPasswordError(true);
-                      playUISound('error');
-                    }
-                  }}
-                  className="flex-1 py-4 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-xl shadow-blue-500/20 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-95"
-                >
-                  Ingresar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
