@@ -13,6 +13,7 @@ import {
   History, Wallet, ArrowUpRight, Store, Utensils, Zap, Save, UserCheck, Scan, Shield, Sun, Moon
 } from 'lucide-react';
 import { MenuItem, Category, TabId, Order, OrderItem, OrderStatus, Customer, AdminSection, DeliveryDriver, VehicleType, PaymentMethod, PaymentStatus, TransferStatus, Staff, StaffRole } from '../types';
+import { soundManager, AudioAction } from '../utils/soundManager';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
 import CategoryTabs from '../components/CategoryTabs';
@@ -166,59 +167,11 @@ export default function AdminView({
     return () => clearInterval(timer);
   }, []);
 
-  const SOUND_MAP = useMemo(() => ({
-    click: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
-    success: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
-    error: 'https://assets.mixkit.co/active_storage/sfx/2573/2573-preview.mp3',
-    kitchen: 'https://assets.mixkit.co/active_storage/sfx/2567/2567-preview.mp3', // Very short digital blip
-    delivery: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
-    local: 'https://assets.mixkit.co/active_storage/sfx/2570/2570-preview.mp3',
-    notification: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
-    addToCart: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'
-  }), []);
-
-  // Professional sound manager: pre-load and avoid overlaps
-  const audioRefs = useRef<Record<string, HTMLAudioElement>>({});
-
-  useEffect(() => {
-    // Lazy pre-load and singleton instances to prevent multiple Audio tags of same sound
-    Object.entries(SOUND_MAP).forEach(([key, url]) => {
-      if (!audioRefs.current[key]) {
-        const audio = new Audio(url as string);
-        audio.volume = 0.12;
-        audio.preload = 'auto';
-        audioRefs.current[key] = audio;
-      }
-    });
-  }, [SOUND_MAP]);
-
-  const lastSoundPlayedAt = useRef<number>(0);
-
-  const playUISound = useCallback((type: keyof typeof SOUND_MAP) => {
-    const now = Date.now();
-    // High-safety cooldown of 500ms to avoid audio hardware stuttering
-    if (now - lastSoundPlayedAt.current < 500) return;
-
-    try {
-      const audio = audioRefs.current[type];
-      if (audio) {
-        // Senior fix: Only reset if it was already playing, otherwise just play
-        if (!audio.paused) {
-          audio.pause();
-          audio.currentTime = 0;
-        }
-        lastSoundPlayedAt.current = now;
-        const playPromise = audio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => {
-            // Silently ignore: usually browser policy preventing auto-play before interaction
-          });
-        }
-      }
-    } catch (e) {
-      console.warn('Sound manager error', e);
-    }
-  }, []);
+  // UI Audio logic using the Centralized Sound Model
+  const playUISound = useCallback((action: AudioAction, section?: AdminSection) => {
+    // Current section is used as context if not provided
+    soundManager.play(action, section || activeSection);
+  }, [activeSection]);
 
   const addNotification = useCallback((message: string, type: 'success' | 'error' | 'info' | 'kitchen' = 'success') => {
     // Prevent duplicate messages in the current view to avoid stacking
@@ -267,13 +220,13 @@ export default function AdminView({
 
   useEffect(() => {
     if (badges.kds > prevCounts.current.kds) {
-      playUISound('kitchen');
+      playUISound('alert', 'kds');
     }
     if (badges.dds > prevCounts.current.dds) {
-      playUISound('delivery');
+      playUISound('alert', 'dds');
     }
     if (badges.local_dispatch > prevCounts.current.local) {
-      playUISound('local');
+      playUISound('alert', 'local_dispatch');
     }
 
     prevCounts.current = {
@@ -737,7 +690,7 @@ export default function AdminView({
                     <Printer className="w-4 h-4" /> Ticket
                   </button>
                   <button
-                    onClick={() => updateOrderStatus(viewingOrder.id, 'delivered')}
+                    onClick={() => { updateOrderStatus(viewingOrder.id, 'delivered'); playUISound('confirm', 'local_dispatch'); }}
                     disabled={viewingOrder.status === 'delivered'}
                     className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 active:scale-95 disabled:opacity-40 transition-all flex items-center justify-center gap-2"
                   >
@@ -895,7 +848,7 @@ export default function AdminView({
           </div>
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => playUISound('kitchen')}
+              onClick={() => playUISound('alert', 'kds')}
               className="px-6 py-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 flex items-center space-x-3 hover:bg-gray-50 active:scale-95 transition-all"
             >
               <Bell className="w-5 h-5 text-amber-500 animate-swing" />
@@ -961,7 +914,7 @@ export default function AdminView({
                   </div>
                   <div className="p-8 pt-0">
                     <button
-                      onClick={() => { updateOrderStatus(order.id, 'ready'); playUISound('kitchen'); }}
+                      onClick={() => { updateOrderStatus(order.id, 'ready'); playUISound('confirm', 'kds'); }}
                       className={`w-full py-8 rounded-[32px] font-black text-xl uppercase tracking-widest shadow-2xl transition-all active:scale-95 flex items-center justify-center space-x-3 bg-emerald-500 text-white shadow-emerald-500/30 hover:bg-emerald-600`}
                     >
                       <CheckCircle className="w-8 h-8" />
@@ -1234,6 +1187,7 @@ export default function AdminView({
                             return newInputs;
                           });
                           addNotification(`Pedido ${currentOrder.id} entregado y pagado`, 'success');
+                          playUISound('confirm', 'driver_panel');
                         }}
                         disabled={!isInputValid()}
                         className={`w-full py-6 rounded-[32px] font-black text-lg uppercase tracking-widest shadow-2xl transition-all active:scale-95 flex items-center justify-center space-x-3 ${isInputValid() ? 'bg-emerald-500 text-white shadow-emerald-500/30 hover:bg-emerald-600' : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed shadow-none'}`}
@@ -1273,7 +1227,7 @@ export default function AdminView({
         setDispatchTicketInput('');
         setDispatchError(null);
         addNotification(`Orden ${orderId} despachada correctamente`);
-        playUISound('success');
+        playUISound('confirm', 'dds');
       } else {
         setDispatchError('Número de orden incorrecto');
         playUISound('error');
@@ -2229,7 +2183,7 @@ export default function AdminView({
                   setTpvCustomerPhone(searchPhone.trim());
                   setTpvCustomerName(customer.name);
                   setFoundCustomer(customer);
-                  playUISound('success');
+                  playUISound('click');
                 } else {
                   setRegPhone(searchPhone.trim());
                   setRegName('');
@@ -2368,7 +2322,7 @@ export default function AdminView({
           quantity: 1
         }];
       });
-      playUISound('addToCart');
+      playUISound('click');
       addNotification(`${item.name} (${variation.label}) añadido`, 'success');
     };
 
@@ -2411,8 +2365,10 @@ export default function AdminView({
         }));
 
         addNotification(`Pedido agregado a Mesa ${tableNumber}`, 'kitchen');
+        playUISound('confirm', 'tpv');
       } else {
         // CREATE logic: New order
+        playUISound('confirm', 'tpv');
         const finalAddress = tpvDeliveryType === 'store' ? `Mostrador: ${tpvAddress || 'Sin notas'}` :
           isTable ? `Mesa: ${tpvAddress || 'Sin número'}` :
             tpvAddress || 'Dirección no especificada';
@@ -2730,7 +2686,7 @@ export default function AdminView({
         onSectionChange={(s) => {
           setActiveSection(s);
           setIsSidebarOpen(false);
-          playUISound('click');
+          playUISound('navigation');
         }}
         badges={badges}
         isFullScreen={isFullScreen}
@@ -2775,7 +2731,7 @@ export default function AdminView({
                   setTpvAddress(tableNum.toString());
                   setTpvWaiterId(waiterId);
                   setActiveSection('tpv');
-                  playUISound('click');
+                  playUISound('navigation');
                 }}
                 staff={staff}
                 lockedWaiterId={undefined}
