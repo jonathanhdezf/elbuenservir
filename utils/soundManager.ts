@@ -12,11 +12,11 @@ const SOUNDS = {
     navigation: 'https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3',
 
     // Section-specific confirmation sounds
-    confirm_kds: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3', // Sharp success
+    confirm_kds: '/sonidos/confirm_kds.mp3', // CAMPANA PERSONALIZADA (Boxing Bell)
     confirm_dds: 'https://assets.mixkit.co/active_storage/sfx/2569/2569-preview.mp3', // Engine-like blip
     confirm_local: 'https://assets.mixkit.co/active_storage/sfx/2578/2578-preview.mp3', // High-pitch chime
     confirm_tpv: 'https://assets.mixkit.co/active_storage/sfx/2575/2575-preview.mp3', // Register sound-ish
-    confirm_generic: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
+    confirm_generic: 'https://pixabay.com/es/sound-effects/pel%C3%ADculas-y-efectos-especiales-descent-whoosh-long-cinematic-sound-effect-405921/',
 
     // Alerts for new items
     alert_kds: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', // Tech Alert
