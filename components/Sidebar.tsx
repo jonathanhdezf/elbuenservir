@@ -18,7 +18,8 @@ import {
   Store,
   Shield,
   ChevronDown,
-  Package
+  Package,
+  Briefcase
 } from 'lucide-react';
 import { AdminSection } from '../types';
 
@@ -52,6 +53,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   isFullScreen = false
 }) => {
   const [logisticsOpen, setLogisticsOpen] = useState(true);
+  const [managementOpen, setManagementOpen] = useState(true);
 
   const mainItems: { icon: any; label: string; id: AdminSection; badge?: number }[] = [
     { icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard' },
@@ -74,6 +76,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   ];
 
   const isLogisticsActive = logisticsItems.some(item => item.id === activeSection);
+  const isManagementActive = managementItems.some(item => item.id === activeSection);
 
   const renderNavItem = (item: { icon: any; label: string; id: AdminSection; badge?: number }) => (
     <button
@@ -150,8 +153,21 @@ const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Gestión */}
         <div className="pt-4">
-          <p className="text-[9px] font-black text-gray-300 dark:text-gray-600 uppercase tracking-[0.2em] px-4 mb-2">Gestión</p>
-          {managementItems.map(renderNavItem)}
+          <button
+            onClick={() => setManagementOpen(!managementOpen)}
+            className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all group ${isManagementActive ? 'bg-blue-50 dark:bg-blue-950/30' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}
+          >
+            <div className="flex items-center">
+              <Briefcase className={`w-5 h-5 mr-3.5 ${isManagementActive ? 'text-blue-500' : 'text-gray-400'}`} />
+              <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${isManagementActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>Gestión</span>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${managementOpen ? 'rotate-180' : ''}`} />
+          </button>
+          <div className={`overflow-hidden transition-all duration-300 ${managementOpen ? 'max-h-[500px] opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+            <div className="pl-2 space-y-1">
+              {managementItems.map(renderNavItem)}
+            </div>
+          </div>
         </div>
 
         <div className="pt-6 mt-4 border-t border-gray-50 dark:border-gray-800 space-y-2">
