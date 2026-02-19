@@ -1,93 +1,114 @@
-
 <!DOCTYPE html>
 <html lang="es" class="light">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>El Buen Servir | Gastronomía con Alma</title>
-    <meta name="description" content="Experimenta el sabor de la tradición con un toque contemporáneo. Reserva tu mesa en El Buen Servir." />
-    
-    <!-- Tailwind and Typography -->
-    <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
-    
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet" />
-    
-    <script>
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            colors: {
-              primary: {
-                50: '#fffbeb',
-                100: '#fef3c7',
-                200: '#fde68a',
-                300: '#fcd34d',
-                400: '#fbbf24',
-                500: '#f59e0b',
-                600: '#d97706',
-                700: '#b45309',
-                800: '#92400e',
-                900: '#78350f',
-              }
-            },
-            fontFamily: {
-              sans: ["Outfit", "sans-serif"],
-              serif: ["Playfair Display", "serif"],
-            },
-            borderRadius: {
-              '2xl': '1rem',
-              '3xl': '1.5rem',
-              '4xl': '2rem',
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>El Buen Servir | Gastronomía con Alma</title>
+  <meta name="description"
+    content="Experimenta el sabor de la tradición con un toque contemporáneo. Reserva tu mesa en El Buen Servir." />
+  <link rel="icon" type="image/png" href="logo.png" />
+
+  <!-- Tailwind and Typography -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap"
+    rel="stylesheet" />
+
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: {
+              50: '#fffbeb',
+              100: '#fef3c7',
+              200: '#fde68a',
+              300: '#fcd34d',
+              400: '#fbbf24',
+              500: '#f59e0b',
+              600: '#d97706',
+              700: '#b45309',
+              800: '#92400e',
+              900: '#78350f',
             }
+          },
+          fontFamily: {
+            sans: ["Outfit", "sans-serif"],
+            serif: ["Playfair Display", "serif"],
+          },
+          borderRadius: {
+            '2xl': '1rem',
+            '3xl': '1.5rem',
+            '4xl': '2rem',
           }
         }
       }
-    </script>
-    <style>
-      body {
-        font-family: 'Outfit', sans-serif;
-        -webkit-tap-highlight-color: transparent;
-        scroll-behavior: smooth;
-      }
-      .font-serif {
-        font-family: 'Playfair Display', serif;
-      }
-      .custom-scrollbar::-webkit-scrollbar {
-        width: 6px;
-      }
-      .custom-scrollbar::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #e5e7eb;
-        border-radius: 10px;
-      }
-      .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-        background: #374151;
-      }
-      .glass-effect {
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-      }
-      .dark .glass-effect {
-        background: rgba(15, 23, 42, 0.7);
-      }
-      @keyframes float {
-        0% { transform: translateY(0px); }
-        50% { transform: translateY(-10px); }
-        100% { transform: translateY(0px); }
-      }
-      .animate-float {
-        animation: float 3s ease-in-out infinite;
-      }
-    </style>
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      scroll-behavior: smooth;
+    }
 
-    <script type="importmap">
+    .font-serif {
+      font-family: 'Playfair Display', serif;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #e5e7eb;
+      border-radius: 10px;
+    }
+
+    .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #374151;
+    }
+
+    .glass-effect {
+      background: rgba(255, 255, 255, 0.7);
+      -webkit-backdrop-filter: blur(12px);
+      backdrop-filter: blur(12px);
+    }
+
+    .dark .glass-effect {
+      background: rgba(15, 23, 42, 0.7);
+    }
+
+    @keyframes float {
+      0% {
+        transform: translateY(0px);
+      }
+
+      50% {
+        transform: translateY(-10px);
+      }
+
+      100% {
+        transform: translateY(0px);
+      }
+    }
+
+    .animate-float {
+      animation: float 3s ease-in-out infinite;
+    }
+  </style>
+
+  <script type="importmap">
     {
       "imports": {
         "lucide-react": "https://esm.sh/lucide-react@^0.574.0",
@@ -97,10 +118,13 @@
       }
     }
     </script>
-  <script type="module" crossorigin src="/elbuenservir/assets/index-Cyvz1DFa.js"></script>
-  <link rel="stylesheet" crossorigin href="/elbuenservir/assets/index-B73WLLhL.css">
+  <script type="module" crossorigin src="./assets/index-J6Tv-JVn.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-B73WLLhL.css">
 </head>
-  <body class="bg-[#FDFDFD] dark:bg-[#0f172a] text-gray-900 dark:text-gray-100 antialiased transition-colors duration-300">
-    <div id="root"></div>
+
+<body
+  class="bg-[#FDFDFD] dark:bg-[#0f172a] text-gray-900 dark:text-gray-100 antialiased transition-colors duration-300">
+  <div id="root"></div>
 </body>
+
 </html>
