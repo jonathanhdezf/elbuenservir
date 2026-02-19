@@ -110,7 +110,7 @@ export default function AdminView({
 }: AdminViewProps) {
   const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
   const [activeTab, setActiveTab] = useState<TabId>(categories[0]?.id || '');
-  const isFullScreen = ['kds', 'dds', 'local_dispatch', 'driver_dashboard'].includes(activeSection);
+  const isFullScreen = true;
 
   // Logistics password protection
   const LOGISTICS_PASSWORD = '1234';
@@ -1055,7 +1055,7 @@ export default function AdminView({
           </div>
         </div>
 
-        <div className="max-w-2xl mx-auto w-full">
+        <div className="w-full">
           <div className="bg-white dark:bg-gray-800 rounded-[48px] shadow-2xl overflow-hidden flex flex-col border border-gray-100 dark:border-gray-700">
             {/* Header Driver */}
             <div className="p-8 bg-gray-900 text-white flex items-center justify-between">

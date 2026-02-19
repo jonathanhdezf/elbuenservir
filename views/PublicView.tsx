@@ -14,6 +14,7 @@ export default function PublicView({ categories, menuItems, onEnterAdmin, isPrev
   const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id || '');
   const [isScrolled, setIsScrolled] = useState(false);
   const [visibleItemsCount, setVisibleItemsCount] = useState(6);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Order Flow States
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
@@ -46,7 +47,7 @@ export default function PublicView({ categories, menuItems, onEnterAdmin, isPrev
     <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-primary-200">
       {/* Navigation */}
       <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${isScrolled || isPreview ? 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl shadow-lg py-4 border-b border-gray-100 dark:border-gray-800' : 'bg-transparent py-8'}`}>
-        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
+        <div className="w-full mx-auto px-6 md:px-12 flex justify-between items-center">
           <div className="flex items-center space-x-3 group cursor-pointer">
             <img
               src={`${(import.meta as any).env.BASE_URL}logo.png`}
@@ -59,6 +60,7 @@ export default function PublicView({ categories, menuItems, onEnterAdmin, isPrev
             </div>
           </div>
 
+          {/* Desktop Menu */}
           <div className="hidden lg:flex items-center space-x-10 text-sm font-bold uppercase tracking-widest">
             {['Inicio', 'Menú', 'Nosotros', 'Contacto'].map(link => (
               <a key={link} href={`#${link.toLowerCase()}`} className={`transition-all hover:text-primary-500 ${isScrolled || isPreview ? 'text-gray-600 dark:text-gray-300' : 'text-white/80'}`}>
@@ -67,7 +69,7 @@ export default function PublicView({ categories, menuItems, onEnterAdmin, isPrev
             ))}
           </div>
 
-          <div className="flex items-center space-x-6">
+          <div className="flex items-center space-x-4 md:space-x-6">
             {!isPreview && (
               <button
                 title="Acceso administrador"
@@ -77,6 +79,7 @@ export default function PublicView({ categories, menuItems, onEnterAdmin, isPrev
                 <Lock className="w-5 h-5" />
               </button>
             )}
+
             <button
               onClick={() => {
                 setOrderStep(1);
@@ -87,8 +90,45 @@ export default function PublicView({ categories, menuItems, onEnterAdmin, isPrev
               <ShoppingBag className="w-4 h-4" />
               Ordenar en Línea
             </button>
+
+            {/* Mobile Menu Button (Hamburger) */}
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className={`p-3 rounded-xl lg:hidden transition-all ${isScrolled || isPreview ? 'text-gray-900 dark:text-white bg-gray-50/50' : 'text-white bg-white/10'}`}
+            >
+              {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Plus className="w-6 h-6 rotate-45" />}
+            </button>
           </div>
         </div>
+
+        {/* Mobile menu panel */}
+        {isMobileMenuOpen && (
+          <div className="lg:hidden absolute top-full left-0 w-full bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 p-8 shadow-2xl animate-in slide-in-from-top-4 duration-300">
+            <div className="flex flex-col space-y-6">
+              {['Inicio', 'Menú', 'Nosotros', 'Contacto'].map(link => (
+                <a
+                  key={link}
+                  href={`#${link.toLowerCase()}`}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="text-2xl font-black uppercase tracking-tighter text-gray-900 dark:text-white hover:text-primary-500 transition-colors"
+                >
+                  {link}
+                </a>
+              ))}
+              <hr className="border-gray-50 dark:border-gray-800" />
+              <button
+                onClick={() => {
+                  setOrderStep(1);
+                  setIsOrderModalOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="w-full bg-primary-500 text-white py-5 rounded-[24px] font-black uppercase tracking-widest shadow-xl shadow-primary-500/30"
+              >
+                Ordenar ahora
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}
@@ -104,8 +144,8 @@ export default function PublicView({ categories, menuItems, onEnterAdmin, isPrev
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white dark:to-[#0f172a]"></div>
           </div>
 
-          <div className="relative z-10 w-full max-w-7xl px-6">
-            <div className="max-w-3xl">
+          <div className="relative z-10 w-full px-6 md:px-12">
+            <div className="w-full">
               <div className="inline-flex items-center space-x-3 mb-2 mt-32 bg-white/10 backdrop-blur-md border border-white/20 px-6 py-2 rounded-full text-white">
                 <Star className="w-4 h-4 text-primary-400 fill-current" />
                 <span className="text-xs font-bold uppercase tracking-widest">El sabor que nos distingue</span>
@@ -138,8 +178,8 @@ export default function PublicView({ categories, menuItems, onEnterAdmin, isPrev
       )}
 
       {/* Featured Section */}
-      <section className="py-24 px-6 bg-white dark:bg-gray-900 overflow-hidden">
-        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-20 items-center">
+      <section className="py-24 px-6 md:px-12 bg-white dark:bg-gray-900 overflow-hidden">
+        <div className="w-full grid lg:grid-cols-2 gap-20 items-center">
           <div className="relative">
             <div className="absolute -top-12 -left-12 w-64 h-64 bg-primary-100 rounded-full blur-3xl opacity-50"></div>
             <div className="relative grid grid-cols-2 gap-4">
@@ -192,7 +232,7 @@ export default function PublicView({ categories, menuItems, onEnterAdmin, isPrev
 
       {/* Menu Section */}
       <section id="menu" className={`py-24 px-6 relative ${isPreview ? 'bg-white' : 'bg-[#FDFDFD] dark:bg-gray-900/50'}`}>
-        <div className="max-w-6xl mx-auto relative z-10">
+        <div className="w-full relative z-10 px-6 md:px-12">
           <div className="text-center mb-20">
             <span className="text-primary-500 font-black uppercase tracking-[0.3em] text-xs mb-4 block">Carta Gastronómica</span>
             <h2 className="text-5xl md:text-7xl font-black mb-8 tracking-tighter dark:text-white">Nuestro <span className="font-serif italic font-normal">Menú</span></h2>
@@ -283,8 +323,8 @@ export default function PublicView({ categories, menuItems, onEnterAdmin, isPrev
 
       {/* CTA Section */}
       {!isPreview && (
-        <section className="py-24 px-6">
-          <div className="max-w-7xl mx-auto bg-gray-900 rounded-[50px] p-12 md:p-24 relative overflow-hidden flex flex-col items-center text-center">
+        <section className="py-24 px-6 md:px-12">
+          <div className="w-full bg-gray-900 rounded-[50px] p-12 md:p-24 relative overflow-hidden flex flex-col items-center text-center">
             <div className="absolute top-0 right-0 w-96 h-96 bg-primary-500/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2"></div>
             <div className="relative z-10 max-w-2xl">
               <h2 className="text-5xl md:text-7xl font-black text-white mb-8 tracking-tighter leading-none">
@@ -318,8 +358,8 @@ export default function PublicView({ categories, menuItems, onEnterAdmin, isPrev
 
       {/* Footer */}
       {!isPreview && (
-        <footer id="contacto" className="bg-white dark:bg-gray-950 pt-24 pb-12 px-6 border-t border-gray-50 dark:border-gray-900">
-          <div className="max-w-7xl mx-auto">
+        <footer id="contacto" className="bg-white dark:bg-gray-950 pt-24 pb-12 px-6 md:px-12 border-t border-gray-50 dark:border-gray-900">
+          <div className="w-full">
             <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-16 mb-24">
               <div className="lg:col-span-1">
                 <div className="flex items-center space-x-2 mb-10">
