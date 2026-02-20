@@ -9,10 +9,11 @@ import {
   Edit2, Smartphone, Map, UserPlus, Send,
   ChevronDown, Settings2, Timer, Check, CreditCard,
   Banknote, Receipt, ArrowRight, Printer, CheckCircle,
-  Monitor, Maximize2, Bell, Truck, UserMinus, Navigation, ShieldCheck,
-  History, Wallet, ArrowUpRight, Store, Utensils, Zap, Save, UserCheck, Scan, Shield, Sun, Moon
+  Monitor, Maximize2, Bell, Truck, UserMinus, Navigation, ShieldCheck, Layers,
+  History, Wallet, ArrowUpRight, Store, Utensils, Zap, Save, UserCheck, Scan, Shield, Sun, Moon,
+  ArrowUp, ArrowDown, Move
 } from 'lucide-react';
-import { MenuItem, Category, TabId, Order, OrderItem, OrderStatus, Customer, AdminSection, DeliveryDriver, VehicleType, PaymentMethod, PaymentStatus, TransferStatus, Staff, StaffRole } from '../types';
+import { MenuItem, Category, TabId, Order, OrderItem, OrderStatus, Customer, AdminSection, DeliveryDriver, VehicleType, PaymentMethod, PaymentStatus, TransferStatus, Staff, StaffRole, SiteLog } from '../types';
 import { soundManager, AudioAction } from '../utils/soundManager';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -22,6 +23,7 @@ import PublicView from './PublicView';
 import { generateTicket } from '../utils/printTicket';
 import { LocalDispatchSection } from '../components/LocalDispatch';
 import ReportsSection from '../components/ReportsSection';
+import LogsSection from '../components/LogsSection';
 
 interface AdminViewProps {
   categories: Category[];
@@ -32,6 +34,10 @@ interface AdminViewProps {
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   drivers: DeliveryDriver[];
   setDrivers: React.Dispatch<React.SetStateAction<DeliveryDriver[]>>;
+  logs: SiteLog[];
+  setLogs: React.Dispatch<React.SetStateAction<SiteLog[]>>;
+  customers: Customer[];
+  setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
   isDarkMode: boolean;
   setIsDarkMode: (val: boolean) => void;
   onExit: () => void;
@@ -46,63 +52,63 @@ interface Notification {
 
 
 
-const INITIAL_CUSTOMERS: Customer[] = [
-  { id: 'cust-1', name: 'Juan Pérez', phone: '555-0101', email: 'juan@example.com', totalOrders: 15, totalSpent: 1250.50, lastOrderDate: new Date(Date.now() - 86400000).toISOString(), addresses: ['Calle 10, Col. Centro', 'Av. Juárez 45'] },
-  { id: 'cust-2', name: 'María García', phone: '555-0102', email: 'maria@example.com', totalOrders: 8, totalSpent: 740.00, lastOrderDate: new Date(Date.now() - 172800000).toISOString(), addresses: ['Av. Reforma 200'] },
-];
-
 const INITIAL_STAFF: Staff[] = [
-  { id: 'S-000', name: 'Miguel', phone: '555-0300', role: 'admin', status: 'active' },
-  { id: 'S-001', name: 'Chef Mario', phone: '555-0301', role: 'cook', status: 'active' },
-  { id: 'S-002', name: 'Ana Mesera', phone: '555-0302', role: 'waiter', status: 'active' },
+  { id: 'S-000', name: 'Miguel', phone: '555-0300', role: 'admin', status: 'active', password: '123' },
+  { id: 'S-001', name: 'Chef Mario', phone: '555-0301', role: 'cook', status: 'active', password: '456' },
+  { id: 'S-002', name: 'Ana Mesera', phone: '555-0302', role: 'waiter', status: 'active', password: '789' },
+  { id: 'S-003', name: 'Carlos Mesero', phone: '555-0303', role: 'waiter', status: 'active', password: '321' },
 ];
-
-const STATUS_CONFIG: Record<OrderStatus, { label: string, color: string, icon: any }> = {
-  pending: { label: 'Pendiente', color: 'bg-gray-100 text-gray-700', icon: Clock },
-  kitchen: { label: 'En Cocina', color: 'bg-amber-100 text-amber-700', icon: ChefHat },
-  ready: { label: 'Listo para envío', color: 'bg-primary-100 text-primary-700', icon: PackageCheck },
-  delivery: { label: 'En Reparto', color: 'bg-blue-100 text-blue-700', icon: Bike },
-  delivered: { label: 'Entregado', color: 'bg-emerald-100 text-emerald-700', icon: CheckCircle2 },
-  cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-700', icon: Trash2 },
-};
-
-const PAYMENT_METHOD_CONFIG: Record<PaymentMethod, { label: string, icon: any, color: string }> = {
-  efectivo: { label: 'Efectivo', icon: Banknote, color: 'text-emerald-500' },
-  tarjeta: { label: 'Tarjeta', icon: CreditCard, color: 'text-blue-500' },
-  transferencia: { label: 'Transferencia', icon: Receipt, color: 'text-purple-500' },
-};
-
-const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { label: string, color: string }> = {
-  pending: { label: 'Pendiente', color: 'bg-red-50 text-red-600 border-red-100' },
-  paid: { label: 'Pagado', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
-};
-
-const TRANSFER_STATUS_LABELS: Record<TransferStatus, string> = {
-  recibido: 'Recibido',
-  pendiente: 'Pendiente',
-  no_recibido: 'No se recibió'
-};
-
-const VEHICLE_CONFIG: Record<VehicleType, { label: string, icon: any }> = {
-  moto: { label: 'Motocicleta', icon: Bike },
-  bici: { label: 'Bicicleta', icon: Bike },
-  auto: { label: 'Automóvil', icon: Truck },
-  walking: { label: 'A pie', icon: Navigation }
-};
 
 export default function AdminView({
   categories,
   setCategories,
   menuItems,
   setMenuItems,
-  isDarkMode,
-  setIsDarkMode,
   orders,
   setOrders,
   drivers,
   setDrivers,
+  logs,
+  setLogs,
+  customers: propCustomers,
+  setCustomers: setPropCustomers,
+  isDarkMode,
+  setIsDarkMode,
   onExit
 }: AdminViewProps) {
+  const STATUS_CONFIG: Record<OrderStatus, { label: string, color: string, icon: any }> = {
+    pending: { label: 'Pendiente', color: 'bg-gray-100 text-gray-700', icon: Clock },
+    kitchen: { label: 'En Cocina', color: 'bg-amber-100 text-amber-700', icon: ChefHat },
+    ready: { label: 'Listo para envío', color: 'bg-primary-100 text-primary-700', icon: PackageCheck },
+    delivery: { label: 'En Reparto', color: 'bg-blue-100 text-blue-700', icon: Bike },
+    delivered: { label: 'Entregado', color: 'bg-emerald-100 text-emerald-700', icon: CheckCircle2 },
+    cancelled: { label: 'Cancelado', color: 'bg-red-100 text-red-700', icon: Trash2 },
+  };
+
+  const PAYMENT_METHOD_CONFIG: Record<PaymentMethod, { label: string, icon: any, color: string }> = {
+    efectivo: { label: 'Efectivo', icon: Banknote, color: 'text-emerald-500' },
+    tarjeta: { label: 'Tarjeta', icon: CreditCard, color: 'text-blue-500' },
+    transferencia: { label: 'Transferencia', icon: Receipt, color: 'text-purple-500' },
+  };
+
+  const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { label: string, color: string }> = {
+    pending: { label: 'Pendiente', color: 'bg-red-50 text-red-600 border-red-100' },
+    paid: { label: 'Pagado', color: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+  };
+
+  const TRANSFER_STATUS_LABELS: Record<TransferStatus, string> = {
+    recibido: 'Recibido',
+    pendiente: 'Pendiente',
+    no_recibido: 'No se recibió'
+  };
+
+  const VEHICLE_CONFIG: Record<VehicleType, { label: string, icon: any }> = {
+    moto: { label: 'Motocicleta', icon: Bike },
+    bici: { label: 'Bicicleta', icon: Bike },
+    auto: { label: 'Automóvil', icon: Truck },
+    walking: { label: 'A pie', icon: Navigation }
+  };
+
   const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
   const [activeTab, setActiveTab] = useState<TabId>(categories[0]?.id || '');
   const isFullScreen = true;
@@ -111,7 +117,17 @@ export default function AdminView({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
+  const [customers, setCustomers] = useState<Customer[]>(propCustomers);
+
+  // Sync with propCustomers when they change from outside
+  useEffect(() => {
+    setCustomers(propCustomers);
+  }, [propCustomers]);
+
+  // Sync with parent when local customers change
+  useEffect(() => {
+    setPropCustomers(customers);
+  }, [customers, setPropCustomers]);
   const [staff, setStaff] = useState<Staff[]>(INITIAL_STAFF);
   const [notificationHistory, setNotificationHistory] = useState<Notification[]>([]);
   const [activeTableOrders, setActiveTableOrders] = useState<Record<number, string>>({});
@@ -189,6 +205,18 @@ export default function AdminView({
     }
   }, [playUISound]);
 
+  const recordLog = useCallback((action: string, details: string, type: SiteLog['type'] = 'info') => {
+    const newLog: SiteLog = {
+      id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      user: 'Miguel (Admin)',
+      action,
+      details,
+      type
+    };
+    setLogs(prev => [newLog, ...prev]);
+  }, [setLogs]);
+
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
   const [isRegisteringCustomer, setIsRegisteringCustomer] = useState(false);
@@ -196,9 +224,13 @@ export default function AdminView({
   const [searchPhone, setSearchPhone] = useState('');
   const [regName, setRegName] = useState('');
   const [regPhone, setRegPhone] = useState('');
+  const [regPassword, setRegPassword] = useState('');
   const [regAddress, setRegAddress] = useState('');
   const [regAddresses, setRegAddresses] = useState<string[]>([]);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+
+  // Reordering State
+  const [isReordering, setIsReordering] = useState(false);
 
   // Sounds & Real-time Badges logic
   const prevCounts = React.useRef({ kds: 0, dds: 0, local: 0 });
@@ -291,12 +323,18 @@ export default function AdminView({
       setDrivers(prev => prev.map(d => d.id === oldOrder.assignedDriverId ? { ...d, status: 'active' } : d));
     }
 
-    // Auto-assign back to active if coming from busy
-    if (newStatus === 'delivery') {
-      // Logic for changing status is handled, just notify
-    }
-
     addNotification(`Pedido ${orderId} actualizado`, 'info');
+    recordLog('Cambio de Estado', `Pedido ${orderId} actualizado a "${newStatus}"`, 'info');
+  };
+
+  const updateOrderPaymentMethod = (orderId: string, method: PaymentMethod) => {
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, paymentMethod: method } : o));
+    addNotification(`Método de pago de ${orderId} actualizado`, 'info');
+  };
+
+  const updateOrderDeliveryFee = (orderId: string, fee: number) => {
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, deliveryFee: fee } : o));
+    addNotification(`Pago de repartidor para ${orderId} actualizado: $${fee}`, 'info');
   };
 
   const confirmPaymentAction = (orderId: string) => {
@@ -333,6 +371,7 @@ export default function AdminView({
 
     setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
     addNotification(`Pago de ${orderId} confirmado`, 'success');
+    recordLog('Pago Confirmado', `Se confirmó el pago de $${updatedOrder.total.toFixed(2)} para el pedido ${orderId} via ${tempPaymentMethod?.toUpperCase()}`, 'success');
 
     // Side effect called OUTSIDE of setOrders
     generateTicket(updatedOrder);
@@ -397,12 +436,14 @@ export default function AdminView({
     };
     setMenuItems(prev => [...prev, newItem]);
     addNotification('Nuevo platillo añadido');
+    recordLog('Menú Modificado', `Se añadió el producto "${newItem.name}" a la categoría ${activeCategoryName}`, 'info');
   };
 
   const deleteDriver = (driverId: string) => {
     if (window.confirm('¿Eliminar repartidor?')) {
       setDrivers(prev => prev.filter(d => d.id !== driverId));
       addNotification('Repartidor eliminado', 'info');
+      recordLog('Personal Modificado', `Se eliminó al repartidor con ID: ${driverId}`, 'warning');
     }
   };
 
@@ -415,11 +456,12 @@ export default function AdminView({
     if (driverData.id) {
       setDrivers(prev => prev.map(d => d.id === driverData.id ? { ...d, ...driverData } as DeliveryDriver : d));
       addNotification('Repartidor actualizado');
+      recordLog('Personal Modificado', `Se actualizaron los datos del repartidor "${driverData.name}"`, 'info');
     } else {
       const newDriver: DeliveryDriver = {
         id: `D-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-        name: driverData.name,
-        phone: driverData.phone,
+        name: driverData.name!,
+        phone: driverData.phone!,
         vehicleType: driverData.vehicleType || 'moto',
         status: 'active',
         deliveriesCompleted: 0,
@@ -427,8 +469,50 @@ export default function AdminView({
       };
       setDrivers(prev => [...prev, newDriver]);
       addNotification('Nuevo repartidor añadido');
+      recordLog('Personal Modificado', `Se registró un nuevo repartidor: "${newDriver.name}"`, 'success');
     }
     setEditingDriver(null);
+  };
+
+  const moveCategory = (index: number, direction: 'left' | 'right') => {
+    if (direction === 'left' && index === 0) return;
+    if (direction === 'right' && index === categories.length - 1) return;
+
+    const newCats = [...categories];
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+
+    // Swap
+    [newCats[index], newCats[targetIndex]] = [newCats[targetIndex], newCats[index]];
+    setCategories(newCats);
+    playUISound('click');
+  };
+
+  const moveMenuItem = (itemId: string, direction: 'up' | 'down') => {
+    const currentList = menuItems.filter(i => {
+      if (activeTab === 'cat-3') return i.categoryId !== 'cat-1' && i.categoryId !== 'cat-2';
+      return i.categoryId === activeTab;
+    });
+
+    const currentIndexInList = currentList.findIndex(i => i.id === itemId);
+    if (currentIndexInList === -1) return;
+
+    if (direction === 'up' && currentIndexInList === 0) return;
+    if (direction === 'down' && currentIndexInList === currentList.length - 1) return;
+
+    const targetItemInList = currentList[direction === 'up' ? currentIndexInList - 1 : currentIndexInList + 1];
+
+    // Find real indices in main array
+    const realIdxCurrent = menuItems.findIndex(i => i.id === itemId);
+    const realIdxTarget = menuItems.findIndex(i => i.id === targetItemInList.id);
+
+    if (realIdxCurrent === -1 || realIdxTarget === -1) return;
+
+    const newItems = [...menuItems];
+    // Swap in main array
+    [newItems[realIdxCurrent], newItems[realIdxTarget]] = [newItems[realIdxTarget], newItems[realIdxCurrent]];
+
+    setMenuItems(newItems);
+    playUISound('click');
   };
 
 
@@ -608,7 +692,7 @@ export default function AdminView({
         <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-[40px] shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
 
           {/* Premium Header */}
-          <div className="relative p-8 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden">
+          <div className="relative p-8 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white overflow-hidden shrink-0">
             <div className="absolute top-0 right-0 w-40 h-40 rounded-full bg-emerald-500/10 blur-3xl"></div>
             <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full bg-primary-500/10 blur-3xl"></div>
             <div className="relative z-10">
@@ -617,6 +701,11 @@ export default function AdminView({
                   <div className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest ${statusCfg.color}`}>
                     {statusCfg.label}
                   </div>
+                  {viewingOrder.source === 'online' && (
+                    <div className="px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest bg-primary-500 text-white shadow-lg shadow-primary-500/40">
+                      ONLINE
+                    </div>
+                  )}
                   <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{viewingOrder.id}</span>
                 </div>
                 <button title="Cerrar" onClick={() => { setViewingOrderId(null); setIsConfirmingPayment(false); }} className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-xl transition-all">
@@ -655,22 +744,84 @@ export default function AdminView({
                       {viewingOrder.paymentStatus === 'paid' ? '✓ PAGADO' : 'Cobrar'}
                     </button>
                   </div>
-                  {viewingOrder.paymentStatus === 'paid' && (viewingOrder.operationNumber || viewingOrder.ticketNumber) && (
-                    <div className="pt-4 mt-4 border-t border-gray-100 dark:border-gray-800 grid grid-cols-2 gap-4">
-                      {viewingOrder.operationNumber && (
-                        <div>
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Operación</p>
-                          <p className="text-xs font-black dark:text-white uppercase truncate">{viewingOrder.operationNumber}</p>
+                </div>
+
+                {/* Items List */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Layers className="w-4 h-4 text-gray-400" />
+                    <h5 className="font-black text-[10px] uppercase tracking-widest text-gray-400">Productos del Pedido</h5>
+                  </div>
+                  <div className="space-y-3">
+                    {viewingOrder.items.map((item, idx) => (
+                      <div key={idx} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-gray-900/40 rounded-2xl border border-gray-100 dark:border-gray-800">
+                        <div className="flex-1">
+                          <p className="font-black text-xs uppercase dark:text-white">{item.name}</p>
+                          <p className="text-[9px] font-bold text-gray-400 uppercase">{item.variationLabel}</p>
                         </div>
-                      )}
-                      {viewingOrder.ticketNumber && (
-                        <div>
-                          <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Ticket</p>
-                          <p className="text-xs font-black dark:text-white uppercase truncate">{viewingOrder.ticketNumber}</p>
+                        <div className="flex items-center gap-4">
+                          <span className="text-[10px] font-black text-gray-400">x{item.quantity}</span>
+                          <span className="text-xs font-black dark:text-white">${(item.price * item.quantity).toFixed(2)}</span>
                         </div>
-                      )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Super User Management Section */}
+                <div className="p-6 bg-primary-50/50 dark:bg-primary-900/10 rounded-[32px] border-2 border-dashed border-primary-100 dark:border-primary-900/30 space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <ShieldCheck className="w-5 h-5 text-primary-500" />
+                    <h5 className="font-black text-[10px] uppercase tracking-widest text-primary-600">Gestión de Súper Usuario</h5>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cambiar Estado</label>
+                      <div className="relative">
+                        <select
+                          value={viewingOrder.status}
+                          onChange={(e) => updateOrderStatus(viewingOrder.id, e.target.value as OrderStatus)}
+                          className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-[10px] font-black uppercase outline-none focus:border-primary-500 appearance-none cursor-pointer"
+                        >
+                          {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                            <option key={key} value={key}>{cfg.label}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+                      </div>
                     </div>
-                  )}
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Método de Pago</label>
+                      <div className="relative">
+                        <select
+                          value={viewingOrder.paymentMethod}
+                          onChange={(e) => updateOrderPaymentMethod(viewingOrder.id, e.target.value as PaymentMethod)}
+                          className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-[10px] font-black uppercase outline-none focus:border-primary-500 appearance-none cursor-pointer"
+                        >
+                          {Object.entries(PAYMENT_METHOD_CONFIG).map(([key, cfg]) => (
+                            <option key={key} value={key}>{cfg.label}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Pago Repartidor (Comisión)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-gray-400">$</span>
+                      <input
+                        type="number"
+                        value={viewingOrder.deliveryFee || ''}
+                        onChange={(e) => updateOrderDeliveryFee(viewingOrder.id, parseFloat(e.target.value) || 0)}
+                        placeholder="0.00"
+                        className="w-full bg-white dark:bg-gray-800 border-2 border-primary-100 dark:border-primary-900/30 rounded-2xl pl-10 pr-4 py-3 font-black text-sm outline-none focus:border-primary-500 transition-all"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {/* Quick Actions */}
@@ -1355,16 +1506,16 @@ export default function AdminView({
                 const paymentCfg = PAYMENT_STATUS_CONFIG[o.paymentStatus];
                 const methodCfg = PAYMENT_METHOD_CONFIG[o.paymentMethod];
                 return (
-                  <tr key={o.id} onClick={() => setViewingOrderId(o.id)} className="hover:bg-gray-50/80 dark:hover:bg-gray-900/50 transition-colors group cursor-pointer">
+                  <tr key={o.id} onClick={() => setViewingOrderId(o.id)} className={`hover:bg-gray-50/80 dark:hover:bg-gray-900/50 transition-colors group cursor-pointer ${o.source === 'online' ? 'bg-primary-50/30 dark:bg-primary-900/10' : ''}`}>
                     <td className="px-8 py-6 font-black text-sm text-primary-500">
                       <div className="flex items-center space-x-2">
-                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${o.source === 'tpv' ? 'bg-amber-100 text-amber-600' : 'bg-primary-50 text-primary-500'}`}>
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${o.source === 'tpv' ? 'bg-amber-100 text-amber-600' : 'bg-primary-500 text-white shadow-lg shadow-primary-500/30'}`}>
                           {o.source === 'tpv' ? <Monitor className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
                         </div>
                         <div className="flex flex-col">
                           <span className="text-sm font-black text-gray-900 dark:text-white uppercase leading-none">{o.id}</span>
-                          <span className="text-[9px] font-bold text-gray-400 uppercase mt-1">
-                            {o.source === 'tpv' ? 'Venta Directa TPV' : 'Pedido Online'}
+                          <span className={`text-[9px] font-bold uppercase mt-1 ${o.source === 'online' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400'}`}>
+                            {o.source === 'tpv' ? 'Venta Directa TPV' : 'Pedido Online Web'}
                           </span>
                         </div>
                       </div>
@@ -1899,6 +2050,16 @@ export default function AdminView({
                   className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-primary-500 rounded-2xl px-4 py-3 font-bold outline-none transition-all"
                 />
               </div>
+              <div className="space-y-2">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Contraseña</label>
+                <input
+                  type="text"
+                  placeholder="Contraseña del cliente"
+                  value={editingCustomer.password || ''}
+                  onChange={e => setEditingCustomer({ ...editingCustomer, password: e.target.value })}
+                  className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-primary-500 rounded-2xl px-4 py-3 font-bold outline-none transition-all"
+                />
+              </div>
             </div>
 
             <div className="space-y-4">
@@ -2019,6 +2180,20 @@ export default function AdminView({
                   />
                 </div>
               </div>
+
+              <div className="md:col-span-2 space-y-3">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Contraseña de acceso</label>
+                <div className="relative">
+                  <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    value={regPassword}
+                    onChange={e => setRegPassword(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-primary-500 rounded-2xl pl-12 pr-4 py-4 font-bold outline-none transition-all"
+                    placeholder="Contraseña para acceso en línea"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Dirección Section */}
@@ -2102,6 +2277,7 @@ export default function AdminView({
                     id: `cust-${Date.now()}`,
                     name: regName,
                     phone: regPhone,
+                    password: regPassword,
                     email: '',
                     totalOrders: 0,
                     totalSpent: 0,
@@ -2721,7 +2897,8 @@ export default function AdminView({
                         activeSection === 'orders' ? 'Pedidos' :
                           activeSection === 'customers' ? 'Clientes' :
                             activeSection === 'staff_management' ? 'Gestión Personal' :
-                              'Dashboard'
+                              activeSection === 'logs' ? 'Logs del Sistema' :
+                                'Dashboard'
           }
         />
 
@@ -2755,6 +2932,7 @@ export default function AdminView({
             {activeSection === 'driver_dashboard' && renderDriverDashboard()}
             {activeSection === 'customers' && renderCustomerList()}
             {activeSection === 'reports' && <ReportsSection orders={orders} drivers={drivers} customers={customers} menuItems={menuItems} />}
+            {activeSection === 'logs' && <LogsSection logs={logs} onClearLogs={() => setLogs([])} />}
             {activeSection === 'staff_management' && renderStaffManagement()}
             {renderCustomerModal()}
             {renderRegisterCustomerModal()}
@@ -2762,13 +2940,37 @@ export default function AdminView({
             {renderFoundCustomerModal()}
             {activeSection === 'menu' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <CategoryTabs activeTab={activeTab} setActiveTab={setActiveTab} categories={categories} onAddCategory={() => {
-                  const name = prompt('Nueva categoría:');
-                  if (name) { setCategories([...categories, { id: `cat-${Date.now()}`, name }]); addNotification(`Categoría creada`); }
-                }} />
+                <div className="flex justify-end mb-4">
+                  <button
+                    onClick={() => { setIsReordering(!isReordering); playUISound(isReordering ? 'click' : 'navigation'); }}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold uppercase text-[10px] tracking-widest transition-all ${isReordering ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30 ring-2 ring-offset-2 ring-primary-500' : 'bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-100 hover:text-primary-500'}`}
+                  >
+                    <Move className="w-4 h-4" />
+                    {isReordering ? 'Terminar Orden' : 'Organizar Menú'}
+                  </button>
+                </div>
+
+                <CategoryTabs
+                  activeTab={activeTab}
+                  setActiveTab={setActiveTab}
+                  categories={categories}
+                  onAddCategory={() => {
+                    const name = prompt('Nueva categoría:');
+                    if (name) { setCategories([...categories, { id: `cat-${Date.now()}`, name }]); addNotification(`Categoría creada`); }
+                  }}
+                  isReordering={isReordering}
+                  onMoveCategory={moveCategory}
+                  onDeleteCategory={(id) => {
+                    if (confirm('¿Eliminar categoría? Los productos no se borrarán pero quedarán sin categoría visible.')) {
+                      setCategories(prev => prev.filter(c => c.id !== id));
+                      addNotification('Categoría eliminada');
+                    }
+                  }}
+                />
+
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
                   <h3 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">{activeCategoryName}</h3>
-                  <button onClick={addItem} className="flex items-center justify-center bg-gray-900 dark:bg-primary-500 text-white px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl">
+                  <button onClick={addItem} disabled={isReordering} className="flex items-center justify-center bg-gray-900 dark:bg-primary-500 text-white px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl disabled:opacity-50 disabled:scale-100">
                     <Plus className="w-5 h-5 mr-3" /> Nuevo Platillo
                   </button>
                 </div>
@@ -2778,8 +2980,33 @@ export default function AdminView({
                       return item.categoryId !== 'cat-1' && item.categoryId !== 'cat-2';
                     }
                     return item.categoryId === activeTab;
-                  }).map(item => (
-                    <MenuItemCard key={item.id} item={item} onUpdate={it => setMenuItems(prev => prev.map(m => m.id === it.id ? it : m))} onDelete={() => { if (confirm('¿Eliminar?')) { setMenuItems(prev => prev.filter(m => m.id !== item.id)); addNotification('Eliminado'); } }} />
+                  }).map((item, idx, arr) => (
+                    <div key={item.id} className={`relative transition-all duration-300 ${isReordering ? 'scale-[0.98] ring-2 ring-primary-500/30 rounded-[32px]' : ''}`}>
+                      <MenuItemCard item={item} onUpdate={it => setMenuItems(prev => prev.map(m => m.id === it.id ? it : m))} onDelete={() => { if (confirm('¿Eliminar?')) { setMenuItems(prev => prev.filter(m => m.id !== item.id)); addNotification('Eliminado'); } }} />
+
+                      {isReordering && (
+                        <div className="absolute -right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-20">
+                          <button
+                            onClick={() => moveMenuItem(item.id, 'up')}
+                            disabled={idx === 0}
+                            title="Mover arriba"
+                            aria-label="Mover platillo arriba"
+                            className="w-12 h-12 flex items-center justify-center bg-white dark:bg-gray-800 text-gray-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-full shadow-lg border border-gray-100 dark:border-gray-700 transition-all disabled:opacity-30 disabled:scale-90"
+                          >
+                            <ArrowUp className="w-6 h-6" />
+                          </button>
+                          <button
+                            onClick={() => moveMenuItem(item.id, 'down')}
+                            disabled={idx === arr.length - 1}
+                            title="Mover abajo"
+                            aria-label="Mover platillo abajo"
+                            className="w-12 h-12 flex items-center justify-center bg-white dark:bg-gray-800 text-gray-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-full shadow-lg border border-gray-100 dark:border-gray-700 transition-all disabled:opacity-30 disabled:scale-90"
+                          >
+                            <ArrowDown className="w-6 h-6" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -2837,7 +3064,13 @@ export default function AdminView({
           <div className="sticky top-0 right-0 p-6 flex justify-end z-[310]">
             <button title="Cerrar vista previa" onClick={() => setShowPreview(false)} className="bg-white/10 backdrop-blur-md text-white p-4 rounded-full hover:bg-white/20 transition-all border border-white/20 shadow-2xl"><X className="w-8 h-8" /></button>
           </div>
-          <PublicView categories={categories} menuItems={menuItems} isPreview />
+          <PublicView
+            categories={categories}
+            menuItems={menuItems}
+            customers={customers}
+            onAddCustomer={(customer) => setCustomers(prev => [...prev, customer])}
+            isPreview
+          />
         </div>
       )}
 

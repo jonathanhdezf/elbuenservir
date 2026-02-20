@@ -77,42 +77,41 @@ export default function ControlPanelView({ onNavigate, onExit, isDarkMode }: Con
                 <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/20 rounded-full blur-[120px] animate-pulse delay-700"></div>
             </div>
 
-            <div className="relative w-full h-full flex flex-col items-center justify-center overflow-y-auto custom-scrollbar">
-                {/* Top Bar (OS Style) */}
-                <div className="absolute top-0 left-0 w-full p-4 md:p-6 flex justify-between items-center text-white/50 z-10 pointer-events-none">
-                    <div className="flex items-center gap-4 pointer-events-auto">
-                        <div className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-white/5 backdrop-blur-md rounded-full border border-white/10">
-                            <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-500 rounded-full animate-ping"></div>
-                            <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-emerald-400">Sistema Activo</span>
-                        </div>
-                        <span className="hidden md:inline text-[10px] font-bold uppercase tracking-[0.3em]">v2.4.0 Premium</span>
+            {/* Top Bar (OS Style) */}
+            <div className="absolute top-0 left-0 w-full p-4 md:p-6 flex justify-between items-center text-white/50 z-20 pointer-events-none">
+                <div className="flex items-center gap-4 pointer-events-auto">
+                    <div className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-white/5 backdrop-blur-md rounded-full border border-white/10">
+                        <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-500 rounded-full animate-ping"></div>
+                        <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-emerald-400">Sistema Activo</span>
                     </div>
-                    <div className="flex items-center gap-4 md:gap-6 pointer-events-auto">
-                        <Bell className="w-4 h-4 hover:text-white transition-colors cursor-pointer" />
-                        <Search className="w-4 h-4 hover:text-white transition-colors cursor-pointer" />
-                        <Settings className="w-4 h-4 hover:text-white transition-colors cursor-pointer" />
-                        <div className="w-px h-4 bg-white/10"></div>
-                        <span className="text-xs md:text-sm font-bold">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    </div>
+                    <span className="hidden md:inline text-[10px] font-bold uppercase tracking-[0.3em]">v2.4.0 Premium</span>
                 </div>
+                <div className="flex items-center gap-4 md:gap-6 pointer-events-auto">
+                    <Bell className="w-4 h-4 hover:text-white transition-colors cursor-pointer" />
+                    <Search className="w-4 h-4 hover:text-white transition-colors cursor-pointer" />
+                    <Settings className="w-4 h-4 hover:text-white transition-colors cursor-pointer" />
+                    <div className="w-px h-4 bg-white/10"></div>
+                    <span className="text-xs md:text-sm font-bold">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+            </div>
 
-                {/* Main Content */}
-                <div className="flex flex-col items-center justify-center w-full max-w-6xl p-6 py-24 md:py-12 min-h-min">
+            <div className="relative w-full h-full flex flex-col items-center justify-center overflow-y-auto custom-scrollbar">
+                <div className="flex flex-col items-center justify-center w-full max-w-6xl p-6 py-32 md:py-32 min-h-min">
 
                     {/* Logo and Header */}
                     <div className="text-center mb-8 md:mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
-                        <div className="relative inline-block mb-4 md:mb-6">
+                        <div className="relative inline-block mb-3 md:mb-6">
                             <div className="absolute -inset-4 bg-gradient-to-tr from-blue-500 to-emerald-500 rounded-full blur-2xl opacity-30 animate-pulse"></div>
                             <img
                                 src={`${(import.meta as any).env.BASE_URL}logo.png`}
                                 alt="System Logo"
-                                className="relative w-20 h-20 md:w-24 md:h-24 rounded-[28px] md:rounded-[32px] shadow-2xl border-2 border-white/20 object-cover"
+                                className="relative w-16 h-16 md:w-24 md:h-24 rounded-[28px] md:rounded-[32px] shadow-2xl border-2 border-white/20 object-cover"
                             />
                         </div>
                         <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-white tracking-tighter uppercase mb-2">
                             Panel de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Control</span>
                         </h1>
-                        <p className="text-white/40 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] md:tracking-[0.4em]">Integrated Operational System</p>
+                        <p className="text-white/40 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] md:tracking-[0.4em]">Sistema Operativo "El Buen Servir"</p>
                     </div>
 
                     {/* App Grid */}

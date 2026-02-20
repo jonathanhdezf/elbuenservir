@@ -1,17 +1,20 @@
 
 import React, { useState, useEffect } from 'react';
-import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Plus, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard } from 'lucide-react';
-import { Category, MenuItem } from '../types';
+import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Plus, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store } from 'lucide-react';
+import { Category, MenuItem, Customer, Order } from '../types';
 import { soundManager } from '../utils/soundManager';
 
 interface PublicViewProps {
   categories: Category[];
   menuItems: MenuItem[];
+  customers: Customer[];
+  onAddCustomer: (customer: Customer) => void;
+  onAddOrder?: (order: Order) => void;
   onEnterControlPanel?: () => void;
   isPreview?: boolean;
 }
 
-export default function PublicView({ categories, menuItems, onEnterControlPanel, isPreview }: PublicViewProps) {
+export default function PublicView({ categories, menuItems, customers, onAddCustomer, onAddOrder, onEnterControlPanel, isPreview }: PublicViewProps) {
   const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id || '');
   const [isScrolled, setIsScrolled] = useState(false);
   const [visibleItemsCount, setVisibleItemsCount] = useState(6);
@@ -25,6 +28,137 @@ export default function PublicView({ categories, menuItems, onEnterControlPanel,
   const [selectedSides, setSelectedSides] = useState<string[]>([]);
   const [selectedExtras, setSelectedExtras] = useState<MenuItem[]>([]);
   const [customerComments, setCustomerComments] = useState('');
+
+  const [extraModalType, setExtraModalType] = useState<string | null>(null);
+  const [viewingExtraItem, setViewingExtraItem] = useState<MenuItem | null>(null);
+  const [viewingExtraVariation, setViewingExtraVariation] = useState<any>(null);
+
+  const [quickSearch, setQuickSearch] = useState('');
+
+  // Auth States
+  const [loggedCustomer, setLoggedCustomer] = useState<Customer | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authForm, setAuthForm] = useState({ name: '', phone: '', password: '', address: '' });
+  const [authError, setAuthError] = useState('');
+
+  // Delivery Choice States
+  const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'table' | 'delivery' | null>(null);
+  const [selectedAddress, setSelectedAddress] = useState('');
+  const [tableNumber, setTableNumber] = useState('');
+  const [isDeliverySelectionOpen, setIsDeliverySelectionOpen] = useState(false);
+
+  const handleAuthSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+
+    if (authMode === 'login') {
+      const customer = customers.find(c => c.phone === authForm.phone && c.password === authForm.password);
+      if (customer) {
+        setLoggedCustomer(customer);
+        setIsAuthModalOpen(false);
+        // Trigger delivery selection after successful login
+        setIsDeliverySelectionOpen(true);
+      } else {
+        setAuthError('Teléfono o contraseña incorrectos');
+      }
+    } else {
+      if (!authForm.name || !authForm.phone || !authForm.password) {
+        setAuthError('Por favor completa los campos obligatorios');
+        return;
+      }
+      const newCustomer: Customer = {
+        id: `cust-${Date.now()}`,
+        name: authForm.name,
+        phone: authForm.phone,
+        password: authForm.password,
+        addresses: authForm.address ? [authForm.address] : [],
+        totalOrders: 0,
+        totalSpent: 0
+      };
+      onAddCustomer(newCustomer);
+      setLoggedCustomer(newCustomer);
+      setIsAuthModalOpen(false);
+      setIsDeliverySelectionOpen(true);
+    }
+  };
+
+  const sendWhatsAppOrder = (customer: Customer) => {
+    const number = "2311024672";
+    const orderId = `BS-${Math.random().toString(36).substr(2, 6).toUpperCase()}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+    const total = (
+      (selectedVariation?.price || 0) +
+      selectedExtras.reduce((acc, e) => acc + Math.min(...e.variations.map(v => v.price)), 0)
+    ).toFixed(2);
+
+    let deliveryInfo = '';
+    if (deliveryMethod === 'pickup') {
+      deliveryInfo = `🏪 *Entrega:* Recoger en mostrador%0A`;
+    } else if (deliveryMethod === 'table') {
+      deliveryInfo = `🪑 *Entrega:* En mesa #${tableNumber}%0A`;
+    } else if (deliveryMethod === 'delivery') {
+      deliveryInfo = `🏠 *Entrega:* Domicilio - ${selectedAddress}%0A`;
+    }
+
+    const orderText = `*NUEVO PEDIDO EN LÍNEA - EL BUEN SERVIR*\n\n` +
+      `🆔 *Orden:* #${orderId}\n` +
+      `👤 *Cliente:* ${customer.name}\n` +
+      `📱 *Teléfono:* ${customer.phone}\n` +
+      deliveryInfo.replace(/%0A/g, '\n') +
+      `🥘 *Platillo:* ${selectedBaseDish?.name}\n` +
+      (selectedSides.length > 0 ? `🥗 *Guarniciones:* ${selectedSides.join(', ')} (Sin costo)\n` : '') +
+      (selectedExtras.length > 0 ? `🥤 *Adicionales:* ${selectedExtras.map(e => e.name).join(', ')}\n` : '') +
+      (customerComments ? `📝 *Notas:* ${customerComments}\n` : '') +
+      `\n💰 *TOTAL:* $${total}\n\n` +
+      `🚀 _Enviado desde el sitio web_`;
+
+    window.open(`https://wa.me/52${number}?text=${encodeURIComponent(orderText)}`, '_blank');
+
+    if (onAddOrder) {
+      const newOrder: Order = {
+        id: orderId,
+        customerName: customer.name,
+        customerPhone: customer.phone,
+        address: deliveryMethod === 'pickup' ? 'Recoger en mostrador' :
+          deliveryMethod === 'table' ? `Mesa: ${tableNumber}` :
+            selectedAddress,
+        items: [
+          {
+            id: selectedBaseDish?.id || '',
+            name: selectedBaseDish?.name || '',
+            variationLabel: selectedVariation?.label || '',
+            price: selectedVariation?.price || 0,
+            quantity: 1
+          },
+          ...selectedExtras.map(extra => ({
+            id: extra.id,
+            name: extra.name,
+            variationLabel: extra.variations[0].label,
+            price: extra.variations[0].price,
+            quantity: 1
+          }))
+        ],
+        total: parseFloat(total),
+        status: 'pending',
+        paymentMethod: 'efectivo',
+        paymentStatus: 'pending',
+        createdAt: new Date().toISOString(),
+        source: 'online',
+        notes: customerComments
+      };
+      onAddOrder(newOrder);
+    }
+
+    setIsOrderModalOpen(false);
+    setOrderStep(1);
+    setSelectedBaseDish(null);
+    setSelectedSides([]);
+    setSelectedExtras([]);
+    setCustomerComments('');
+    setDeliveryMethod(null);
+    setTableNumber('');
+    setSelectedAddress('');
+  };
 
   useEffect(() => {
     setVisibleItemsCount(6);
@@ -483,38 +617,60 @@ export default function PublicView({ categories, menuItems, onEnterControlPanel,
                 {/* Step 1: Menu Selection */}
                 {orderStep === 1 && (
                   <div className="space-y-6">
+                    {/* Busqueda Rapida */}
+                    <div className="relative">
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Buscar platillo..."
+                        value={quickSearch}
+                        onChange={(e) => setQuickSearch(e.target.value)}
+                        className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl pl-12 pr-4 py-3 font-bold text-gray-700 dark:text-white outline-none transition-all"
+                      />
+                    </div>
+
                     {categories.filter(cat => cat.id === 'cat-3').map(cat => (
                       <div key={cat.id} className="space-y-4">
                         <h5 className="text-xs font-black text-primary-500 uppercase tracking-[0.2em]">{cat.name}</h5>
                         <div className="grid grid-cols-1 gap-3">
-                          {menuItems.filter(item => item.categoryId !== 'cat-1' && item.categoryId !== 'cat-2' && item.isActive).map(item => (
-                            <div
-                              key={item.id}
-                              className="p-5 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-all"
-                            >
-                              <div className="mb-4">
-                                <p className="font-black text-gray-900 dark:text-white uppercase tracking-tight text-lg">{item.name}</p>
-                                <p className="text-xs text-gray-400 italic mt-1">{item.description}</p>
-                              </div>
+                          {menuItems
+                            .filter(item =>
+                              item.categoryId !== 'cat-1' &&
+                              item.categoryId !== 'cat-2' &&
+                              item.isActive &&
+                              item.name.toLowerCase().includes(quickSearch.toLowerCase())
+                            )
+                            .map(item => (
+                              <div
+                                key={item.id}
+                                className="p-5 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-all"
+                              >
+                                <div className="mb-4">
+                                  <p className="font-black text-gray-900 dark:text-white uppercase tracking-tight text-lg">{item.name}</p>
+                                  <p className="text-xs text-gray-400 italic mt-1">{item.description}</p>
+                                </div>
 
-                              <div className="flex flex-wrap gap-2">
-                                {item.variations.map(v => (
-                                  <button
-                                    key={v.id}
-                                    onClick={() => {
-                                      setSelectedBaseDish(item);
-                                      setSelectedVariation(v);
-                                      setOrderStep(2);
-                                    }}
-                                    className="flex-grow sm:flex-grow-0 flex items-center justify-between gap-3 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-600 hover:border-primary-500 dark:hover:border-primary-500 hover:text-primary-500 transition-all group/var"
-                                  >
-                                    <span className="text-xs font-black uppercase tracking-wide text-gray-600 dark:text-gray-300 group-hover/var:text-primary-500">{v.label}</span>
-                                    <span className="text-sm font-black text-gray-900 dark:text-white group-hover/var:text-primary-500">${v.price}</span>
-                                  </button>
-                                ))}
+                                <div className="flex flex-wrap gap-2">
+                                  {item.variations.map(v => (
+                                    <button
+                                      key={v.id}
+                                      onClick={() => {
+                                        setSelectedBaseDish(item);
+                                        setSelectedVariation(v);
+                                        setOrderStep(2);
+                                      }}
+                                      className="flex-grow sm:flex-grow-0 flex items-center justify-between gap-3 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-600 hover:border-primary-500 dark:hover:border-primary-500 hover:text-primary-500 transition-all group/var"
+                                    >
+                                      <span className="text-xs font-black uppercase tracking-wide text-gray-600 dark:text-gray-300 group-hover/var:text-primary-500">{v.label}</span>
+                                      <span className="text-sm font-black text-gray-900 dark:text-white group-hover/var:text-primary-500">${v.price}</span>
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          {menuItems.filter(item => item.categoryId !== 'cat-1' && item.categoryId !== 'cat-2' && item.isActive && item.name.toLowerCase().includes(quickSearch.toLowerCase())).length === 0 && (
+                            <p className="text-center text-gray-400 italic py-4">No se encontraron platillos con ese nombre.</p>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -569,44 +725,65 @@ export default function PublicView({ categories, menuItems, onEnterControlPanel,
 
                 {/* Step 3: Drinks & Desserts */}
                 {orderStep === 3 && (
-                  <div className="space-y-8 text-center py-6">
+                  <div className="space-y-6 text-center py-6">
                     <div className="inline-flex p-4 bg-amber-50 dark:bg-amber-950/30 rounded-3xl mb-4">
                       <Award className="w-12 h-12 text-amber-500" />
                     </div>
                     <h4 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">¿Deseas algo más?</h4>
-                    <p className="text-gray-500 dark:text-gray-400 font-bold max-w-sm mx-auto">Te sugerimos acompañar tu plato con una de nuestras bebidas o postres artesanales.</p>
+                    <p className="text-gray-500 dark:text-gray-400 font-bold max-w-sm mx-auto mb-8">Te sugerimos acompañar tu plato con una de nuestras bebidas o postres artesanales.</p>
 
-                    <div className="grid grid-cols-1 gap-4 text-left mt-8">
-                      {menuItems.filter(item => ['cat-1', 'cat-2', 'cat-bebidas', 'cat-postres', 'cat-4', 'cat-5'].includes(item.categoryId) && item.isActive).slice(0, 6).map(item => (
-                        <button
-                          key={item.id}
-                          onClick={() => {
-                            if (selectedExtras.some(e => e.id === item.id)) {
-                              setSelectedExtras(prev => prev.filter(e => e.id !== item.id));
-                            } else {
-                              setSelectedExtras(prev => [...prev, item]);
-                            }
-                          }}
-                          className={`flex items-center justify-between p-6 rounded-3xl border-2 transition-all ${selectedExtras.some(e => e.id === item.id)
-                            ? 'bg-amber-500 text-white border-amber-500 shadow-xl shadow-amber-500/20'
-                            : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-100 dark:border-gray-700 hover:border-amber-200'
-                            }`}
-                        >
-                          <div className="flex-1">
-                            <p className="font-black text-sm uppercase tracking-tight">{item.name}</p>
-                            <p className="text-[10px] font-bold opacity-60 uppercase mt-1">${Math.min(...item.variations.map(v => v.price)).toFixed(2)}</p>
+                    <div className="space-y-4">
+                      {categories
+                        .filter(cat => !['cat-3', 'cat-5', 'cat-caldos', 'cat-cerdo', 'cat-pollo', 'cat-carnes', 'cat-mariscos', 'cat-desayunos'].includes(cat.id))
+                        .map(cat => (
+                          <div key={cat.id} className="space-y-2">
+                            <button
+                              onClick={() => setExtraModalType(cat.id === 'cat-2' ? 'drinks' : cat.id === 'cat-1' ? 'desserts' : null)} // Currently mapping manually, eventually should be dynamic based on category type
+                              className={`w-full flex items-center justify-between p-6 bg-white dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-800 rounded-3xl hover:border-primary-500 transition-all shadow-sm hover:shadow-xl group
+                                ${cat.id === 'cat-2' ? 'hover:border-amber-500' : ''}
+                                ${cat.id === 'cat-1' ? 'hover:border-pink-500' : ''}
+                              `}
+                            >
+                              <div className="flex items-center gap-4">
+                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform
+                                   ${cat.id === 'cat-2' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
+                                    cat.id === 'cat-1' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400' :
+                                      'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'}
+                                `}>
+                                  {cat.id === 'cat-2' ? <ShoppingBag className="w-6 h-6" /> :
+                                    cat.id === 'cat-1' ? <Heart className="w-6 h-6" /> :
+                                      <Utensils className="w-6 h-6" />}
+                                </div>
+                                <div className="text-left">
+                                  <h5 className="font-black text-gray-900 dark:text-white uppercase tracking-widest text-sm">{cat.name}</h5>
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Toca para elegir</p>
+                                </div>
+                              </div>
+                              <ChevronRight className={`w-5 h-5 text-gray-300 transition-colors
+                                  ${cat.id === 'cat-2' ? 'group-hover:text-amber-500' :
+                                  cat.id === 'cat-1' ? 'group-hover:text-pink-500' :
+                                    'group-hover:text-primary-500'}
+                              `} />
+                            </button>
+
+                            {selectedExtras.filter(e => e.categoryId === cat.id).length > 0 && (
+                              <div className="flex flex-wrap gap-2 px-2">
+                                {selectedExtras.filter(e => e.categoryId === cat.id).map(item => (
+                                  <span key={item.id} className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase flex items-center gap-2
+                                       ${cat.id === 'cat-2' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' :
+                                      cat.id === 'cat-1' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400' :
+                                        'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'}
+                                    `}>
+                                    {item.name}
+                                    <button onClick={() => setSelectedExtras(prev => prev.filter(p => p.id !== item.id))} className="hover:opacity-70" aria-label={`Eliminar ${item.name}`}><X className="w-3 h-3" /></button>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          {selectedExtras.some(e => e.id === item.id) ? <Check className="w-6 h-6" /> : <Plus className="w-5 h-5 opacity-30" />}
-                        </button>
-                      ))}
-                      {/* Fallback items if categories are not found */}
-                      {menuItems.filter(item => ['cat-bebidas', 'cat-postres', 'cat-4', 'cat-5'].includes(item.categoryId)).length === 0 && (
-                        ['Agua de Horchata', 'Flan Napolitano', 'Refresco de Vidrio', 'Cerveza Nacional'].map(extra => (
-                          <div key={extra} className="p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl text-gray-400 text-center font-bold text-xs uppercase tracking-widest border-2 border-dashed border-gray-200 dark:border-gray-700">
-                            {extra} (Disponible)
-                          </div>
-                        ))
-                      )}
+                        ))}
+
+
                     </div>
                   </div>
                 )}
@@ -698,28 +875,11 @@ export default function PublicView({ categories, menuItems, onEnterControlPanel,
                   ) : (
                     <button
                       onClick={() => {
-                        const number = "2311024672";
-                        const total = (
-                          (selectedVariation?.price || 0) +
-                          selectedExtras.reduce((acc, e) => acc + Math.min(...e.variations.map(v => v.price)), 0)
-                        ).toFixed(2);
-
-                        const message = `*NUEVO PEDIDO EN LÍNEA - EL BUEN SERVIR*%0A%0A` +
-                          `🥘 *Platillo:* ${selectedBaseDish?.name}%0A` +
-                          (selectedSides.length > 0 ? `🥗 *Guarniciones:* ${selectedSides.join(', ')} (Sin costo)%0A` : '') +
-                          (selectedExtras.length > 0 ? `🥤 *Adicionales:* ${selectedExtras.map(e => e.name).join(', ')}%0A` : '') +
-                          (customerComments ? `📝 *Notas:* ${customerComments}%0A` : '') +
-                          `%0A💰 *TOTAL:* $${total}%0A%0A` +
-                          `🚀 _Enviado desde el sitio web_`;
-
-                        window.open(`https://wa.me/52${number}?text=${message}`, '_blank');
-                        setIsOrderModalOpen(false);
-                        // Reset state
-                        setOrderStep(1);
-                        setSelectedBaseDish(null);
-                        setSelectedSides([]);
-                        setSelectedExtras([]);
-                        setCustomerComments('');
+                        if (!loggedCustomer) {
+                          setIsAuthModalOpen(true);
+                          return;
+                        }
+                        setIsDeliverySelectionOpen(true);
                       }}
                       className="flex-1 flex items-center justify-center gap-3 py-6 bg-emerald-500 text-white rounded-[28px] font-black uppercase text-sm tracking-[0.2em] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-emerald-500/20"
                     >
@@ -733,6 +893,376 @@ export default function PublicView({ categories, menuItems, onEnterControlPanel,
           </div>
         )
       }
-    </div >
+
+      {/* Selection Modal (Drinks/Desserts) */}
+      {
+        extraModalType && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setExtraModalType(null)}></div>
+            <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-[32px] shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-300">
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+                <div>
+                  <h4 className="font-black text-xl text-gray-900 dark:text-white uppercase tracking-tighter">
+                    {extraModalType === 'drinks' ? 'Seleccionar Bebidas' : 'Seleccionar Postres'}
+                  </h4>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Elige tus favoritos</p>
+                </div>
+                <button onClick={() => setExtraModalType(null)} className="p-2 bg-white dark:bg-gray-800 text-gray-400 rounded-xl hover:text-red-500 transition-colors" aria-label="Cerrar modal">
+                  <X className="w-5 h-5" />
+                </button>
+
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                <div className="grid grid-cols-1 gap-3">
+                  {menuItems
+                    .filter(item => {
+                      if (extraModalType === 'drinks' || extraModalType === 'cat-2') return ['cat-2', 'cat-bebidas'].includes(item.categoryId) && item.isActive;
+                      if (extraModalType === 'desserts' || extraModalType === 'cat-1') return ['cat-1', 'cat-postres'].includes(item.categoryId) && item.isActive;
+                      // Allow other categories if dynamic
+                      return item.categoryId === extraModalType && item.isActive;
+                    })
+                    .map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setViewingExtraItem(item);
+                          setViewingExtraVariation(item.variations[0]);
+                        }}
+
+                        className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-100 dark:border-gray-700 hover:border-gray-300`}
+                      >
+                        <div className="text-left">
+                          <p className="font-black text-xs uppercase tracking-tight">{item.name}</p>
+                          <p className="text-[10px] font-bold opacity-70 uppercase mt-0.5 text-primary-500">Toca para elegir</p>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                      </button>
+                    ))
+                  }
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+                <button
+                  onClick={() => setExtraModalType(null)}
+                  className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Item Details Modal (Level 2) */}
+      {
+        viewingExtraItem && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-in fade-in duration-300">
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setViewingExtraItem(null)}></div>
+            <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-[32px] shadow-2xl relative z-10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+                <h4 className="font-black text-xl text-gray-900 dark:text-white uppercase tracking-tighter">{viewingExtraItem.name}</h4>
+                <button onClick={() => setViewingExtraItem(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors" aria-label="Cerrar detalle">
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-6">
+                <p className="text-gray-500 dark:text-gray-400 text-sm italic">{viewingExtraItem.description || "Deliciosa opción para acompañar tus alimentos."}</p>
+
+                {/* Variation Selection */}
+                <div className="space-y-3">
+                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Elige una opción</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {viewingExtraItem.variations.map(variation => (
+                      <button
+                        key={variation.id}
+                        onClick={() => setViewingExtraVariation(variation)}
+                        className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-1
+                            ${viewingExtraVariation?.id === variation.id
+                            ? 'bg-primary-500 text-white border-primary-500 shadow-lg'
+                            : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-100 dark:border-gray-700 hover:border-primary-200'}
+                          `}
+                      >
+                        <span className="font-black text-xs uppercase tracking-wide">{variation.label}</span>
+                        <span className={`text-sm font-bold ${viewingExtraVariation?.id === variation.id ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                          ${variation.price}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
+                  <span className="font-black text-gray-900 dark:text-white uppercase text-sm">Precio Final</span>
+                  <span className="font-black text-primary-500 text-xl">${viewingExtraVariation?.price.toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+                <button
+                  onClick={() => {
+                    if (viewingExtraVariation) {
+                      // Store item with ONLY the selected variation to simplify price calculation later
+                      const itemWithSelectedVariation = {
+                        ...viewingExtraItem,
+                        variations: [viewingExtraVariation]
+                      };
+                      setSelectedExtras(prev => [...prev, itemWithSelectedVariation]);
+                      setViewingExtraItem(null);
+                      setViewingExtraVariation(null);
+                      setExtraModalType(null); // Return to main flow
+                    }
+                  }}
+                  disabled={!viewingExtraVariation}
+                  className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-lg flex items-center justify-center gap-2
+                       ${viewingExtraVariation
+                      ? 'bg-emerald-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-emerald-500/20'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'}
+                     `}
+                >
+                  <Check className="w-5 h-5" />
+                  Agregar y Continuar
+                </button>
+              </div>
+
+            </div>
+          </div>
+        )
+      }
+
+      {/* Authentication Modal */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsAuthModalOpen(false)}></div>
+          <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[32px] shadow-2xl relative z-10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
+            <div className="p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
+              <div>
+                <h4 className="font-black text-2xl text-gray-900 dark:text-white uppercase tracking-tighter">
+                  {authMode === 'login' ? 'Iniciar Sesión' : 'Crea tu Cuenta'}
+                </h4>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                  {authMode === 'login' ? 'Bienvenido de nuevo' : 'Únete a El Buen Servir'}
+                </p>
+              </div>
+              <button
+                title="Cerrar"
+                onClick={() => setIsAuthModalOpen(false)}
+                className="p-2 bg-gray-100 dark:bg-gray-800 text-gray-400 rounded-xl hover:text-red-500 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAuthSubmit} className="p-8 space-y-5">
+              {authMode === 'register' && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre Completo</label>
+                  <input
+                    type="text"
+                    required
+                    value={authForm.name}
+                    onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })}
+                    className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl outline-none transition-all dark:text-white"
+                    placeholder="Ej. Juan Pérez"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Número de Teléfono</label>
+                <input
+                  type="tel"
+                  required
+                  value={authForm.phone}
+                  onChange={(e) => setAuthForm({ ...authForm, phone: e.target.value })}
+                  className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl outline-none transition-all dark:text-white"
+                  placeholder="Tu número a 10 dígitos"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contraseña</label>
+                <input
+                  type="password"
+                  required
+                  value={authForm.password}
+                  onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
+                  className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl outline-none transition-all dark:text-white"
+                  placeholder="********"
+                />
+              </div>
+
+              {authMode === 'register' && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dirección (Opcional)</label>
+                  <input
+                    type="text"
+                    value={authForm.address}
+                    onChange={(e) => setAuthForm({ ...authForm, address: e.target.value })}
+                    className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl outline-none transition-all dark:text-white"
+                    placeholder="Calle, Número, Colonia"
+                  />
+                </div>
+              )}
+
+              {authError && (
+                <p className="text-red-500 text-[10px] font-black uppercase text-center">{authError}</p>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-5 bg-gray-900 dark:bg-primary-500 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-primary-500/20"
+              >
+                {authMode === 'login' ? 'Entrar y Enviar Pedido' : 'Registrarme y Finalizar'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode(authMode === 'login' ? 'register' : 'login');
+                  setAuthError('');
+                }}
+                className="w-full text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-primary-500 transition-colors"
+                title={authMode === 'login' ? 'Si no tienes cuenta, presiona aquí para registrarte' : 'Si ya tienes cuenta, presiona aquí para iniciar sesión'}
+              >
+                {authMode === 'login' ? '¿No tienes cuenta? Regístrate aquí' : '¿Ya tienes cuenta? Inicia sesión'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delivery Selection Modal */}
+      {isDeliverySelectionOpen && loggedCustomer && (
+        <div className="fixed inset-0 z-[210] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsDeliverySelectionOpen(false)}></div>
+          <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[32px] shadow-2xl relative z-10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 max-h-[90vh]">
+            <div className="p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center shrink-0">
+              <div>
+                <h4 className="font-black text-2xl text-gray-900 dark:text-white uppercase tracking-tighter">¿Cómo recibes tu pedido?</h4>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Selecciona una opción de entrega</p>
+              </div>
+              <button
+                title="Cerrar selección de entrega"
+                onClick={() => setIsDeliverySelectionOpen(false)}
+                className="p-2 bg-gray-100 dark:bg-gray-800 text-gray-400 rounded-xl hover:text-red-500 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+              <div className="grid grid-cols-1 gap-4">
+                <button
+                  onClick={() => setDeliveryMethod('pickup')}
+                  className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${deliveryMethod === 'pickup' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-lg' : 'border-gray-100 dark:border-gray-800 hover:border-gray-200'}`}
+                >
+                  <div className={`p-3 rounded-xl transition-colors ${deliveryMethod === 'pickup' ? 'bg-primary-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
+                    <Store className="w-6 h-6" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-black text-sm uppercase dark:text-white tracking-tight">Recoger en Mostrador</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Sin costo adicional</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setDeliveryMethod('table')}
+                  className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${deliveryMethod === 'table' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-lg' : 'border-gray-100 dark:border-gray-800 hover:border-gray-200'}`}
+                >
+                  <div className={`p-3 rounded-xl transition-colors ${deliveryMethod === 'table' ? 'bg-primary-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
+                    <Utensils className="w-6 h-6" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-black text-sm uppercase dark:text-white tracking-tight">Consumo en Mesa</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Para comer aquí</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setDeliveryMethod('delivery')}
+                  className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${deliveryMethod === 'delivery' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-lg' : 'border-gray-100 dark:border-gray-800 hover:border-gray-200'}`}
+                >
+                  <div className={`p-3 rounded-xl transition-colors ${deliveryMethod === 'delivery' ? 'bg-primary-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
+                    <Truck className="w-6 h-6" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-black text-sm uppercase dark:text-white tracking-tight">Envío a Domicilio</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Llegamos hasta tu puerta</p>
+                  </div>
+                </button>
+              </div>
+
+              {deliveryMethod === 'table' && (
+                <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">¿Qué mesa ocupas?</label>
+                  <input
+                    type="number"
+                    value={tableNumber}
+                    onChange={(e) => setTableNumber(e.target.value)}
+                    className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl outline-none transition-all dark:text-white font-black text-xl text-center"
+                    placeholder="Escribe el número"
+                  />
+                </div>
+              )}
+
+              {deliveryMethod === 'delivery' && (
+                <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dirección de entrega</label>
+                  <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar p-1">
+                    {loggedCustomer.addresses?.map((addr, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedAddress(addr)}
+                        className={`w-full p-4 rounded-xl border-2 text-left transition-all ${selectedAddress === addr ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600 shadow-sm' : 'border-gray-100 dark:border-gray-800 text-gray-500'}`}
+                      >
+                        <p className="text-xs font-bold truncate tracking-tight">{addr}</p>
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newAddr = prompt("Nueva dirección:");
+                        if (newAddr) setSelectedAddress(newAddr);
+                      }}
+                      className="w-full p-4 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 text-center text-gray-400 hover:border-primary-300 hover:text-primary-500 transition-all font-bold text-[10px] uppercase tracking-widest"
+                    >
+                      + Agregar Nueva Dirección
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+
+
+            <div className="p-8 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
+              <button
+                disabled={!deliveryMethod || (deliveryMethod === 'table' && !tableNumber) || (deliveryMethod === 'delivery' && !selectedAddress)}
+                onClick={() => {
+                  sendWhatsAppOrder(loggedCustomer);
+                  setIsDeliverySelectionOpen(false);
+                }}
+                className={`w-full py-5 rounded-[28px] font-black uppercase text-sm tracking-[0.2em] transition-all shadow-xl flex items-center justify-center gap-3
+                  ${(!deliveryMethod || (deliveryMethod === 'table' && !tableNumber) || (deliveryMethod === 'delivery' && !selectedAddress))
+                    ? 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'
+                    : 'bg-emerald-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-emerald-500/20'
+                  }`}
+              >
+                <MessageCircle className="w-6 h-6" />
+                <span>Confirmar Pedido WhatsApp</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
+
+
+
+

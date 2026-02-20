@@ -19,7 +19,8 @@ import {
   Shield,
   ChevronDown,
   Package,
-  Briefcase
+  Briefcase,
+  History
 } from 'lucide-react';
 import { AdminSection } from '../types';
 
@@ -73,6 +74,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { icon: Users, label: 'Clientes', id: 'customers' },
     { icon: BarChart3, label: 'Reportes', id: 'reports' },
     { icon: Shield, label: 'Gestión Personal', id: 'staff_management' },
+    { icon: History, label: 'Logs del Sitio', id: 'logs' },
   ];
 
   const isLogisticsActive = logisticsItems.some(item => item.id === activeSection);

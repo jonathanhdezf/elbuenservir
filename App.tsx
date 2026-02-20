@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { MenuItem, Category, TabId, Order, Customer, DeliveryDriver, Staff } from './types';
+import { MenuItem, Category, TabId, Order, Customer, DeliveryDriver, Staff, SiteLog } from './types';
 import AdminView from './views/AdminView';
 import PublicView from './views/PublicView';
 import MonitorCocina from './views/MonitorCocina';
@@ -12,14 +12,14 @@ import ControlPanelView from './views/ControlPanelView';
 const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-3', name: 'Menú del Día' },
   { id: 'cat-5', name: 'Para Acompañar' },
+  { id: 'cat-2', name: 'Bebidas' },
+  { id: 'cat-1', name: 'Postres' },
   { id: 'cat-caldos', name: 'Caldos' },
   { id: 'cat-cerdo', name: 'Cerdo' },
   { id: 'cat-pollo', name: 'Pollo' },
   { id: 'cat-carnes', name: 'Carnes' },
   { id: 'cat-mariscos', name: 'Mariscos' },
   { id: 'cat-desayunos', name: 'Desayunos' },
-  { id: 'cat-1', name: 'Postres' },
-  { id: 'cat-2', name: 'Bebidas' },
 ];
 
 const INITIAL_ITEMS: MenuItem[] = [
@@ -289,7 +289,7 @@ const INITIAL_DRIVERS: DeliveryDriver[] = [
   { id: 'D-004', name: 'Lucía Méndez', phone: '555-0204', status: 'active', vehicleType: 'walking', deliveriesCompleted: 45, rating: 4.9 },
 ];
 const INITIAL_CUSTOMERS: Customer[] = [
-  { id: 'cust-1', name: 'Juan Pérez', phone: '555-0101', email: 'juan@example.com', totalOrders: 15, totalSpent: 1250.50, lastOrderDate: new Date(Date.now() - 86400000).toISOString(), addresses: ['Calle 10, Col. Centro', 'Av. Juárez 45'] },
+  { id: 'cust-1', name: 'Juan Pérez', phone: '1234567890', email: 'juan@example.com', totalOrders: 15, totalSpent: 1250.50, lastOrderDate: new Date(Date.now() - 86400000).toISOString(), addresses: ['Calle 10, Col. Centro', 'Av. Juárez 45'], password: '123456' },
   { id: 'cust-2', name: 'María García', phone: '555-0102', email: 'maria@example.com', totalOrders: 8, totalSpent: 740.00, lastOrderDate: new Date(Date.now() - 172800000).toISOString(), addresses: ['Av. Reforma 200'] },
 ];
 
@@ -299,6 +299,41 @@ const INITIAL_STAFF: Staff[] = [
   { id: 'S-002', name: 'Ana Mesera', phone: '555-0302', role: 'waiter', status: 'active', password: '789' },
   { id: 'S-003', name: 'Carlos Mesero', phone: '555-0303', role: 'waiter', status: 'active', password: '321' },
 ];
+
+const INITIAL_LOGS: SiteLog[] = [
+  {
+    id: 'log-1',
+    timestamp: new Date(Date.now() - 3600000).toISOString(),
+    user: 'Miguel (Admin)',
+    action: 'Inicio de Sesion',
+    details: 'El administrador Miguel ha iniciado sesión desde el puerto de control.',
+    type: 'success'
+  },
+  {
+    id: 'log-2',
+    timestamp: new Date(Date.now() - 7200000).toISOString(),
+    user: 'Chef Mario',
+    action: 'Actualización Menú',
+    details: 'Se ha modificado el precio del producto "Chilpozo de res" de $90 a $95',
+    type: 'info'
+  },
+  {
+    id: 'log-3',
+    timestamp: new Date(Date.now() - 10800000).toISOString(),
+    user: 'Sistema',
+    action: 'Error de Ticket',
+    details: 'Falla en la comunicación con la impresora térmica del área de barra.',
+    type: 'error'
+  },
+  {
+    id: 'log-4',
+    timestamp: new Date(Date.now() - 14400000).toISOString(),
+    user: 'Ana Mesera',
+    action: 'Venta Local',
+    details: 'Se completó el cobro de la Mesa 4 por un total de $350.00 en efectivo.',
+    type: 'success'
+  }
+];
 export default function App() {
   const [view, setView] = useState<'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch' | 'control_panel'>('public');
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
@@ -307,6 +342,7 @@ export default function App() {
   const [drivers, setDrivers] = useState<DeliveryDriver[]>(INITIAL_DRIVERS);
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
   const [staff, setStaff] = useState<Staff[]>(INITIAL_STAFF);
+  const [logs, setLogs] = useState<SiteLog[]>(INITIAL_LOGS);
   const [tpvEditOrder, setTpvEditOrder] = useState<Order | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
 
@@ -364,6 +400,10 @@ export default function App() {
         setOrders={setOrders}
         drivers={drivers}
         setDrivers={setDrivers}
+        logs={logs}
+        setLogs={setLogs}
+        customers={customers}
+        setCustomers={setCustomers}
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
         onExit={() => setView('control_panel')}
@@ -428,6 +468,9 @@ export default function App() {
     <PublicView
       categories={categories}
       menuItems={menuItems}
+      customers={customers}
+      onAddCustomer={(customer) => setCustomers(prev => [...prev, customer])}
+      onAddOrder={(order) => setOrders(prev => [order, ...prev])}
       onEnterControlPanel={() => setView('control_panel')}
     />
   );

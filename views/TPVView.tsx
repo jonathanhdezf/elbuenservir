@@ -4,7 +4,8 @@ import {
     Monitor, Lock, LogIn, X, ShoppingBag,
     ArrowRight, User, Key, AlertCircle, ChevronDown,
     Plus, Minus, Trash2, Printer, CheckCircle, Search,
-    Sun, Moon, Phone, Clipboard, Map, Utensils, MapPin
+    Sun, Moon, Phone, Clipboard, Map, Utensils, MapPin,
+    ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { MenuItem, Category, Order, OrderItem, Staff, Customer, PaymentMethod } from '../types';
 import { soundManager } from '../utils/soundManager';
@@ -65,6 +66,18 @@ export default function TPVView({
     const [tpvPaymentMethod, setTpvPaymentMethod] = useState<PaymentMethod>('efectivo');
     const [cashReceived, setCashReceived] = useState<string>('');
     const [paymentError, setPaymentError] = useState<string | null>(null);
+
+    const categoriesScrollRef = React.useRef<HTMLDivElement>(null);
+
+    const scrollCategories = (direction: 'left' | 'right') => {
+        if (categoriesScrollRef.current) {
+            const scrollAmount = 200;
+            categoriesScrollRef.current.scrollBy({
+                left: direction === 'left' ? -scrollAmount : scrollAmount,
+                behavior: 'smooth'
+            });
+        }
+    };
 
     // Initial Order Logic
     React.useEffect(() => {
@@ -307,8 +320,8 @@ export default function TPVView({
                         </button>
                     </div>
 
-                    <div className="p-12">
-                        <div className="flex flex-col items-center text-center mb-10">
+                    <div className="p-8">
+                        <div className="flex flex-col items-center text-center mb-6">
                             <div className="w-24 h-24 bg-primary-500 rounded-[32px] flex items-center justify-center text-white shadow-2xl shadow-primary-500/30 mb-6 group hover:rotate-12 transition-transform duration-500">
                                 <Monitor className="w-12 h-12" />
                             </div>
@@ -328,7 +341,7 @@ export default function TPVView({
                                         value={selectedStaffId}
                                         onChange={(e) => setSelectedStaffId(e.target.value)}
                                         required
-                                        className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-3xl pl-16 pr-12 py-5 font-black text-gray-700 dark:text-white appearance-none outline-none transition-all shadow-inner uppercase tracking-wider"
+                                        className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-3xl pl-16 pr-12 py-4 font-black text-gray-700 dark:text-white appearance-none outline-none transition-all shadow-inner uppercase tracking-wider"
                                     >
                                         <option value="" disabled>Elegir Usuario...</option>
                                         {staff.filter(s => s.role !== 'driver').map(s => (
@@ -353,7 +366,7 @@ export default function TPVView({
                                         onChange={(e) => setPassword(e.target.value)}
                                         placeholder="••••••••"
                                         required
-                                        className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-3xl pl-16 pr-6 py-5 font-black text-gray-700 dark:text-white outline-none transition-all shadow-inner tracking-[0.5em]"
+                                        className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-3xl pl-16 pr-6 py-4 font-black text-gray-700 dark:text-white outline-none transition-all shadow-inner tracking-[0.5em]"
                                     />
                                 </div>
                             </div>
@@ -367,7 +380,7 @@ export default function TPVView({
 
                             <button
                                 type="submit"
-                                className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-6 rounded-[32px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl hover:shadow-primary-500/20"
+                                className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-5 rounded-[32px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl hover:shadow-primary-500/20"
                             >
                                 <LogIn className="w-6 h-6" />
                                 Acceder al Sistema
@@ -427,19 +440,42 @@ export default function TPVView({
 
                 <div className="flex-1 overflow-y-auto px-6 md:px-8 py-6 custom-scrollbar pb-32">
                     {/* Categories Tabs */}
-                    <div className="flex items-center gap-2 mb-8 overflow-x-auto pb-2 no-scrollbar">
-                        {categories.map(cat => (
-                            <button
-                                key={cat.id}
-                                onClick={() => setActiveTab(cat.id)}
-                                className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === cat.id
-                                    ? 'bg-gray-900 dark:bg-primary-500 text-white shadow-xl translate-y-[-2px]'
-                                    : 'bg-gray-50 dark:bg-gray-800 text-gray-400 hover:bg-gray-100'
-                                    }`}
-                            >
-                                {cat.name}
-                            </button>
-                        ))}
+                    <div className="relative mb-8 group/cats px-4 md:px-12">
+                        <button
+                            onClick={() => scrollCategories('left')}
+                            title="Desplazar a la izquierda"
+                            aria-label="Desplazar categorías a la izquierda"
+                            className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-full shadow-lg items-center justify-center text-gray-400 hover:text-primary-500 hover:scale-110 active:scale-95 transition-all z-10"
+                        >
+                            <ChevronLeft className="w-5 h-5" />
+                        </button>
+
+                        <div
+                            ref={categoriesScrollRef}
+                            className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar scroll-smooth px-1"
+                        >
+                            {categories.map(cat => (
+                                <button
+                                    key={cat.id}
+                                    onClick={() => setActiveTab(cat.id)}
+                                    className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === cat.id
+                                        ? 'bg-gray-900 dark:bg-primary-500 text-white shadow-xl translate-y-[-2px]'
+                                        : 'bg-gray-50 dark:bg-gray-800 text-gray-400 hover:bg-gray-100'
+                                        }`}
+                                >
+                                    {cat.name}
+                                </button>
+                            ))}
+                        </div>
+
+                        <button
+                            onClick={() => scrollCategories('right')}
+                            title="Desplazar a la derecha"
+                            aria-label="Desplazar categorías a la derecha"
+                            className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-full shadow-lg items-center justify-center text-gray-400 hover:text-primary-500 hover:scale-110 active:scale-95 transition-all z-10"
+                        >
+                            <ChevronRight className="w-5 h-5" />
+                        </button>
                     </div>
 
                     {/* Menu Items Grid */}

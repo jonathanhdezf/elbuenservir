@@ -57,6 +57,8 @@ export interface Order {
   waiterId?: string;
   cashReceived?: number;
   change?: number;
+  notes?: string;
+  deliveryFee?: number;
 }
 
 export interface Customer {
@@ -68,6 +70,7 @@ export interface Customer {
   totalSpent?: number;
   lastOrderDate?: string;
   addresses: string[];
+  password?: string;
 }
 
 export type VehicleType = 'moto' | 'bici' | 'auto' | 'walking';
@@ -93,4 +96,13 @@ export interface Staff {
   password?: string;
 }
 
-export type AdminSection = 'dashboard' | 'kitchen' | 'kds' | 'dds' | 'menu' | 'orders' | 'customers' | 'reports' | 'driver_dashboard' | 'tpv' | 'local_dispatch' | 'staff_management';
+export interface SiteLog {
+  id: string;
+  timestamp: string;
+  user: string;
+  action: string;
+  details: string;
+  type: 'info' | 'success' | 'warning' | 'error' | 'critical';
+}
+
+export type AdminSection = 'dashboard' | 'kitchen' | 'kds' | 'dds' | 'menu' | 'orders' | 'customers' | 'reports' | 'driver_dashboard' | 'tpv' | 'local_dispatch' | 'staff_management' | 'logs';
