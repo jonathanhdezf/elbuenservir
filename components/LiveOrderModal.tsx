@@ -296,7 +296,7 @@ export default function LiveOrderModal({ isOpen, onClose, menuItems, categories,
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             sourceRef.current = audioContextRef.current.createMediaStreamSource(stream);
 
-            const apiKey = (process.env as any).GEMINI_API_KEY || (process.env as any).API_KEY || '';
+            const apiKey = import.meta.env.VITE_GEMINI_API_KEY || (process.env as any).GEMINI_API_KEY || '';
             const ai = new GoogleGenAI({ apiKey });
 
             const menuText = buildMenuSummary(menuItems, categories);
@@ -372,8 +372,9 @@ export default function LiveOrderModal({ isOpen, onClose, menuItems, categories,
                 }
             });
 
-        } catch (err) {
+        } catch (err: any) {
             console.error("Connection failed:", err);
+            alert(`Error de Conexión: ${err.message || 'Verifica los permisos de micrófono y tu API Key en Vercel.'}`);
             setStatus('error');
         }
     };
