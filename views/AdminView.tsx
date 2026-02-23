@@ -777,9 +777,12 @@ export default function AdminView({
 
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cambiar Estado</label>
+                      <label htmlFor="order-status-select" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Cambiar Estado</label>
                       <div className="relative">
                         <select
+                          id="order-status-select"
+                          title="Cambiar estado del pedido"
+                          aria-label="Cambiar estado del pedido"
                           value={viewingOrder.status}
                           onChange={(e) => updateOrderStatus(viewingOrder.id, e.target.value as OrderStatus)}
                           className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-[10px] font-black uppercase outline-none focus:border-primary-500 appearance-none cursor-pointer"
@@ -793,9 +796,12 @@ export default function AdminView({
                     </div>
 
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Método de Pago</label>
+                      <label htmlFor="payment-method-select" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Método de Pago</label>
                       <div className="relative">
                         <select
+                          id="payment-method-select"
+                          title="Cambiar método de pago"
+                          aria-label="Cambiar método de pago"
                           value={viewingOrder.paymentMethod}
                           onChange={(e) => updateOrderPaymentMethod(viewingOrder.id, e.target.value as PaymentMethod)}
                           className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2.5 text-[10px] font-black uppercase outline-none focus:border-primary-500 appearance-none cursor-pointer"
@@ -847,10 +853,11 @@ export default function AdminView({
 
                 {/* Collected By */}
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Cobrado Por</label>
+                  <label htmlFor="waiter-select" className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Cobrado Por</label>
                   <div className="relative">
                     <UserCheck className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <select
+                      id="waiter-select"
                       value={selectedWaiterIdForPanel || ''}
                       onChange={(e) => setSelectedWaiterIdForPanel(e.target.value)}
                       className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-700 rounded-2xl pl-12 pr-10 py-3.5 font-bold text-sm outline-none focus:border-primary-500 uppercase appearance-none transition-all"
@@ -1764,9 +1771,10 @@ export default function AdminView({
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Rol</label>
+              <label htmlFor="staff-role-select" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Rol</label>
               <div className="relative">
                 <select
+                  id="staff-role-select"
                   value={newStaffRole}
                   onChange={e => setNewStaffRole(e.target.value as StaffRole)}
                   className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-700 rounded-2xl px-4 py-3 font-bold text-sm outline-none focus:border-violet-500 transition-all uppercase appearance-none"
