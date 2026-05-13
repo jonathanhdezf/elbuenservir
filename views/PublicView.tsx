@@ -527,10 +527,8 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-16 mb-24">
                 <div className="lg:col-span-1">
                   <div className="flex items-center space-x-2 mb-10">
-                    <div className="w-10 h-10 bg-primary-500 rounded-xl flex items-center justify-center text-white">
-                      <Utensils className="w-6 h-6" />
-                    </div>
                     <span className="text-2xl font-black tracking-tighter dark:text-white uppercase">El Buen Servir</span>
+                    <img src={`${(import.meta as any).env.BASE_URL}assets/logo_pie.png`} alt="Logo pie" className="w-10 h-10 rounded-xl object-cover ml-3" />
                   </div>
                   <p className="text-gray-500 dark:text-gray-400 leading-relaxed mb-10 italic">
                     "Donde cada bocado cuenta una historia de tradición y excelencia culinaria."
