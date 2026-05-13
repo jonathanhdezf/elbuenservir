@@ -322,7 +322,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                     <ShoppingBag className="w-6 h-6" />
                     <span>Ordenar en Línea</span>
                   </button>
-                  <button onClick={() => document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' })} className="w-full sm:w-auto group flex items-center justify-center space-x-4 bg-white/5 backdrop-blur-md border border-white/20 text-white px-8 py-6 rounded-3xl text-base font-bold hover:bg-white/10 transition-all" aria-label="Ir a Nuestra Historia">
+                  <button onClick={() => document.getElementById('pasion-por-lo-que-hacemos')?.scrollIntoView({ behavior: 'smooth' })} className="w-full sm:w-auto group flex items-center justify-center space-x-4 bg-white/5 backdrop-blur-md border border-white/20 text-white px-8 py-6 rounded-3xl text-base font-bold hover:bg-white/10 transition-all" aria-label="Ir a Nuestra Historia">
                     <span>Nuestra Historia</span>
                     <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </button>
@@ -339,7 +339,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
       }
 
       {/* Featured Section */}
-      <section className="py-24 px-6 md:px-12 bg-white dark:bg-gray-900 overflow-hidden">
+      <section id="pasion-por-lo-que-hacemos" className="py-24 px-6 md:px-12 bg-white dark:bg-gray-900 overflow-hidden">
         <div className="w-full grid lg:grid-cols-2 gap-20 items-center">
           <div className="relative">
             <div className="absolute -top-12 -left-12 w-64 h-64 bg-primary-100 rounded-full blur-3xl opacity-50"></div>
