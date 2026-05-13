@@ -32,6 +32,7 @@ interface SidebarProps {
   onExitToSite?: () => void;
   activeSection: AdminSection;
   onSectionChange: (section: AdminSection) => void;
+  badges?: Record<string, number>;
   isFullScreen?: boolean;
 }
 

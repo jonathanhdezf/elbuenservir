@@ -4,7 +4,7 @@ import {
     Store, Utensils, CheckCircle, Clock,
     ShieldCheck, AlertCircle, X, Scan,
     Plus, DollarSign, LayoutGrid, Receipt, Users, User, UserPlus,
-    Banknote, CreditCard
+    Banknote, CreditCard, MessageCircle
 } from 'lucide-react';
 import { Order, Staff } from '../types';
 
@@ -111,8 +111,8 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
     };
 
     const localOrders = orders.filter(o => {
-        const isTable = o.address.includes('Mesa');
-        const isMostrador = o.address.includes('Mostrador');
+        const isTable = o.address?.includes('Mesa') || false;
+        const isMostrador = o.address?.includes('Mostrador') || false;
 
         if (o.status === 'cancelled' || o.status === 'delivered') return false;
         if (o.source !== 'tpv') return false;
@@ -177,8 +177,10 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
             {viewMode === 'tables' ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 pb-32">
                     {tables.map(num => {
-                        const orderId = activeTableOrders[num];
-                        const order = orderId ? orders.find(o => o.id === orderId) : null;
+                        const order = orders.find(o =>
+                            o.address?.includes(`Mesa: ${num}`) &&
+                            !['delivered', 'cancelled'].includes(o.status)
+                        );
                         const isOccupied = !!order;
 
                         return (
@@ -190,7 +192,7 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
                                             <h4 className="text-4xl font-black tracking-tight leading-none mb-1">MESA {num}</h4>
                                             <div className="flex flex-col">
                                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-70">
-                                                    {isOccupied ? 'Ocupada • ' + orderId : 'Disponible'}
+                                                    {isOccupied ? 'Ocupada • ' + order.id : 'Disponible'}
                                                 </p>
                                                 {isOccupied && order?.waiterId && (
                                                     <p className="text-[9px] font-bold uppercase tracking-widest mt-1 bg-white/20 w-fit px-2 py-0.5 rounded-lg">
@@ -335,6 +337,33 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
                                     </div>
 
                                     <div className="pt-4 border-t border-gray-100 dark:border-gray-700 flex flex-col gap-3">
+                                        {(order.status === 'kitchen' || order.status === 'delivery' || order.status === 'delivered') && order.customerPhone && (
+                                            <button
+                                                onClick={() => {
+                                                    const isSent = order.notifiedStatuses?.[order.status];
+                                                    if (!isSent) {
+                                                        setOrders(prev => prev.map(o =>
+                                                            o.id === order.id
+                                                                ? { ...o, notifiedStatuses: { ...(o.notifiedStatuses || {}), [order.status]: true } }
+                                                                : o
+                                                        ));
+                                                    }
+
+                                                    const phone = order.customerPhone.replace(/\D/g, '');
+                                                    const message = order.status === 'kitchen'
+                                                        ? `Hola ${order.customerName}, tu pedido ${order.id} de El Buen Servir está siendo preparado en cocina. Te avisaremos cuando esté listo.`
+                                                        : order.status === 'delivery'
+                                                            ? `Hola ${order.customerName}, tu pedido ${order.id} de El Buen Servir está en camino en reparto. ¡Prepárate para recibirlo!`
+                                                            : `Hola ${order.customerName}, confirmamos la entrega de tu pedido ${order.id}. ¡Gracias por tu preferencia! Visítanos en nuestra página web: https://elbuenservir.vercel.app. Te enviamos tu comprobante en PDF adjunto a este mensaje.`;
+
+                                                    window.open(`https://wa.me/52${phone}?text=${encodeURIComponent(message)}`, '_blank');
+                                                }}
+                                                className={`w-full py-3 rounded-2xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all ${order.notifiedStatuses?.[order.status] ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 border-2 border-transparent' : 'bg-green-500 hover:bg-green-600 text-white shadow-xl shadow-green-500/20'}`}
+                                            >
+                                                <MessageCircle className="w-4 h-4" /> 
+                                                {order.notifiedStatuses?.[order.status] ? 'Aviso Enviado' : 'Notificar por WhatsApp'}
+                                            </button>
+                                        )}
                                         {order.waiterId ? (
                                             <>
                                                 <div className="flex items-center space-x-2 p-3 bg-gray-50 dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-700">

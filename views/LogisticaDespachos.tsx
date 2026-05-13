@@ -28,7 +28,7 @@ export default function LogisticaDespachos({
     setIsDarkMode,
     onExit
 }: LogisticaDespachosProps) {
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isAuthenticated, setIsAuthenticated] = useState(true);
     const [password, setPassword] = useState('');
     const [error, setError] = useState(false);
     const [activeTab, setActiveTab] = useState<'dds' | 'drivers'>('dds');
@@ -87,8 +87,8 @@ export default function LogisticaDespachos({
 
     const readyOrders = orders.filter(o =>
         o.status === 'ready' &&
-        !o.address.toLowerCase().includes('mesa') &&
-        !o.address.toLowerCase().includes('mostrador')
+        !(o.address?.toLowerCase().includes('mesa')) &&
+        !(o.address?.toLowerCase().includes('mostrador'))
     );
 
     const activeDrivers = drivers.filter(d => d.status !== 'offline');
@@ -210,32 +210,6 @@ export default function LogisticaDespachos({
 
                                     return (
                                         <div key={order.id} className="bg-white dark:bg-gray-900 rounded-[24px] md:rounded-[32px] shadow-xl overflow-hidden flex flex-col border border-gray-100 dark:border-gray-800 relative transition-transform hover:scale-[1.01]">
-                                            {verifyingDispatchOrderId === order.id && (
-                                                <div className="absolute inset-0 bg-white/95 dark:bg-gray-950/95 z-20 flex flex-col items-center justify-center p-6 md:p-8 animate-in fade-in duration-300">
-                                                    <button title="Cerrar verificación" onClick={() => { setVerifyingDispatchOrderId(null); setDispatchError(null); setDispatchTicketInput(''); }} className="absolute top-4 right-4 md:top-6 md:right-6 p-2 text-gray-400 hover:text-gray-600"><X className="w-6 h-6 md:w-8 md:h-8" /></button>
-                                                    <ShieldCheck className="w-14 h-14 md:w-20 md:h-20 text-blue-500 mb-4 md:mb-6" />
-                                                    <h4 className="text-xl md:text-3xl font-black uppercase text-gray-900 dark:text-white mb-1 md:mb-2">Verificar</h4>
-                                                    <p className="text-gray-400 font-bold uppercase tracking-widest text-[9px] md:text-xs mb-6 md:mb-8">No. de Orden</p>
-
-                                                    <input
-                                                        type="text"
-                                                        value={dispatchTicketInput}
-                                                        onChange={(e) => { setDispatchTicketInput(e.target.value); setDispatchError(null); }}
-                                                        placeholder={`No. ${order.id}`}
-                                                        className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent rounded-2xl md:rounded-[24px] px-4 md:px-6 py-4 md:py-6 font-black text-center text-xl md:text-2xl uppercase mb-4 focus:border-blue-500 outline-none tracking-widest dark:text-white"
-                                                        autoFocus
-                                                    />
-
-                                                    {dispatchError && <p className="text-[10px] font-black text-red-500 mb-4 md:mb-6 flex items-center gap-2"><AlertCircle className="w-4 h-4" /> {dispatchError}</p>}
-
-                                                    <button
-                                                        onClick={() => handleDispatchVerify(order.id)}
-                                                        className="w-full py-4 md:py-6 bg-blue-500 hover:bg-blue-600 text-white rounded-2xl md:rounded-[24px] font-black uppercase tracking-widest transition-all shadow-xl shadow-blue-500/30 active:scale-95 text-sm md:text-base"
-                                                    >
-                                                        Autorizar Salida
-                                                    </button>
-                                                </div>
-                                            )}
 
                                             <div className="p-5 md:p-6 bg-blue-600 text-white flex justify-between items-center">
                                                 <div className="min-w-0 pr-2">
@@ -275,7 +249,7 @@ export default function LogisticaDespachos({
 
                                             <div className="p-5 md:p-6 pt-0">
                                                 <button
-                                                    onClick={() => { if (driver) setVerifyingDispatchOrderId(order.id); }}
+                                                    onClick={() => { if (driver) { updateOrderStatus(order.id, 'delivery'); soundManager.play('confirm', 'dds'); } }}
                                                     disabled={!driver}
                                                     className={`w-full py-4 md:py-6 rounded-2xl md:rounded-[32px] font-black text-sm md:text-lg uppercase tracking-wider shadow-xl transition-all active:scale-95 flex items-center justify-center gap-2 ${driver ? 'bg-blue-600 text-white shadow-blue-500/20 hover:bg-blue-700' : 'bg-gray-100 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
                                                         }`}

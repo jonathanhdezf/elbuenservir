@@ -4,8 +4,9 @@
  * Categorizes sounds by section and action type.
  */
 
+import { AdminSection } from '../types';
+
 export type AudioAction = 'confirm' | 'alert' | 'notification' | 'error' | 'navigation' | 'click' | 'recycle';
-export type AdminSection = 'dashboard' | 'orders' | 'menu' | 'customers' | 'staff' | 'configuration' | 'kds' | 'dds' | 'local_dispatch' | 'driver_panel' | 'reports' | 'tpv';
 
 const SOUNDS = {
     // Navigation (Stays as is, requested by user)

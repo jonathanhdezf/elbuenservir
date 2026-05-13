@@ -22,7 +22,7 @@ export default function MonitorCocina({
     setIsDarkMode,
     onExit
 }: MonitorCocinaProps) {
-    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isAuthenticated, setIsAuthenticated] = useState(true);
     const [password, setPassword] = useState('');
     const [error, setError] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());

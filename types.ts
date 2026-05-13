@@ -59,6 +59,7 @@ export interface Order {
   change?: number;
   notes?: string;
   deliveryFee?: number;
+  notifiedStatuses?: Record<string, boolean>;
 }
 
 export interface Customer {

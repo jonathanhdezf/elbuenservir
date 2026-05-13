@@ -11,7 +11,7 @@ import {
   Banknote, Receipt, ArrowRight, Printer, CheckCircle,
   Monitor, Maximize2, Bell, Truck, UserMinus, Navigation, ShieldCheck, Layers,
   History, Wallet, ArrowUpRight, Store, Utensils, Zap, Save, UserCheck, Scan, Shield, Sun, Moon,
-  ArrowUp, ArrowDown, Move
+  ArrowUp, ArrowDown, Move, MessageCircle
 } from 'lucide-react';
 import { MenuItem, Category, TabId, Order, OrderItem, OrderStatus, Customer, AdminSection, DeliveryDriver, VehicleType, PaymentMethod, PaymentStatus, TransferStatus, Staff, StaffRole, SiteLog } from '../types';
 import { soundManager, AudioAction } from '../utils/soundManager';
@@ -136,6 +136,8 @@ export default function AdminView({
   // Modal states
   const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null);
   const [viewingOrderId, setViewingOrderId] = useState<string | null>(null);
+  const [orderToDelete, setOrderToDelete] = useState<string | null>(null);
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null);
 
   // Payment confirmation flow states
   const [isConfirmingPayment, setIsConfirmingPayment] = useState(false);
@@ -181,6 +183,18 @@ export default function AdminView({
     soundManager.play(action, section || activeSection);
   }, [activeSection]);
 
+  const recordLog = useCallback((action: string, details: string, type: SiteLog['type'] = 'info') => {
+    const newLog: SiteLog = {
+      id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: new Date().toISOString(),
+      user: 'Sistema',
+      action,
+      details,
+      type
+    };
+    setLogs(prev => [newLog, ...prev]);
+  }, [setLogs]);
+
   const addNotification = useCallback((message: string, type: 'success' | 'error' | 'info' | 'kitchen' = 'success') => {
     // Prevent duplicate messages in the current view to avoid stacking
     setNotifications(prev => {
@@ -196,6 +210,14 @@ export default function AdminView({
         setNotifications(current => current.filter(n => n.id !== id));
       }, 4000);
 
+      // Register the notification in the System Logs
+      let logType: SiteLog['type'] = 'info';
+      if (type === 'error') logType = 'error';
+      else if (type === 'success') logType = 'success';
+      else if (type === 'kitchen') logType = 'info';
+      
+      recordLog('Notificación', message, logType);
+
       return [...prev, newNotif];
     });
 
@@ -203,19 +225,7 @@ export default function AdminView({
     if (type === 'error') {
       playUISound('error');
     }
-  }, [playUISound]);
-
-  const recordLog = useCallback((action: string, details: string, type: SiteLog['type'] = 'info') => {
-    const newLog: SiteLog = {
-      id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      timestamp: new Date().toISOString(),
-      user: 'Miguel (Admin)',
-      action,
-      details,
-      type
-    };
-    setLogs(prev => [newLog, ...prev]);
-  }, [setLogs]);
+  }, [playUISound, recordLog]);
 
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
@@ -238,8 +248,8 @@ export default function AdminView({
   const badges = useMemo(() => ({
     orders: orders.filter(o => o.status === 'pending').length,
     kds: orders.filter(o => o.status === 'kitchen').length,
-    dds: orders.filter(o => o.status === 'ready' && !o.address.toLowerCase().includes('mesa') && !o.address.toLowerCase().includes('mostrador')).length,
-    local_dispatch: orders.filter(o => o.status === 'ready' && (o.address.toLowerCase().includes('mesa') || o.address.toLowerCase().includes('mostrador'))).length,
+    dds: orders.filter(o => o.status === 'ready' && !(o.address?.toLowerCase().includes('mesa')) && !(o.address?.toLowerCase().includes('mostrador'))).length,
+    local_dispatch: orders.filter(o => o.status === 'ready' && (o.address?.toLowerCase().includes('mesa') || o.address?.toLowerCase().includes('mostrador'))).length,
   }), [orders]);
 
   useEffect(() => {
@@ -1006,7 +1016,7 @@ export default function AdminView({
             </button>
             <button
               title={isDarkMode ? "Modo Claro" : "Modo Oscuro"}
-              onClick={() => { setIsDarkMode(!isDarkMode); playUISound.playt('alert'); }}
+              onClick={() => { setIsDarkMode(!isDarkMode); playUISound('click'); }}
               className="p-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all"
             >
               {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -1337,7 +1347,7 @@ export default function AdminView({
                             return newInputs;
                           });
                           addNotification(`Pedido ${currentOrder.id} entregado y pagado`, 'success');
-                          playUISound('confirm', 'driver_panel');
+                          playUISound('confirm', 'driver_dashboard');
                         }}
                         disabled={!isInputValid()}
                         className={`w-full py-6 rounded-[32px] font-black text-lg uppercase tracking-widest shadow-2xl transition-all active:scale-95 flex items-center justify-center space-x-3 ${isInputValid() ? 'bg-emerald-500 text-white shadow-emerald-500/30 hover:bg-emerald-600' : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed shadow-none'}`}
@@ -1366,8 +1376,8 @@ export default function AdminView({
   const renderDDSSection = () => {
     const readyOrders = orders.filter(o =>
       o.status === 'ready' &&
-      !o.address.toLowerCase().includes('mesa') &&
-      !o.address.toLowerCase().includes('mostrador')
+      !(o.address?.toLowerCase().includes('mesa')) &&
+      !(o.address?.toLowerCase().includes('mostrador'))
     );
 
     const handleDispatchVerify = (orderId: string) => {
@@ -1505,6 +1515,7 @@ export default function AdminView({
                 <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Pago</th>
                 <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Repartidor</th>
                 <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Total</th>
+                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
@@ -1567,11 +1578,96 @@ export default function AdminView({
                       )}
                     </td>
                     <td className="px-8 py-6 text-right font-black text-gray-900 dark:text-white">${o.total.toFixed(2)}</td>
+                    <td className="px-8 py-6 text-center">
+                      <div className="flex items-center justify-center space-x-2">
+                        {(o.status === 'kitchen' || o.status === 'delivery' || o.status === 'delivered') && o.customerPhone && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const isSent = o.notifiedStatuses?.[o.status];
+                              if (!isSent) {
+                                setOrders(prev => prev.map(order => 
+                                  order.id === o.id 
+                                    ? { ...order, notifiedStatuses: { ...(order.notifiedStatuses || {}), [o.status]: true } } 
+                                    : order
+                                ));
+                              }
+                              
+                              const phone = o.customerPhone.replace(/\D/g, '');
+                              const message = o.status === 'kitchen' 
+                                ? `Hola ${o.customerName}, tu pedido ${o.id} de El Buen Servir está siendo preparado en cocina. Te avisaremos cuando esté listo.`
+                                : o.status === 'delivery'
+                                  ? `Hola ${o.customerName}, tu pedido ${o.id} de El Buen Servir está en camino en reparto. ¡Prepárate para recibirlo!`
+                                  : `Hola ${o.customerName}, confirmamos la entrega de tu pedido ${o.id}. ¡Gracias por tu preferencia! Visítanos en nuestra página web: https://elbuenservir.vercel.app. Te enviamos tu comprobante en PDF adjunto a este mensaje.`;
+                                
+                              window.open(`https://wa.me/52${phone}?text=${encodeURIComponent(message)}`, '_blank');
+                            }}
+                            className={`p-2 rounded-xl transition-all inline-flex items-center justify-center ${o.notifiedStatuses?.[o.status] ? 'text-gray-400 bg-gray-50 dark:bg-gray-800' : 'text-green-500 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50'}`}
+                            title={o.notifiedStatuses?.[o.status] ? "Mensaje de WhatsApp ya enviado" : "Enviar notificación por WhatsApp"}
+                          >
+                            <MessageCircle className="w-5 h-5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOrderToDelete(o.id);
+                          }}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-all inline-flex items-center justify-center"
+                          title="Eliminar pedido permanentemente"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDeleteConfirmModal = () => {
+    if (!orderToDelete) return null;
+
+    return (
+      <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 animate-in fade-in duration-300">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setOrderToDelete(null)}></div>
+        <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-[40px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500">
+              <Trash2 className="w-8 h-8" />
+            </div>
+            <h4 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mb-2">Eliminar Pedido</h4>
+            <p className="text-sm font-bold text-gray-500 dark:text-gray-400">
+              ¿Estás seguro de eliminar el pedido <span className="text-primary-500 uppercase">{orderToDelete}</span>?
+            </p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mt-4 bg-red-50 dark:bg-red-900/10 p-3 rounded-xl border border-red-100 dark:border-red-900/30">
+              Esta acción no se puede deshacer y ajustará todos los totales de ingresos.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-4 p-8 pt-0">
+            <button
+              onClick={() => setOrderToDelete(null)}
+              className="w-full py-4 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => {
+                setOrders(prev => prev.filter(order => order.id !== orderToDelete));
+                addNotification(`Pedido ${orderToDelete} eliminado del sistema`, 'error');
+                playUISound('error');
+                setOrderToDelete(null);
+              }}
+              className="w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-red-500/30"
+            >
+              Sí, Eliminar
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -1655,7 +1751,9 @@ export default function AdminView({
   // ─── STAFF MANAGEMENT ──────────────────────────────────
   const [newStaffName, setNewStaffName] = useState('');
   const [newStaffPhone, setNewStaffPhone] = useState('');
+  const [newStaffPassword, setNewStaffPassword] = useState('');
   const [newStaffRole, setNewStaffRole] = useState<StaffRole>('waiter');
+  const [editingStaffId, setEditingStaffId] = useState<string | null>(null);
   const [staffRoleFilter, setStaffRoleFilter] = useState<StaffRole | 'all'>('all');
 
   const ROLE_CONFIG: Record<StaffRole, { label: string; color: string; bg: string; icon: any }> = {
@@ -1666,20 +1764,46 @@ export default function AdminView({
     driver: { label: 'Repartidor', color: 'text-teal-600', bg: 'bg-teal-100 dark:bg-teal-900/30', icon: Bike },
   };
 
-  const addStaffMember = () => {
+  const saveStaffMember = () => {
     if (!newStaffName.trim()) return;
-    const newMember: Staff = {
-      id: `S-${Date.now()}`,
-      name: newStaffName.trim(),
-      phone: newStaffPhone.trim() || 'N/A',
-      role: newStaffRole,
-      status: 'active',
-    };
-    setStaff(prev => [...prev, newMember]);
-    addNotification(`${ROLE_CONFIG[newStaffRole].label} "${newStaffName}" registrado`, 'success');
+    
+    if (editingStaffId) {
+      setStaff(prev => prev.map(s => s.id === editingStaffId ? {
+        ...s,
+        name: newStaffName.trim(),
+        phone: newStaffPhone.trim() || 'N/A',
+        password: newStaffPassword.trim(),
+        role: newStaffRole
+      } : s));
+      addNotification('Credenciales actualizadas', 'success');
+      setEditingStaffId(null);
+    } else {
+      const newMember: Staff = {
+        id: `S-${Date.now()}`,
+        name: newStaffName.trim(),
+        phone: newStaffPhone.trim() || 'N/A',
+        password: newStaffPassword.trim(),
+        role: newStaffRole,
+        status: 'active',
+      };
+      setStaff(prev => [...prev, newMember]);
+      addNotification(`${ROLE_CONFIG[newStaffRole].label} "${newStaffName}" registrado`, 'success');
+    }
+    
     setNewStaffName('');
     setNewStaffPhone('');
+    setNewStaffPassword('');
     setNewStaffRole('waiter');
+  };
+
+  const editStaffMember = (member: Staff) => {
+    setEditingStaffId(member.id);
+    setNewStaffName(member.name);
+    setNewStaffPhone(member.phone);
+    setNewStaffPassword(member.password || '');
+    setNewStaffRole(member.role);
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const deleteStaffMember = (id: string) => {
@@ -1749,7 +1873,7 @@ export default function AdminView({
             <UserPlus className="w-6 h-6 text-violet-500" />
             Registrar Personal
           </h4>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-10">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 relative z-10">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre</label>
               <input
@@ -1771,6 +1895,17 @@ export default function AdminView({
               />
             </div>
             <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contraseña (PIN)</label>
+              <input
+                type="text"
+                maxLength={4}
+                value={newStaffPassword}
+                onChange={e => setNewStaffPassword(e.target.value)}
+                className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-700 rounded-2xl px-4 py-3 font-black text-center tracking-[0.5em] text-sm outline-none focus:border-violet-500 transition-all"
+                placeholder="1234"
+              />
+            </div>
+            <div className="space-y-2">
               <label htmlFor="staff-role-select" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Rol</label>
               <div className="relative">
                 <select
@@ -1788,15 +1923,29 @@ export default function AdminView({
                 <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
               </div>
             </div>
-            <div className="flex items-end">
+            <div className="flex items-end gap-2">
               <button
-                onClick={addStaffMember}
+                onClick={saveStaffMember}
                 disabled={!newStaffName.trim()}
-                className="w-full py-3 bg-violet-500 hover:bg-violet-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-violet-500/20 transition-all active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2"
+                className={`flex-1 py-3 ${editingStaffId ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-violet-500 hover:bg-violet-600'} text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg transition-all active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2`}
               >
-                <Plus className="w-4 h-4" />
-                Agregar
+                {editingStaffId ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                {editingStaffId ? 'Guardar' : 'Agregar'}
               </button>
+              {editingStaffId && (
+                <button
+                  title="Cancelar edición"
+                  onClick={() => {
+                    setEditingStaffId(null);
+                    setNewStaffName('');
+                    setNewStaffPhone('');
+                    setNewStaffPassword('');
+                  }}
+                  className="p-3 bg-gray-100 dark:bg-gray-700 text-gray-500 rounded-2xl hover:bg-gray-200 transition-all"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1830,19 +1979,33 @@ export default function AdminView({
                       {member.phone}
                     </div>
                     <div className="flex items-center justify-between border-t border-gray-50 dark:border-gray-700 pt-4">
-                      <button
-                        onClick={() => toggleStaffStatus(member.id)}
-                        className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all active:scale-95 ${member.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800' : 'bg-gray-50 text-gray-400 border-gray-100 dark:bg-gray-900 dark:border-gray-700'}`}
-                      >
-                        {member.status === 'active' ? 'Activo' : 'Inactivo'}
-                      </button>
-                      <button
-                        title="Eliminar personal"
-                        onClick={() => deleteStaffMember(member.id)}
-                        className="p-2 text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => toggleStaffStatus(member.id)}
+                          className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border transition-all active:scale-95 ${member.status === 'active' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 dark:bg-emerald-900/20 dark:border-emerald-800' : 'bg-gray-50 text-gray-400 border-gray-100 dark:bg-gray-900 dark:border-gray-700'}`}
+                        >
+                          {member.status === 'active' ? 'Activo' : 'Inactivo'}
+                        </button>
+                        <div className="bg-gray-100 dark:bg-gray-900 px-2 py-1 rounded-lg">
+                          <code className="text-[9px] font-black text-violet-500 tracking-widest">{member.password || '----'}</code>
+                        </div>
+                      </div>
+                      <div className="flex gap-1">
+                        <button
+                          title="Editar personal"
+                          onClick={() => editStaffMember(member)}
+                          className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          title="Eliminar personal"
+                          onClick={() => deleteStaffMember(member.id)}
+                          className="p-2 text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2006,15 +2169,23 @@ export default function AdminView({
               </div>
               <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-2xl">
                 <p className="text-[10px] uppercase tracking-widest text-gray-400">Total</p>
-                <p className="font-black text-lg">${customer.totalSpent.toFixed(2)}</p>
+                <p className="font-black text-lg">${customer.totalSpent?.toFixed(2) || '0.00'}</p>
               </div>
             </div>
-            <button
-              onClick={() => setEditingCustomer(customer)}
-              className="mt-6 w-full py-3 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-2xl flex items-center justify-center text-xs font-black uppercase tracking-widest text-gray-500 hover:text-primary-500 transition-all"
-            >
-              <Info className="w-4 h-4 mr-2" /> Detalles
-            </button>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setEditingCustomer(customer)}
+                className="py-3 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-2xl flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-primary-500 transition-all"
+              >
+                <Edit2 className="w-4 h-4 mr-2" /> Editar
+              </button>
+              <button
+                onClick={() => setCustomerToDelete(customer)}
+                className="py-3 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-2xl flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-red-500 transition-all"
+              >
+                <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+              </button>
+            </div>
           </div>
         ))}
       </div>
@@ -2106,12 +2277,12 @@ export default function AdminView({
             <div className="pt-6 border-t border-gray-100 dark:border-gray-700 grid grid-cols-2 gap-4">
               <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl text-center">
                 <p className="text-[10px] uppercase tracking-widest text-blue-400 font-black">Total Gastado</p>
-                <p className="text-2xl font-black text-blue-600 dark:text-blue-400">${editingCustomer.totalSpent.toFixed(2)}</p>
+                <p className="text-2xl font-black text-blue-600 dark:text-blue-400">${editingCustomer.totalSpent?.toFixed(2) || '0.00'}</p>
               </div>
               <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-2xl text-center">
                 <p className="text-[10px] uppercase tracking-widest text-emerald-400 font-black">Última Compra</p>
                 <p className="text-sm font-black text-emerald-600 dark:text-emerald-400 mt-1">
-                  {new Date(editingCustomer.lastOrderDate).toLocaleDateString()}
+                  {editingCustomer.lastOrderDate ? new Date(editingCustomer.lastOrderDate).toLocaleDateString() : 'Nunca'}
                 </p>
               </div>
             </div>
@@ -2127,6 +2298,49 @@ export default function AdminView({
               className="w-full py-4 bg-gray-900 dark:bg-primary-500 text-white rounded-2xl font-black uppercase tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl"
             >
               Guardar Cambios
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderDeleteCustomerConfirmModal = () => {
+    if (!customerToDelete) return null;
+
+    return (
+      <div className="fixed inset-0 z-[300] flex items-center justify-center p-6 animate-in fade-in duration-300">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setCustomerToDelete(null)}></div>
+        <div className="bg-white dark:bg-gray-800 w-full max-w-sm rounded-[40px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300">
+          <div className="p-8 text-center">
+            <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6 text-red-500">
+              <Trash2 className="w-8 h-8" />
+            </div>
+            <h4 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter mb-2">Eliminar Cliente</h4>
+            <p className="text-sm font-bold text-gray-500 dark:text-gray-400">
+              ¿Estás seguro de eliminar al cliente <span className="text-primary-500 uppercase">{customerToDelete.name}</span>?
+            </p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-red-500 mt-4 bg-red-50 dark:bg-red-900/10 p-3 rounded-xl border border-red-100 dark:border-red-900/30">
+              Esta acción no se puede deshacer y borrará permanentemente sus datos y direcciones guardadas.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-4 p-8 pt-0">
+            <button
+              onClick={() => setCustomerToDelete(null)}
+              className="w-full py-4 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-200 dark:hover:bg-gray-600 transition-all"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => {
+                setCustomers(prev => prev.filter(c => c.id !== customerToDelete.id));
+                addNotification(`Cliente ${customerToDelete.name} eliminado`, 'error');
+                playUISound('error');
+                setCustomerToDelete(null);
+              }}
+              className="w-full py-4 bg-red-500 hover:bg-red-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-red-500/30"
+            >
+              Sí, Eliminar
             </button>
           </div>
         </div>
@@ -2494,7 +2708,7 @@ export default function AdminView({
       setTpvCart(prev => {
         const existing = prev.find(i => i.id === cartItemId);
         if (existing) {
-          return prev.map(i => i.id === cartItemId ? { ...i, quantity: i.quantity + 1 } : i);
+          return prev.map(i => i.id === cartItemId ? { ...i, quantity: i.quantity + 1, isOld: false } : i);
         }
         return [...prev, {
           id: cartItemId,
@@ -2946,6 +3160,7 @@ export default function AdminView({
             {renderRegisterCustomerModal()}
             {renderSearchCustomerModal()}
             {renderFoundCustomerModal()}
+            {renderDeleteCustomerConfirmModal()}
             {activeSection === 'menu' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex justify-end mb-4">
@@ -3026,6 +3241,7 @@ export default function AdminView({
       {/* Modals */}
       {renderOrderDetailModal()}
       {renderDriverModal()}
+      {renderDeleteConfirmModal()}
 
 
       {assigningOrderId && (

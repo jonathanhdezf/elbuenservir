@@ -215,7 +215,7 @@ export default function TPVView({
             const existing = prev.find(i => i.id === item.id && i.variationLabel === variation.label);
             if (existing) {
                 return prev.map(i => i.id === item.id && i.variationLabel === variation.label
-                    ? { ...i, quantity: i.quantity + 1 }
+                    ? { ...i, quantity: i.quantity + 1, isOld: false }
                     : i
                 );
             }
@@ -224,7 +224,8 @@ export default function TPVView({
                 name: item.name,
                 variationLabel: variation.label,
                 price: variation.price,
-                quantity: 1
+                quantity: 1,
+                isOld: false
             }];
         });
         soundManager.play('click');

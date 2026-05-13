@@ -7,7 +7,7 @@ interface CategoryTabsProps {
   activeTab: TabId;
   setActiveTab: (id: TabId) => void;
   categories: Category[];
-  onAddCategory: () => void;
+  onAddCategory?: () => void;
   isReordering?: boolean;
   onMoveCategory?: (index: number, direction: 'left' | 'right') => void;
   onDeleteCategory?: (id: string) => void;
