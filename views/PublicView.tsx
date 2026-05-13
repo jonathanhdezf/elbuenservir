@@ -547,8 +547,8 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                 <div>
                   <h5 className="font-black mb-8 text-xs uppercase tracking-[0.3em] text-gray-900 dark:text-white">Menú Rápido</h5>
                   <ul className="space-y-4 text-sm font-bold text-gray-500 dark:text-gray-400">
-                    {['Postres', 'Bebidas', 'Platos Fuertes', 'Entradas'].map(item => (
-                      <li key={item}><a href="#" className="hover:text-primary-500 transition-colors">{item}</a></li>
+                    {[{label: 'INICIO', href: '#inicio'}, {label: 'NUESTRA HISTORIA', href: '#pasion-por-lo-que-hacemos'}, {label: 'NUESTRO MENU', href: '#menu'}, {label: 'CONTACTANOS', href: '#contacto'}].map(item => (
+                      <li key={item.label}><a href={item.href} className="hover:text-primary-500 transition-colors">{item.label}</a></li>
                     ))}
                   </ul>
                 </div>
