@@ -558,7 +558,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                   <div className="space-y-6 text-sm">
                     <p className="text-gray-500 dark:text-gray-400 flex items-start">
                       <MapPin className="w-5 h-5 mr-4 text-primary-500 flex-shrink-0" />
-                      <span>Av. Gourmet 789<br />Distrito Gastronómico, CDMX</span>
+                      <span>Mercado Filomeno Mata Local #67<br />16 de Septiembre<br />73800 Teziutlán Puebla</span>
                     </p>
                     <p className="text-gray-500 dark:text-gray-400 flex items-start">
                       <Phone className="w-5 h-5 mr-4 text-primary-500 flex-shrink-0" />
