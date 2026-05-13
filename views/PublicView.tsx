@@ -192,7 +192,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
         <div className="w-full mx-auto px-6 md:px-12 flex justify-between items-center">
           <div className="flex items-center space-x-3 group cursor-pointer">
             <img
-              src={`${(import.meta as any).env.BASE_URL}logo.png`}
+              src={`${(import.meta as any).env.BASE_URL}assets/logo_nuevo.png`}
               alt="El Buen Servir"
               className="w-12 h-12 rounded-2xl shadow-xl shadow-primary-500/20 object-cover group-hover:rotate-12 transition-transform"
             />
