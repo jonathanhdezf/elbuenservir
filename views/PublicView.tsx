@@ -569,12 +569,32 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                   <h5 className="font-black mb-8 text-xs uppercase tracking-[0.3em] text-gray-900 dark:text-white">Horarios</h5>
                   <div className="space-y-4 text-sm">
                     <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 border-b border-gray-50 dark:border-gray-900 pb-2">
-                      <span>Lun - Jue</span>
-                      <span className="font-black text-gray-900 dark:text-white">13:00 - 22:00</span>
+                      <span>Lunes</span>
+                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
                     </div>
                     <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 border-b border-gray-50 dark:border-gray-900 pb-2">
-                      <span>Vie - Sáb</span>
-                      <span className="font-black text-gray-900 dark:text-white">13:00 - 00:00</span>
+                      <span>Martes</span>
+                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
+                    </div>
+                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 border-b border-gray-50 dark:border-gray-900 pb-2">
+                      <span>Miércoles</span>
+                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
+                    </div>
+                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 border-b border-gray-50 dark:border-gray-900 pb-2">
+                      <span>Jueves</span>
+                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
+                    </div>
+                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 border-b border-gray-50 dark:border-gray-900 pb-2">
+                      <span>Viernes</span>
+                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
+                    </div>
+                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 border-b border-gray-50 dark:border-gray-900 pb-2">
+                      <span>Sábado</span>
+                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
+                    </div>
+                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 pb-2">
+                      <span>Domingo</span>
+                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
                     </div>
                     <div className="flex justify-between items-center text-gray-500 dark:text-gray-400">
                       <span>Domingo</span>
