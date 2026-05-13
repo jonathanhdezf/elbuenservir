@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Plus, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap } from 'lucide-react';
 import { Category, MenuItem, Customer, Order } from '../types';
 import { soundManager } from '../utils/soundManager';
-import LiveOrderModal from '../components/LiveOrderModal';
 
 interface PublicViewProps {
   categories: Category[];
@@ -23,7 +22,6 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
 
   // Order Flow States
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
-  const [isLiveOrderOpen, setIsLiveOrderOpen] = useState(false);
   const [orderStep, setOrderStep] = useState(1);
   const [selectedBaseDish, setSelectedBaseDish] = useState<MenuItem | null>(null);
   const [selectedVariation, setSelectedVariation] = useState<any>(null);
@@ -307,7 +305,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                   <span className="text-primary-500 font-serif italic font-normal">Cocina</span> con <br />
                   Herencia.
                 </h1>
-                <p className="text-xl text-white/70 mb-6 max-w-xl leading-relaxed font-medium">
+                <p className="text-xl text-black/70 dark:text-white/70 mb-6 max-w-xl leading-relaxed font-medium">
                   Cada plato cuenta una historia. Descubre la fusión perfecta entre técnicas tradicionales y una visión culinaria moderna.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -316,19 +314,13 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                   </a>
                   <button
                     onClick={() => {
-                      if (!loggedCustomer) {
-                        setAuthMode('login');
-                        setAuthIntent('live');
-                        setAuthError('Esta experiencia de pedido por voz es exclusiva para nuestros clientes registrados.');
-                        setIsAuthModalOpen(true);
-                        return;
-                      }
-                      setIsLiveOrderOpen(true);
+                      setOrderStep(1);
+                      setIsOrderModalOpen(true);
                     }}
-                    className="w-full sm:w-auto group flex items-center justify-center gap-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-white px-10 py-6 rounded-3xl text-lg font-black uppercase tracking-widest shadow-2xl shadow-amber-500/30 transition-all hover:-translate-y-1 active:scale-95"
+                    className="w-full sm:w-auto group flex items-center justify-center gap-3 bg-white text-gray-900 px-10 py-6 rounded-3xl text-lg font-black uppercase tracking-widest shadow-2xl shadow-white/30 transition-all hover:-translate-y-1 hover:bg-primary-500 hover:text-white active:scale-95"
                   >
-                    <Zap className="w-6 h-6 animate-pulse" />
-                    <span>Pedido en Vivo</span>
+                    <ShoppingBag className="w-6 h-6" />
+                    <span>Ordenar en Línea</span>
                   </button>
                   <button className="w-full sm:w-auto group flex items-center justify-center space-x-4 bg-white/5 backdrop-blur-md border border-white/20 text-white px-8 py-6 rounded-3xl text-base font-bold hover:bg-white/10 transition-all">
                     <span>Nuestra Historia</span>
@@ -1195,29 +1187,6 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                 </button>
 
                 <button
-                  onClick={() => {
-                    if (!loggedCustomer) {
-                      setAuthMode('login');
-                      setAuthIntent('live');
-                      setAuthError('Esta experiencia de pedido por voz es exclusiva para nuestros clientes registrados.');
-                      setIsAuthModalOpen(true);
-                      return;
-                    }
-                    setIsDeliverySelectionOpen(false);
-                    setIsLiveOrderOpen(true);
-                  }}
-                  className="flex-1 bg-gray-900 dark:bg-primary-500 text-white p-6 rounded-[32px] flex items-center justify-center gap-4 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl group"
-                >
-                  <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center group-hover:rotate-12 transition-transform">
-                    <Zap className="w-6 h-6" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-xs font-black uppercase tracking-widest opacity-60">Nuevo</p>
-                    <h4 className="text-xl font-black uppercase tracking-tighter">Habla con Sofía</h4>
-                  </div>
-                </button>
-
-                <button
                   onClick={() => setDeliveryMethod('table')}
                   className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${deliveryMethod === 'table' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-lg' : 'border-gray-100 dark:border-gray-800 hover:border-gray-200'}`}
                 >
@@ -1307,18 +1276,6 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
           </div>
         </div>
       )}
-      <LiveOrderModal
-        isOpen={isLiveOrderOpen}
-        onClose={() => setIsLiveOrderOpen(false)}
-        menuItems={menuItems}
-        categories={categories}
-        onAddOrder={onAddOrder}
-        loggedCustomer={loggedCustomer}
-        onOpenAuth={() => {
-          setAuthMode('login');
-          setIsAuthModalOpen(true);
-        }}
-      />
     </div>
   );
 }
