@@ -485,7 +485,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
       {/* CTA Section */}
       {
         !isPreview && (
-          <section className="py-24 px-6 md:px-12">
+          <section id="cta" className="py-24 px-6 md:px-12">
             <div className="w-full bg-gray-900 rounded-[50px] p-12 md:p-24 relative overflow-hidden flex flex-col items-center text-center">
               <div className="absolute top-0 right-0 w-96 h-96 bg-primary-500/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2"></div>
               <div className="relative z-10 max-w-2xl">
@@ -547,7 +547,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                 <div>
                   <h5 className="font-black mb-8 text-xs uppercase tracking-[0.3em] text-gray-900 dark:text-white">Menú Rápido</h5>
                   <ul className="space-y-4 text-sm font-bold text-gray-500 dark:text-gray-400">
-                    {[{label: 'INICIO', href: '#inicio'}, {label: 'NUESTRA HISTORIA', href: '#pasion-por-lo-que-hacemos'}, {label: 'NUESTRO MENU', href: '#menu'}, {label: 'CONTACTANOS', href: '#contacto'}].map(item => (
+                    {[{label: 'INICIO', href: '#inicio'}, {label: 'NUESTRA HISTORIA', href: '#pasion-por-lo-que-hacemos'}, {label: 'NUESTRO MENU', href: '#menu'}, {label: 'CONTACTANOS', href: '#cta'}].map(item => (
                       <li key={item.label}><a href={item.href} className="hover:text-primary-500 transition-colors">{item.label}</a></li>
                     ))}
                   </ul>
