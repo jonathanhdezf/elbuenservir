@@ -322,7 +322,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                     <ShoppingBag className="w-6 h-6" />
                     <span>Ordenar en Línea</span>
                   </button>
-                  <button className="w-full sm:w-auto group flex items-center justify-center space-x-4 bg-white/5 backdrop-blur-md border border-white/20 text-white px-8 py-6 rounded-3xl text-base font-bold hover:bg-white/10 transition-all">
+                  <button onClick={() => document.getElementById('menu')?.scrollIntoView({ behavior: 'smooth' })} className="w-full sm:w-auto group flex items-center justify-center space-x-4 bg-white/5 backdrop-blur-md border border-white/20 text-white px-8 py-6 rounded-3xl text-base font-bold hover:bg-white/10 transition-all" aria-label="Ir a Nuestra Historia">
                     <span>Nuestra Historia</span>
                     <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </button>
