@@ -194,7 +194,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
             <img
               src={`${(import.meta as any).env.BASE_URL}assets/logo_nuevo.png`}
               alt="El Buen Servir"
-              className="w-12 h-12 rounded-2xl shadow-xl shadow-primary-500/20 object-cover group-hover:rotate-12 transition-transform"
+              className="w-12 h-12 rounded-2xl object-cover"
             />
             <div className="flex flex-col">
               <span className={`text-2xl font-black tracking-tighter leading-none ${isScrolled || isPreview ? 'text-gray-900 dark:text-white' : 'text-white'}`}>EL BUEN SERVIR</span>
