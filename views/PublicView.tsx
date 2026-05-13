@@ -204,9 +204,9 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
 
           {/* Desktop Menu */}
           <div className="hidden lg:flex items-center space-x-10 text-sm font-bold uppercase tracking-widest">
-            {['Inicio', 'Menú', 'Nosotros', 'Contacto'].map(link => (
-              <a key={link} href={`#${link.toLowerCase()}`} className={`transition-all hover:text-primary-500 ${isScrolled || isPreview ? 'text-gray-600 dark:text-gray-300' : 'text-white/80'}`}>
-                {link}
+            {[{label: 'INICIO', href: '#inicio'}, {label: 'NUESTRA HISTORIA', href: '#pasion-por-lo-que-hacemos'}, {label: 'NUESTRO MENU', href: '#menu'}, {label: 'CONTACTANOS', href: '#cta'}].map(item => (
+              <a key={item.label} href={item.href} className={`transition-all hover:text-primary-500 ${isScrolled || isPreview ? 'text-gray-600 dark:text-gray-300' : 'text-white/80'}`}>
+                {item.label}
               </a>
             ))}
           </div>
@@ -253,14 +253,14 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
           isMobileMenuOpen && (
             <div className="lg:hidden absolute top-full left-0 w-full bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 p-8 shadow-2xl animate-in slide-in-from-top-4 duration-300">
               <div className="flex flex-col space-y-6">
-                {['Inicio', 'Menú', 'Nosotros', 'Contacto'].map(link => (
+                {[{label: 'INICIO', href: '#inicio'}, {label: 'NUESTRA HISTORIA', href: '#pasion-por-lo-que-hacemos'}, {label: 'NUESTRO MENU', href: '#menu'}, {label: 'CONTACTANOS', href: '#cta'}].map(item => (
                   <a
-                    key={link}
-                    href={`#${link.toLowerCase()}`}
+                    key={item.label}
+                    href={item.href}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className="text-2xl font-black uppercase tracking-tighter text-gray-900 dark:text-white hover:text-primary-500 transition-colors"
                   >
-                    {link}
+                    {item.label}
                   </a>
                 ))}
                 <hr className="border-gray-50 dark:border-gray-800" />
