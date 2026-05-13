@@ -506,11 +506,11 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                     <ShoppingCart className="w-6 h-6" />
                     Ordenar Ahora
                   </button>
-                  <a href="tel:5550100" className="flex items-center space-x-3 text-white hover:text-primary-400 transition-colors">
+                  <a href="tel:+522311808272" className="flex items-center space-x-3 text-white hover:text-primary-400 transition-colors">
                     <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center">
                       <Phone className="w-5 h-5" />
                     </div>
-                    <span className="text-lg font-bold">555-0100</span>
+                    <span className="text-lg font-bold">+522311808272</span>
                   </a>
                 </div>
               </div>
@@ -562,7 +562,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                     </p>
                     <p className="text-gray-500 dark:text-gray-400 flex items-start">
                       <Phone className="w-5 h-5 mr-4 text-primary-500 flex-shrink-0" />
-                      <span>Resv: (55) 555-0100</span>
+                      <span>Resv: +522311808272</span>
                     </p>
                   </div>
                 </div>

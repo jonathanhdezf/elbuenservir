@@ -1714,7 +1714,7 @@ export default function AdminView({
                   value={editingDriver.phone || ''}
                   onChange={e => setEditingDriver({ ...editingDriver, phone: e.target.value })}
                   className="w-full pl-12 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-primary-500 rounded-3xl outline-none transition-all font-bold dark:text-white"
-                  placeholder="Ej. 555-0100"
+                  placeholder="Ej. +522311808272"
                 />
               </div>
             </div>
@@ -2555,7 +2555,7 @@ export default function AdminView({
                   onChange={e => setSearchPhone(e.target.value)}
                   autoFocus
                   className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-primary-500 rounded-2xl pl-12 pr-4 py-4 font-black text-lg outline-none transition-all"
-                  placeholder="Ej. 555-0100"
+                  placeholder="Ej. +522311808272"
                 />
               </div>
             </div>
