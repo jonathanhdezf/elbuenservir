@@ -111,11 +111,15 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
     };
 
     const localOrders = orders.filter(o => {
-        const isTable = o.address?.includes('Mesa') || false;
-        const isMostrador = o.address?.includes('Mostrador') || false;
+        const addressLower = o.address?.toLowerCase() || '';
+        const isTable = addressLower.includes('mesa');
+        const isMostrador = addressLower.includes('mostrador');
 
         if (o.status === 'cancelled' || o.status === 'delivered') return false;
-        if (o.source !== 'tpv') return false;
+        
+        // Allow online orders if they are for a table or counter
+        if (o.source !== 'tpv' && o.source !== 'online') return false;
+        
         if (lockedWaiterId && o.waiterId !== lockedWaiterId) return false;
 
         if (isTable) return true;
@@ -178,7 +182,7 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8 pb-32">
                     {tables.map(num => {
                         const order = orders.find(o =>
-                            o.address?.includes(`Mesa: ${num}`) &&
+                            o.address?.toLowerCase().includes(`mesa: ${num}`) &&
                             !['delivered', 'cancelled'].includes(o.status)
                         );
                         const isOccupied = !!order;

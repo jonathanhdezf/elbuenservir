@@ -48,7 +48,7 @@ const LocalDispatchView: React.FC<LocalDispatchViewProps> = ({
     // Get active order for a table
     const getTableOrder = (tableNum: string) => {
         return orders.find(o =>
-            o.address?.includes(`Mesa: ${tableNum}`) &&
+            o.address?.toLowerCase().includes(`mesa: ${tableNum}`) &&
             !['delivered', 'cancelled'].includes(o.status)
         );
     };
@@ -138,7 +138,7 @@ const LocalDispatchView: React.FC<LocalDispatchViewProps> = ({
         onUpdateOrder(updatedOrder);
 
         // Auto-release table after 5 seconds
-        if (order.address?.includes('Mesa')) {
+        if (order.address?.toLowerCase().includes('mesa')) {
             setTimeout(() => {
                 onUpdateOrder({ id: order.id, status: 'delivered' });
             }, 5000);
@@ -159,7 +159,7 @@ const LocalDispatchView: React.FC<LocalDispatchViewProps> = ({
     };
 
     const counterOrders = orders.filter(o =>
-        o.address?.includes('Mostrador') &&
+        o.address?.toLowerCase().includes('mostrador') &&
         o.status === 'ready'
     );
 
