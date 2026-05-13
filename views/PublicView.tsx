@@ -596,10 +596,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                       <span>Domingo</span>
                       <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
                     </div>
-                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400">
-                      <span>Domingo</span>
-                      <span className="font-black text-primary-500">12:00 - 20:00</span>
-                    </div>
+
                   </div>
                 </div>
               </div>
