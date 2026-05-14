@@ -465,7 +465,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                   <div className="col-span-full flex justify-center mt-12">
                     <button
                       onClick={() => setVisibleItemsCount(prev => prev + 6)}
-                      className="px-8 py-4 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-full font-black text-xs uppercase tracking-widest hover:border-primary-500 hover:text-primary-500 transition-all shadow-xl hover:shadow-primary-500/10 active:scale-95"
+                      className="px-8 py-4 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-full font-black text-xs uppercase tracking-widest text-gray-900 dark:text-white hover:border-primary-500 hover:text-primary-500 transition-all shadow-xl hover:shadow-primary-500/10 active:scale-95"
                     >
                       Mostrar más platillos ({filteredItems.length - visibleItemsCount} restantes)
                     </button>
