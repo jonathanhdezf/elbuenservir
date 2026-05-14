@@ -303,20 +303,11 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                 </button>
 
                 <button
-                  onClick={() => {
-                    soundManager.play('click');
-                    setAuthIntent('live');
-                    if (loggedCustomer) {
-                      setIsLiveOrderOpen(true);
-                    } else {
-                      setIsAuthModalOpen(true);
-                    }
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="w-full bg-emerald-500 text-white py-5 rounded-[24px] font-black uppercase tracking-widest shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-3 active:scale-95 transition-all"
+                  disabled
+                  className="w-full bg-gray-100 dark:bg-gray-800 text-gray-400 py-5 rounded-[24px] font-black uppercase tracking-widest flex items-center justify-center gap-3 cursor-not-allowed opacity-60"
                 >
-                  <Mic className="w-5 h-5 animate-pulse" />
-                  Hablar con Sofía (AI)
+                  <Mic className="w-5 h-5" />
+                  Sofía AI (Próximamente)
                 </button>
               </div>
             </div>
