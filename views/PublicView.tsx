@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap } from 'lucide-react';
+import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap, Mic } from 'lucide-react';
 import { Category, MenuItem, Customer, Order } from '../types';
 import { soundManager } from '../utils/soundManager';
+import LiveOrderModal from '../components/LiveOrderModal';
 
 interface PublicViewProps {
   categories: Category[];
@@ -44,6 +45,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
   const [authForm, setAuthForm] = useState({ name: '', phone: '', password: '', address: '' });
   const [authError, setAuthError] = useState('');
   const [authIntent, setAuthIntent] = useState<'order' | 'live'>('order'); // track WHY auth modal was opened
+  const [isLiveOrderOpen, setIsLiveOrderOpen] = useState(false);
 
   // Delivery Choice States
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'table' | 'delivery' | null>(null);
@@ -298,6 +300,23 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                   className="w-full bg-primary-500 text-white py-5 rounded-[24px] font-black uppercase tracking-widest shadow-xl shadow-primary-500/30 active:scale-95 transition-all"
                 >
                   Ordenar ahora
+                </button>
+
+                <button
+                  onClick={() => {
+                    soundManager.play('click');
+                    setAuthIntent('live');
+                    if (loggedCustomer) {
+                      setIsLiveOrderOpen(true);
+                    } else {
+                      setIsAuthModalOpen(true);
+                    }
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-emerald-500 text-white py-5 rounded-[24px] font-black uppercase tracking-widest shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-3 active:scale-95 transition-all"
+                >
+                  <Mic className="w-5 h-5 animate-pulse" />
+                  Hablar con Sofía (AI)
                 </button>
               </div>
             </div>
@@ -1089,6 +1108,20 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
           </div>
         )
       }
+
+      {/* Live Order Modal (Sofia AI) */}
+      <LiveOrderModal
+        isOpen={isLiveOrderOpen}
+        onClose={() => setIsLiveOrderOpen(false)}
+        menuItems={menuItems}
+        categories={categories}
+        onAddOrder={onAddOrder}
+        loggedCustomer={loggedCustomer}
+        onOpenAuth={() => {
+          setAuthIntent('live');
+          setIsAuthModalOpen(true);
+        }}
+      />
 
       {/* Authentication Modal */}
       {isAuthModalOpen && (
