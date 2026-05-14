@@ -20,6 +20,7 @@ interface TPVViewProps {
     onAddOrder: (order: Partial<Order>) => void;
     onUpdateOrder?: (order: Partial<Order>) => void;
     onAddCustomer: (customer: Customer) => void;
+    updateCustomerStats: (name: string, phone: string, amount: number, adding?: boolean) => void;
     initialOrder?: Order | null;
     isDarkMode: boolean;
     setIsDarkMode: (val: boolean) => void;
@@ -35,6 +36,7 @@ export default function TPVView({
     onAddOrder,
     onUpdateOrder,
     onAddCustomer,
+    updateCustomerStats,
     initialOrder,
     isDarkMode,
     setIsDarkMode,
@@ -300,6 +302,7 @@ export default function TPVView({
         // Print ticket immediately if paid or regular flow
         if (status === 'paid') {
             generateTicket(newOrder as Order);
+            updateCustomerStats(newOrder.customerName!, newOrder.customerPhone!, newOrder.total!, true);
         }
 
         setCart([]);

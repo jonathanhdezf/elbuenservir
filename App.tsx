@@ -8,6 +8,7 @@ import LogisticaDespachos from './views/LogisticaDespachos';
 import TPVView from './views/TPVView';
 import LocalDispatchView from './views/LocalDispatchView.tsx';
 import ControlPanelView from './views/ControlPanelView';
+import RepartidorView from './views/RepartidorView';
 
 const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-3', name: 'Menú del Día' },
@@ -283,10 +284,10 @@ const INITIAL_ORDERS: Order[] = [
 ];
 
 const INITIAL_DRIVERS: DeliveryDriver[] = [
-  { id: 'D-001', name: 'Roberto Sánchez', phone: '555-0201', status: 'active', vehicleType: 'moto', deliveriesCompleted: 154, rating: 4.8 },
-  { id: 'D-002', name: 'Elena Torres', phone: '555-0202', status: 'busy', vehicleType: 'bici', deliveriesCompleted: 89, rating: 4.9 },
-  { id: 'D-003', name: 'Marco Ruíz', phone: '555-0203', status: 'offline', vehicleType: 'auto', deliveriesCompleted: 210, rating: 4.7 },
-  { id: 'D-004', name: 'Lucía Méndez', phone: '555-0204', status: 'active', vehicleType: 'walking', deliveriesCompleted: 45, rating: 4.9 },
+  { id: 'D-001', name: 'Roberto Sánchez', phone: '555-0201', status: 'active', vehicleType: 'moto', deliveriesCompleted: 154, rating: 4.8, pin: '1111' },
+  { id: 'D-002', name: 'Elena Torres', phone: '555-0202', status: 'busy', vehicleType: 'bici', deliveriesCompleted: 89, rating: 4.9, pin: '2222' },
+  { id: 'D-003', name: 'Marco Ruíz', phone: '555-0203', status: 'offline', vehicleType: 'auto', deliveriesCompleted: 210, rating: 4.7, pin: '3333' },
+  { id: 'D-004', name: 'Lucía Méndez', phone: '555-0204', status: 'active', vehicleType: 'walking', deliveriesCompleted: 45, rating: 4.9, pin: '4444' },
 ];
 const INITIAL_CUSTOMERS: Customer[] = [
   { id: 'cust-1', name: 'Juan Pérez', phone: '1234567890', email: 'juan@example.com', totalOrders: 15, totalSpent: 1250.50, lastOrderDate: new Date(Date.now() - 86400000).toISOString(), addresses: ['Calle 10, Col. Centro', 'Av. Juárez 45'], password: '123456' },
@@ -354,12 +355,81 @@ export default function App() {
     }
   }, [isDarkMode]);
 
+  const updateCustomerStats = React.useCallback((customerName: string, customerPhone: string, amount: number, isAdding: boolean = true) => {
+    if (!customerPhone || customerPhone === 'N/A' || customerPhone === '0000000000') return;
+
+    setCustomers(prev => {
+      const customerIndex = prev.findIndex(c => {
+        const cPhone = c.phone.replace(/\D/g, '').slice(-10);
+        const oPhone = customerPhone.replace(/\D/g, '').slice(-10);
+        return cPhone === oPhone;
+      });
+      
+      if (customerIndex === -1) {
+        if (!isAdding) return prev;
+        const newCustomer: Customer = {
+          id: `cust-${Date.now()}`,
+          name: customerName || 'Cliente Nuevo',
+          phone: customerPhone,
+          totalOrders: 1,
+          totalSpent: amount,
+          lastOrderDate: new Date().toISOString(),
+          addresses: []
+        };
+        return [...prev, newCustomer];
+      }
+
+      const newCustomers = [...prev];
+      const customer = newCustomers[customerIndex];
+      
+      newCustomers[customerIndex] = {
+        ...customer,
+        totalOrders: Math.max(0, (customer.totalOrders || 0) + (isAdding ? 1 : -1)),
+        totalSpent: Math.max(0, (customer.totalSpent || 0) + (isAdding ? amount : -amount)),
+        lastOrderDate: isAdding ? new Date().toISOString() : customer.lastOrderDate
+      };
+      
+      return newCustomers;
+    });
+  }, []);
+
+  const updateDriverStats = React.useCallback((driverId: string, rating: number, isAdding: boolean = true) => {
+    setDrivers(prev => prev.map(d => {
+      if (d.id === driverId) {
+        const newCount = Math.max(0, d.deliveriesCompleted + (isAdding ? 1 : -1));
+        // Simple moving average for rating if needed, but for now we just update it
+        return {
+          ...d,
+          deliveriesCompleted: newCount,
+          rating: rating || d.rating
+        };
+      }
+      return d;
+    }));
+  }, []);
+
   if (view === 'control_panel') {
     return (
       <ControlPanelView
-        onNavigate={(newView) => setView(newView)}
+        onNavigate={(newView) => setView(newView as any)}
         onExit={() => setView('public')}
         isDarkMode={isDarkMode}
+      />
+    );
+  }
+
+  if (view === 'driver_portal') {
+    return (
+      <RepartidorView
+        drivers={drivers}
+        setDrivers={setDrivers}
+        orders={orders}
+        setOrders={setOrders}
+        updateCustomerStats={updateCustomerStats}
+        updateDriverStats={updateDriverStats}
+        isDarkMode={isDarkMode}
+        setIsDarkMode={setIsDarkMode}
+        onExit={() => setView('control_panel')}
       />
     );
   }
@@ -404,6 +474,8 @@ export default function App() {
         setLogs={setLogs}
         customers={customers}
         setCustomers={setCustomers}
+        updateCustomerStats={updateCustomerStats}
+        updateDriverStats={updateDriverStats}
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
         onExit={() => setView('control_panel')}
@@ -420,6 +492,7 @@ export default function App() {
         customers={customers}
         orders={orders}
         onAddCustomer={(customer) => setCustomers(prev => [...prev, customer])}
+        updateCustomerStats={updateCustomerStats}
         onAddOrder={(order) => {
           const fullOrder: Order = {
             ...order,
@@ -454,6 +527,7 @@ export default function App() {
       <LocalDispatchView
         orders={orders}
         staff={staff}
+        updateCustomerStats={updateCustomerStats}
         onUpdateOrder={(updated) => setOrders(orders.map(o => o.id === updated.id ? { ...o, ...updated } : o))}
         onEditOrder={(order) => {
           setTpvEditOrder(order);

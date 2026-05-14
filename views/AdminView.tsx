@@ -5,7 +5,7 @@ import {
   Trash2, Clock, MapPin, Phone, User,
   ChefHat, Bike, PackageCheck, TrendingUp,
   Users, ShoppingBag, DollarSign, Search,
-  ChevronRight, Filter, MoreHorizontal, Star,
+  ChevronRight, Filter, MoreHorizontal, Star, Package,
   Edit2, Smartphone, Map, UserPlus, Send,
   ChevronDown, Settings2, Timer, Check, CreditCard,
   Banknote, Receipt, ArrowRight, Printer, CheckCircle,
@@ -13,7 +13,7 @@ import {
   History, Wallet, ArrowUpRight, Store, Utensils, Zap, Save, UserCheck, Scan, Shield, Sun, Moon,
   ArrowUp, ArrowDown, Move, MessageCircle
 } from 'lucide-react';
-import { MenuItem, Category, TabId, Order, OrderItem, OrderStatus, Customer, AdminSection, DeliveryDriver, VehicleType, PaymentMethod, PaymentStatus, TransferStatus, Staff, StaffRole, SiteLog } from '../types';
+import { MenuItem, Category, TabId, Order, OrderItem, OrderStatus, Customer, AdminSection, DeliveryDriver, VehicleType, PaymentMethod, PaymentStatus, TransferStatus, Staff, StaffRole, SiteLog, PayrollEntry, Loan } from '../types';
 import { soundManager, AudioAction } from '../utils/soundManager';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -24,6 +24,7 @@ import { generateTicket } from '../utils/printTicket';
 import { LocalDispatchSection } from '../components/LocalDispatch';
 import ReportsSection from '../components/ReportsSection';
 import LogsSection from '../components/LogsSection';
+import { PayrollSection } from '../components/PayrollSection';
 
 interface AdminViewProps {
   categories: Category[];
@@ -38,6 +39,8 @@ interface AdminViewProps {
   setLogs: React.Dispatch<React.SetStateAction<SiteLog[]>>;
   customers: Customer[];
   setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>;
+  updateCustomerStats: (name: string, phone: string, amount: number, adding?: boolean) => void;
+  updateDriverStats: (driverId: string, rating: number, adding?: boolean) => void;
   isDarkMode: boolean;
   setIsDarkMode: (val: boolean) => void;
   onExit: () => void;
@@ -70,8 +73,10 @@ export default function AdminView({
   setDrivers,
   logs,
   setLogs,
-  customers: propCustomers,
-  setCustomers: setPropCustomers,
+  customers,
+  setCustomers,
+  updateCustomerStats,
+  updateDriverStats,
   isDarkMode,
   setIsDarkMode,
   onExit
@@ -117,17 +122,6 @@ export default function AdminView({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>(propCustomers);
-
-  // Sync with propCustomers when they change from outside
-  useEffect(() => {
-    setCustomers(propCustomers);
-  }, [propCustomers]);
-
-  // Sync with parent when local customers change
-  useEffect(() => {
-    setPropCustomers(customers);
-  }, [customers, setPropCustomers]);
   const [staff, setStaff] = useState<Staff[]>(INITIAL_STAFF);
   const [notificationHistory, setNotificationHistory] = useState<Notification[]>([]);
   const [activeTableOrders, setActiveTableOrders] = useState<Record<number, string>>({});
@@ -162,6 +156,10 @@ export default function AdminView({
   const [tpvDeliveryType, setTpvDeliveryType] = useState<'store' | 'table' | 'delivery'>('store');
   const [tpvWaiterId, setTpvWaiterId] = useState<string | null>(null);
   const [visibleItemsCount, setVisibleItemsCount] = useState(6);
+
+  // Payroll & Loans State
+  const [payrollEntries, setPayrollEntries] = useState<PayrollEntry[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
 
   useEffect(() => {
     setVisibleItemsCount(6);
@@ -227,39 +225,6 @@ export default function AdminView({
     }
   }, [playUISound, recordLog]);
 
-  const updateCustomerStats = useCallback((customerName: string, customerPhone: string, amount: number, isAdding: boolean = true) => {
-    if (!customerPhone || customerPhone === 'N/A') return;
-
-    setCustomers(prev => {
-      const customerIndex = prev.findIndex(c => c.phone === customerPhone);
-      
-      if (customerIndex === -1) {
-        if (!isAdding) return prev;
-        const newCustomer: Customer = {
-          id: `cust-${Date.now()}`,
-          name: customerName || 'Cliente Nuevo',
-          phone: customerPhone,
-          totalOrders: 1,
-          totalSpent: amount,
-          lastOrderDate: new Date().toISOString(),
-          addresses: []
-        };
-        return [...prev, newCustomer];
-      }
-
-      const newCustomers = [...prev];
-      const customer = newCustomers[customerIndex];
-      
-      newCustomers[customerIndex] = {
-        ...customer,
-        totalOrders: Math.max(0, (customer.totalOrders || 0) + (isAdding ? 1 : -1)),
-        totalSpent: Math.max(0, (customer.totalSpent || 0) + (isAdding ? amount : -amount)),
-        lastOrderDate: isAdding ? new Date().toISOString() : customer.lastOrderDate
-      };
-      
-      return newCustomers;
-    });
-  }, []);
 
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
@@ -469,6 +434,77 @@ export default function AdminView({
     }
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, assignedDriverId: undefined } : o));
     addNotification(`Repartidor desvinculado`, 'info');
+  };
+
+  const markAsWhatsAppNotified = (orderId: string) => {
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, whatsappNotified: true } : o));
+    addNotification('Notificación enviada con éxito', 'success');
+  };
+
+  const renderWhatsAppNotifications = () => {
+    const pending = orders.filter(o => o.status === 'delivered' && o.whatsappNotified === false);
+    if (pending.length === 0) return null;
+
+    return (
+      <div className="fixed bottom-8 right-8 z-[200] flex flex-col gap-4 max-w-sm w-full animate-in slide-in-from-bottom-8 duration-500">
+        <div className="flex items-center justify-between px-6 py-2 bg-emerald-500 text-white rounded-t-[24px] shadow-lg">
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2">
+            <Bell className="w-3 h-3 animate-pulse" /> Pendientes de Notificar ({pending.length})
+          </span>
+        </div>
+        <div className="max-h-[50vh] overflow-y-auto p-1 space-y-4 custom-scrollbar">
+          {pending.map(order => {
+            const message = `¡Hola ${order.customerName}! ✨\n\nTu pedido *${order.id}* por un total de *$${order.total.toFixed(2)}* ha sido entregado con éxito. ✅\n\nMuchas gracias por tu preferencia. Te invitamos a conocer más de nosotros en nuestra página web: http://elbuenservir.vercel.app\n\n¡Que lo disfrutes! 🍽️`;
+            
+            return (
+              <div key={order.id} className="bg-white dark:bg-gray-800 p-6 rounded-[32px] shadow-2xl border-2 border-emerald-500/10 flex flex-col gap-4 group hover:scale-[1.02] transition-all relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none"></div>
+                
+                {/* Botón de cerrar manual */}
+                <button 
+                  onClick={() => markAsWhatsAppNotified(order.id)}
+                  title="Omitir notificación"
+                  className="absolute top-4 right-4 p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl transition-all z-10"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+
+                <div className="flex justify-between items-start pr-8">
+                  <div>
+                    <h5 className="font-black text-gray-900 dark:text-white uppercase text-sm tracking-tighter">{order.customerName}</h5>
+                    <p className="text-[8px] font-black text-emerald-500 uppercase tracking-widest mt-0.5">Pedido Entregado • {order.id}</p>
+                  </div>
+                  <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/20 rounded-2xl flex items-center justify-center text-emerald-500 shrink-0">
+                    <PackageCheck className="w-5 h-5" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                    <Smartphone className="w-3.5 h-3.5 text-emerald-500" />
+                    <span className="text-[9px] font-black text-gray-600 dark:text-gray-300">{order.customerPhone}</span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2.5 bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-gray-100 dark:border-gray-800">
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-500" />
+                    <span className="text-[9px] font-black text-gray-900 dark:text-white">${order.total.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <a
+                  href={`https://wa.me/${order.customerPhone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => markAsWhatsAppNotified(order.id)}
+                  className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+                >
+                  <MessageCircle className="w-4 h-4" /> Notificar WhatsApp
+                </a>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   const addItem = () => {
@@ -1369,7 +1405,7 @@ export default function AdminView({
                           }
                           // Mark as delivered and paid
                           const updatedOrder: Order = {
-                            ...o,
+                            ...currentOrder,
                             status: 'delivered',
                             paymentStatus: 'paid',
                             paidAt: new Date().toISOString(),
@@ -1378,6 +1414,7 @@ export default function AdminView({
                           };
                           setOrders(prev => prev.map(o => o.id === currentOrder.id ? updatedOrder : o));
                           updateCustomerStats(updatedOrder.customerName, updatedOrder.customerPhone, updatedOrder.total, true);
+                          updateDriverStats(driver.id, 5, true); // Assuming 5 stars for a successful delivery, can be adjusted
                           setDrivers(prev => prev.map(d => d.id === driver.id ? { ...d, status: 'active' } : d));
                           setDriverInputs(prev => {
                             const newInputs = { ...prev };
@@ -1397,11 +1434,35 @@ export default function AdminView({
                   );
                 })()
               ) : (
-                <div className="py-12 flex flex-col items-center justify-center text-gray-300 dark:text-gray-700 space-y-4">
-                  <div className="w-20 h-20 rounded-[32px] bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-                    <PackageCheck className="w-10 h-10" />
+                <div className="py-12 flex flex-col items-center justify-center space-y-8 animate-in zoom-in-95 duration-500">
+                  <div className="w-24 h-24 rounded-[40px] bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-200 dark:text-gray-700 shadow-inner">
+                    {driver.status === 'offline' ? <Moon className="w-12 h-12" /> : <PackageCheck className="w-12 h-12" />}
                   </div>
-                  <p className="text-xs font-black uppercase tracking-[0.2em]">Sin entregas activas</p>
+                  
+                  <div className="text-center">
+                    <p className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight mb-2">
+                      {driver.status === 'offline' ? 'ESTÁS FUERA DE TURNO' : 'ESTÁS EN TURNO'}
+                    </p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                      {driver.status === 'offline' ? 'Inicia sesión para recibir pedidos' : 'Esperando que administración te asigne un pedido'}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      const newStatus = driver.status === 'offline' ? 'active' : 'offline';
+                      setDrivers(prev => prev.map(d => d.id === driver.id ? { ...d, status: newStatus } : d));
+                      addNotification(newStatus === 'active' ? 'Sesión iniciada: Estás en línea' : 'Sesión cerrada: Estás fuera de línea', 'info');
+                      playUISound('confirm', 'driver_dashboard');
+                    }}
+                    className={`px-12 py-6 rounded-[32px] font-black text-sm uppercase tracking-[0.2em] transition-all active:scale-95 shadow-2xl ${
+                      driver.status === 'offline' 
+                        ? 'bg-emerald-500 text-white shadow-emerald-500/30 hover:bg-emerald-600' 
+                        : 'bg-gray-900 dark:bg-gray-700 text-white shadow-gray-900/30 hover:bg-black dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {driver.status === 'offline' ? 'Entrar a Turno' : 'Cerrar Turno'}
+                  </button>
                 </div>
               )}
             </div>
@@ -1762,6 +1823,52 @@ export default function AdminView({
             </div>
 
             <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">PIN del Portal <span className="text-primary-400">(4 dígitos)</span></label>
+              <div className="relative">
+                <Shield className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-500" />
+                <input
+                  type="text"
+                  maxLength={6}
+                  value={(editingDriver as any).pin || ''}
+                  onChange={e => setEditingDriver({ ...editingDriver, pin: e.target.value.replace(/\D/g, '') } as any)}
+                  className="w-full pl-12 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-primary-500 rounded-3xl outline-none transition-all font-black text-xl tracking-[0.5em] dark:text-white"
+                  placeholder="1234"
+                />
+              </div>
+              <p className="text-[9px] text-gray-400 ml-2">Solo números. El repartidor usa este PIN para entrar a su portal personal.</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Entregas Totales</label>
+                <div className="relative">
+                  <Package className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-500" />
+                  <input
+                    type="number"
+                    value={editingDriver.deliveriesCompleted || 0}
+                    onChange={e => setEditingDriver({ ...editingDriver, deliveriesCompleted: parseInt(e.target.value) || 0 })}
+                    className="w-full pl-10 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-primary-500 rounded-3xl outline-none transition-all font-bold dark:text-white"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Puntaje (Estrellas)</label>
+                <div className="relative">
+                  <Star className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400" />
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="1"
+                    max="5"
+                    value={editingDriver.rating || 5}
+                    onChange={e => setEditingDriver({ ...editingDriver, rating: parseFloat(e.target.value) || 5 })}
+                    className="w-full pl-10 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-primary-500 rounded-3xl outline-none transition-all font-bold dark:text-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Forma de Entrega</label>
               <div className="grid grid-cols-2 gap-3">
                 {(Object.entries(VEHICLE_CONFIG) as [VehicleType, typeof VEHICLE_CONFIG['moto']][]).map(([id, cfg]) => (
@@ -2016,10 +2123,16 @@ export default function AdminView({
                       </div>
                       <div className={`w-3 h-3 rounded-full mt-1 ${member.status === 'active' ? 'bg-emerald-500 animate-pulse' : 'bg-gray-300'}`}></div>
                     </div>
-                    <div className="flex items-center text-xs font-bold text-gray-400 mb-5 gap-2">
-                      <Smartphone className="w-3.5 h-3.5" />
+                    <a 
+                      href={`https://wa.me/${member.phone.replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Enviar WhatsApp"
+                      className="flex items-center text-xs font-black text-gray-400 mb-5 gap-2 hover:text-emerald-500 transition-colors group/wa"
+                    >
+                      <Smartphone className="w-3.5 h-3.5 group-hover/wa:scale-110 transition-transform" />
                       {member.phone}
-                    </div>
+                    </a>
                     <div className="flex items-center justify-between border-t border-gray-50 dark:border-gray-700 pt-4">
                       <div className="flex items-center gap-2">
                         <button
@@ -2066,11 +2179,11 @@ export default function AdminView({
                 </div>
                 <div>
                   <h4 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Equipo de Reparto</h4>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{drivers.length} repartidores • {drivers.filter(d => d.status === 'active').length} disponibles</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{drivers.filter(d => !d.isDisabled).length} habilitados • {drivers.filter(d => d.status === 'active' && !d.isDisabled).length} disponibles</p>
                 </div>
               </div>
               <button
-                onClick={() => setEditingDriver({ name: '', phone: '', vehicleType: 'moto' })}
+                onClick={() => setEditingDriver({ name: '', phone: '', vehicleType: 'moto', pin: '1234' } as any)}
                 className="flex items-center bg-teal-500 hover:bg-teal-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-teal-500/20 gap-2"
               >
                 <UserPlus className="w-4 h-4" /> Nuevo Repartidor
@@ -2102,13 +2215,30 @@ export default function AdminView({
                             <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-3 border-white dark:border-gray-800 ${driver.status === 'active' ? 'bg-emerald-500' : driver.status === 'busy' ? 'bg-amber-500 animate-pulse' : 'bg-gray-400'}`}></div>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <h5 className="font-black text-lg text-gray-900 dark:text-white tracking-tight truncate uppercase">{driver.name}</h5>
-                            <div className="flex items-center space-x-2 mt-1">
-                              <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-lg ${driver.status === 'active' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30' : driver.status === 'busy' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30' : 'bg-gray-100 text-gray-500 dark:bg-gray-700'}`}>
-                                {driver.status === 'active' ? 'Libre' : driver.status === 'busy' ? 'En Ruta' : 'Fuera'}
-                              </span>
-                              <span className="text-[8px] font-black text-teal-500 uppercase tracking-widest">{vCfg.label}</span>
+                            <div className="flex flex-col">
+                              <h4 className={`font-black tracking-tight uppercase truncate ${driver.isDisabled ? 'text-gray-400 line-through' : 'text-gray-900 dark:text-white'}`}>{driver.name}</h4>
+                              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{driver.vehicleType} • {driver.phone}</p>
                             </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div 
+                              title="PIN de acceso al portal"
+                              className="bg-teal-50 dark:bg-teal-900/20 px-2.5 py-1.5 rounded-xl border border-teal-100 dark:border-teal-800 flex flex-col items-center cursor-help group/pin"
+                            >
+                               <span className="text-[6px] font-black uppercase text-teal-600/60 dark:text-teal-400/60 leading-none mb-0.5">PIN ACCESO</span>
+                               <code className="text-[10px] font-black text-teal-600 dark:text-teal-400 tracking-[0.2em]">{driver.pin || '1234'}</code>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setDrivers(prev => prev.map(d => 
+                                  d.id === driver.id ? { ...d, isDisabled: !d.isDisabled } : d
+                                ));
+                                addNotification(driver.isDisabled ? 'Repartidor habilitado' : 'Repartidor deshabilitado', 'info');
+                              }}
+                              className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all ${driver.isDisabled ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}
+                            >
+                              {driver.isDisabled ? 'Habilitar' : 'Deshabilitar'}
+                            </button>
                           </div>
                         </div>
 
@@ -2129,9 +2259,15 @@ export default function AdminView({
 
                         {/* Footer */}
                         <div className="flex items-center justify-between border-t border-gray-50 dark:border-gray-700 pt-4 text-gray-400">
-                          <span className="flex items-center text-xs font-bold gap-1.5">
-                            <Smartphone className="w-3.5 h-3.5" /> {driver.phone}
-                          </span>
+                          <a 
+                            href={`https://wa.me/${driver.phone.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title="Enviar WhatsApp"
+                            className="flex items-center text-xs font-black gap-1.5 hover:text-emerald-500 transition-colors group/wa"
+                          >
+                            <Smartphone className="w-3.5 h-3.5 group-hover/wa:scale-110 transition-transform" /> {driver.phone}
+                          </a>
                           <div className="flex gap-1">
                             <button title="Editar repartidor" onClick={() => setEditingDriver(driver)} className="p-2 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors opacity-0 group-hover:opacity-100">
                               <Edit2 className="w-4 h-4" />
@@ -2201,7 +2337,16 @@ export default function AdminView({
               </div>
               <div>
                 <h5 className="font-black text-lg text-gray-900 dark:text-white uppercase">{customer.name}</h5>
-                <p className="text-xs text-gray-500">{customer.phone}</p>
+                <a 
+                  href={`https://wa.me/${customer.phone.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Enviar WhatsApp"
+                  className="text-xs font-black text-gray-500 hover:text-emerald-500 transition-colors flex items-center gap-1 group/wa"
+                >
+                  <MessageCircle className="w-3 h-3 group-hover/wa:scale-110 transition-transform" />
+                  {customer.phone}
+                </a>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4 text-center">
@@ -3144,6 +3289,9 @@ export default function AdminView({
         ))}
       </div>
 
+      {/* WhatsApp Delivery Notifications Panel */}
+      {renderWhatsAppNotifications()}
+
       <Sidebar
         isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)}
         isDarkMode={isDarkMode} toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
@@ -3213,6 +3361,15 @@ export default function AdminView({
             {activeSection === 'reports' && <ReportsSection orders={orders} drivers={drivers} customers={customers} menuItems={menuItems} />}
             {activeSection === 'logs' && <LogsSection logs={logs} onClearLogs={() => setLogs([])} />}
             {activeSection === 'staff_management' && renderStaffManagement()}
+            {activeSection === 'payroll' && (
+              <PayrollSection
+                staff={staff}
+                payrollEntries={payrollEntries}
+                setPayrollEntries={setPayrollEntries}
+                loans={loans}
+                setLoans={setLoans}
+              />
+            )}
             {renderCustomerModal()}
             {renderRegisterCustomerModal()}
             {renderSearchCustomerModal()}
@@ -3310,16 +3467,16 @@ export default function AdminView({
               <button title="Cerrar" onClick={() => setAssigningOrderId(null)} className="p-2 text-gray-400 hover:bg-gray-100 rounded-xl transition-colors"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-2">
-              {drivers.filter(d => d.status === 'active').length === 0 ? (
+              {drivers.filter(d => d.status === 'active' && !d.isDisabled).length === 0 ? (
                 <div className="text-center py-8">
                   <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
                     <Bike className="w-8 h-8" />
                   </div>
                   <p className="text-sm font-black text-gray-900 dark:text-white uppercase">No hay repartidores disponibles</p>
-                  <p className="text-xs text-gray-500 mt-1">Todos los repartidores están ocupados o fuera de servicio.</p>
+                  <p className="text-xs text-gray-500 mt-1">Todos los repartidores están ocupados o fuera de turno.</p>
                 </div>
               ) : (
-                drivers.filter(d => d.status === 'active').map(driver => {
+                drivers.filter(d => d.status === 'active' && !d.isDisabled).map(driver => {
                   const vCfg = VEHICLE_CONFIG[driver.vehicleType] || VEHICLE_CONFIG.moto;
                   return (
                     <button key={driver.id} onClick={() => assignDriverToOrder(assigningOrderId, driver.id)} className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-2xl transition-all border-2 border-transparent hover:border-primary-500 group">

@@ -60,6 +60,7 @@ export interface Order {
   notes?: string;
   deliveryFee?: number;
   notifiedStatuses?: Record<string, boolean>;
+  whatsappNotified?: boolean;
 }
 
 export interface Customer {
@@ -84,6 +85,8 @@ export interface DeliveryDriver {
   vehicleType: VehicleType;
   deliveriesCompleted: number;
   rating: number;
+  isDisabled?: boolean;
+  pin?: string;
 }
 
 export type StaffRole = 'waiter' | 'cook' | 'admin' | 'cashier' | 'driver';
@@ -106,4 +109,44 @@ export interface SiteLog {
   type: 'info' | 'success' | 'warning' | 'error' | 'critical';
 }
 
-export type AdminSection = 'dashboard' | 'kitchen' | 'kds' | 'dds' | 'menu' | 'orders' | 'customers' | 'reports' | 'driver_dashboard' | 'tpv' | 'local_dispatch' | 'staff_management' | 'logs';
+export type AdminSection = 'dashboard' | 'kitchen' | 'kds' | 'dds' | 'menu' | 'orders' | 'customers' | 'reports' | 'driver_dashboard' | 'tpv' | 'local_dispatch' | 'staff_management' | 'logs' | 'payroll';
+
+export type PayrollPeriod = 'semanal' | 'quincenal' | 'mensual';
+export type LoanStatus = 'active' | 'paid' | 'defaulted';
+
+export interface PayrollEntry {
+  id: string;
+  staffId: string;
+  staffName: string;
+  staffRole: StaffRole;
+  period: PayrollPeriod;
+  baseSalary: number;
+  bonuses: number;
+  deductions: number;
+  loanDeduction: number;
+  netPay: number;
+  paidAt?: string;
+  createdAt: string;
+  notes?: string;
+  status: 'pending' | 'paid';
+}
+
+export interface LoanPayment {
+  id: string;
+  amount: number;
+  paidAt: string;
+  payrollId?: string;
+}
+
+export interface Loan {
+  id: string;
+  staffId: string;
+  staffName: string;
+  amount: number;
+  remainingBalance: number;
+  monthlyInstallment: number;
+  reason: string;
+  status: LoanStatus;
+  createdAt: string;
+  payments: LoanPayment[];
+}

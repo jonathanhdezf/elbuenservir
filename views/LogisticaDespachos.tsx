@@ -91,7 +91,7 @@ export default function LogisticaDespachos({
         !(o.address?.toLowerCase().includes('mostrador'))
     );
 
-    const activeDrivers = drivers.filter(d => d.status !== 'offline');
+    const activeDrivers = drivers.filter(d => !d.isDisabled);
 
     if (!isAuthenticated) {
         return (
@@ -290,14 +290,16 @@ export default function LogisticaDespachos({
                                             <div className="w-14 h-14 md:w-20 md:h-20 bg-gray-50 dark:bg-gray-800 rounded-2xl md:rounded-[28px] flex items-center justify-center text-gray-400 shadow-inner shrink-0">
                                                 <User className="w-7 h-7 md:w-10 md:h-10" />
                                             </div>
-                                            <div className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl md:rounded-2xl font-black text-[8px] md:text-[10px] uppercase tracking-widest ${driver.status === 'active' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-700 animate-pulse'
+                                            <div className={`px-3 md:px-4 py-1.5 md:py-2 rounded-xl md:rounded-2xl font-black text-[8px] md:text-[10px] uppercase tracking-widest ${driver.status === 'active' ? 'bg-emerald-100 text-emerald-600' : driver.status === 'busy' ? 'bg-amber-100 text-amber-700 animate-pulse' : 'bg-gray-100 text-gray-400'
                                                 }`}>
-                                                {driver.status === 'active' ? 'Libre' : 'En Ruta'}
+                                                {driver.status === 'active' ? 'Libre' : driver.status === 'busy' ? 'En Ruta' : 'Offline'}
                                             </div>
                                         </div>
 
                                         <h4 className="text-xl md:text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight leading-none mb-1 truncate">{driver.name}</h4>
-                                        <p className="text-gray-400 font-bold uppercase tracking-widest text-[8px] md:text-[9px] mb-4 md:mb-8 truncate">{driver.vehicleType} • {driver.phone}</p>
+                                        <p className="text-gray-400 font-black uppercase tracking-widest text-[8px] md:text-[9px] mb-4 md:mb-8 truncate">
+                                            {driver.vehicleType} • <a href={`https://wa.me/${driver.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="hover:text-emerald-500 transition-colors">{driver.phone}</a>
+                                        </p>
 
                                         <div className="grid grid-cols-2 gap-3 md:gap-4">
                                             <div className="bg-gray-50 dark:bg-gray-800/50 p-4 md:p-6 rounded-2xl md:rounded-[32px] text-center">

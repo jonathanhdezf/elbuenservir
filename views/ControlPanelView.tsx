@@ -10,12 +10,13 @@ import {
     Settings,
     Bell,
     Search,
-    Power
+    Power,
+    Bike
 } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
 
 interface ControlPanelViewProps {
-    onNavigate: (view: 'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch') => void;
+    onNavigate: (view: 'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch' | 'driver_portal') => void;
     onExit: () => void;
     isDarkMode: boolean;
 }
@@ -61,6 +62,14 @@ export default function ControlPanelView({ onNavigate, onExit, isDarkMode }: Con
             color: 'bg-indigo-500',
             description: 'Repartos y última milla',
             view: 'logistics' as const
+        },
+        {
+            id: 'driver_portal',
+            name: 'Portal Repartidor',
+            icon: Bike,
+            color: 'bg-teal-500',
+            description: 'Turno y entregas personales',
+            view: 'driver_portal' as const
         }
     ];
 
@@ -115,7 +124,7 @@ export default function ControlPanelView({ onNavigate, onExit, isDarkMode }: Con
                     </div>
 
                     {/* App Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-8 w-full animate-in fade-in zoom-in-95 duration-700 delay-200">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-8 w-full animate-in fade-in zoom-in-95 duration-700 delay-200">
                         {apps.map((app, index) => (
                             <button
                                 key={app.id}

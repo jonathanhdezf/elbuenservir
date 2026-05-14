@@ -19,6 +19,7 @@ interface LocalDispatchViewProps {
     orders: Order[];
     staff: Staff[];
     onUpdateOrder: (order: Partial<Order>) => void;
+    updateCustomerStats: (name: string, phone: string, amount: number, adding?: boolean) => void;
     onEditOrder: (order: Order) => void;
     setView: (view: any) => void;
 }
@@ -27,6 +28,7 @@ const LocalDispatchView: React.FC<LocalDispatchViewProps> = ({
     orders,
     staff,
     onUpdateOrder,
+    updateCustomerStats,
     onEditOrder,
     setView
 }) => {
@@ -136,6 +138,7 @@ const LocalDispatchView: React.FC<LocalDispatchViewProps> = ({
         };
 
         onUpdateOrder(updatedOrder);
+        updateCustomerStats(order.customerName, order.customerPhone, order.total, true);
 
         // Auto-release table after 5 seconds
         if (order.address?.toLowerCase().includes('mesa')) {

@@ -20,7 +20,8 @@ import {
   ChevronDown,
   Package,
   Briefcase,
-  History
+  History,
+  Wallet
 } from 'lucide-react';
 import { AdminSection } from '../types';
 
@@ -74,6 +75,7 @@ const Sidebar: React.FC<SidebarProps> = ({
     { icon: UtensilsCrossed, label: 'Editor de Menú', id: 'menu' },
     { icon: Users, label: 'Clientes', id: 'customers' },
     { icon: BarChart3, label: 'Reportes', id: 'reports' },
+    { icon: Wallet, label: 'Nóminas', id: 'payroll' },
     { icon: Shield, label: 'Gestión Personal', id: 'staff_management' },
     { icon: History, label: 'Logs del Sitio', id: 'logs' },
   ];
