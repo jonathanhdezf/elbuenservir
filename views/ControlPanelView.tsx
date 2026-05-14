@@ -48,6 +48,15 @@ export default function ControlPanelView({
         return () => clearTimeout(timer);
     }, []);
 
+    useEffect(() => {
+        if (showWelcome) {
+            const hideTimer = setTimeout(() => {
+                setShowWelcome(false);
+            }, 5000);
+            return () => clearTimeout(hideTimer);
+        }
+    }, [showWelcome]);
+
     const apps = [
         {
             id: 'admin',
@@ -252,7 +261,7 @@ export default function ControlPanelView({
                                             </button>
                                         </div>
                                         <p className="text-sm font-bold text-gray-800 dark:text-white leading-tight">
-                                            Bienvenido Miguel los sistemas estan listos, es un gusto trabajar contigo. :)
+                                            Bienvenido Miguel 👋 los sistemas estan listos, es un gusto trabajar contigo. :)
                                         </p>
                                     </div>
                                 </div>
