@@ -546,6 +546,8 @@ export default function App() {
       onAddCustomer={(customer) => setCustomers(prev => [...prev, customer])}
       onAddOrder={(order) => setOrders(prev => [order, ...prev])}
       onEnterControlPanel={() => setView('control_panel')}
+      isDarkMode={isDarkMode}
+      setIsDarkMode={setIsDarkMode}
     />
   );
 }

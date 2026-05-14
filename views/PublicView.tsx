@@ -12,9 +12,11 @@ interface PublicViewProps {
   onAddOrder?: (order: Order) => void;
   onEnterControlPanel?: () => void;
   isPreview?: boolean;
+  isDarkMode?: boolean;
+  setIsDarkMode?: (isDark: boolean) => void;
 }
 
-export default function PublicView({ categories, menuItems, customers, onAddCustomer, onAddOrder, onEnterControlPanel, isPreview }: PublicViewProps) {
+export default function PublicView({ categories, menuItems, customers, onAddCustomer, onAddOrder, onEnterControlPanel, isPreview, isDarkMode, setIsDarkMode }: PublicViewProps) {
   const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id || '');
   const [isScrolled, setIsScrolled] = useState(false);
   const [visibleItemsCount, setVisibleItemsCount] = useState(6);
@@ -264,13 +266,36 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                   </a>
                 ))}
                 <hr className="border-gray-50 dark:border-gray-800" />
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-[24px]">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 ${isDarkMode ? 'bg-primary-500/20 text-primary-400' : 'bg-amber-100 text-amber-600'}`}>
+                      {isDarkMode ? <Zap className="w-5 h-5 animate-pulse" /> : <Clock className="w-5 h-5" />}
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-tighter">Modo {isDarkMode ? 'Oscuro' : 'Claro'}</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Personaliza tu vista</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      soundManager.play('click');
+                      if (setIsDarkMode) setIsDarkMode(!isDarkMode);
+                    }}
+                    className={`relative w-14 h-8 rounded-full transition-all duration-500 p-1 flex items-center ${isDarkMode ? 'bg-primary-500' : 'bg-gray-200'}`}
+                  >
+                    <div className={`w-6 h-6 bg-white rounded-full shadow-lg transform transition-transform duration-500 flex items-center justify-center ${isDarkMode ? 'translate-x-6' : 'translate-x-0'}`}>
+                      {isDarkMode ? <Monitor className="w-3.5 h-3.5 text-primary-600" /> : <Zap className="w-3.5 h-3.5 text-amber-500" />}
+                    </div>
+                  </button>
+                </div>
+
                 <button
                   onClick={() => {
                     setOrderStep(1);
                     setIsOrderModalOpen(true);
                     setIsMobileMenuOpen(false);
                   }}
-                  className="w-full bg-primary-500 text-white py-5 rounded-[24px] font-black uppercase tracking-widest shadow-xl shadow-primary-500/30"
+                  className="w-full bg-primary-500 text-white py-5 rounded-[24px] font-black uppercase tracking-widest shadow-xl shadow-primary-500/30 active:scale-95 transition-all"
                 >
                   Ordenar ahora
                 </button>
