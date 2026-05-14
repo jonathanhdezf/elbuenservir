@@ -101,7 +101,11 @@ export default function ControlPanelView({
             <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[40px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300">
                 <div className="p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-white/5">
                     <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">Personalización</h3>
-                    <button onClick={() => setIsSettingsOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
+                    <button 
+                        onClick={() => setIsSettingsOpen(false)} 
+                        title="Cerrar personalización"
+                        className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                    >
                         <X className="w-5 h-5" />
                     </button>
                 </div>
@@ -117,6 +121,7 @@ export default function ControlPanelView({
                             {['#0f172a', '#1e1b4b', '#312e81', '#111827', '#000000'].map(color => (
                                 <button
                                     key={color}
+                                    title={`Cambiar fondo a ${color}`}
                                     onClick={() => { setSystemBgColor(color); soundManager.play('click'); }}
                                     className={`w-full aspect-square rounded-2xl border-4 transition-all ${systemBgColor === color ? 'border-primary-500 scale-110 shadow-lg shadow-primary-500/20' : 'border-transparent hover:scale-105'}`}
                                     style={{ backgroundColor: color }}
@@ -128,6 +133,7 @@ export default function ControlPanelView({
                         <div className="flex items-center gap-3 mt-4">
                             <input
                                 type="color"
+                                title="Elegir color de fondo personalizado"
                                 value={systemBgColor}
                                 onChange={(e) => setSystemBgColor(e.target.value)}
                                 className="w-12 h-12 rounded-xl bg-transparent border-none cursor-pointer p-0"
@@ -210,9 +216,10 @@ export default function ControlPanelView({
                     <span className="hidden md:inline text-[10px] font-bold uppercase tracking-[0.3em]">v2.4.0 Premium</span>
                 </div>
                 <div className="flex items-center gap-4 md:gap-6">
-                    <Bell className="w-4 h-4 hover:text-white transition-colors cursor-pointer" onClick={() => soundManager.play('click')} />
-                    <Search className="w-4 h-4 hover:text-white transition-colors cursor-pointer" onClick={() => soundManager.play('click')} />
+                    <Bell className="w-4 h-4 hover:text-white transition-colors cursor-pointer" title="Notificaciones" onClick={() => soundManager.play('click')} />
+                    <Search className="w-4 h-4 hover:text-white transition-colors cursor-pointer" title="Buscar" onClick={() => soundManager.play('click')} />
                     <Settings
+                        title="Configuración de Sistema"
                         className={`w-4 h-4 hover:text-white transition-all cursor-pointer ${isSettingsOpen ? 'rotate-90 text-primary-400' : ''}`}
                         onClick={() => { setIsSettingsOpen(true); soundManager.play('click'); }}
                     />
@@ -245,6 +252,7 @@ export default function ControlPanelView({
                         {apps.map((app, index) => (
                             <button
                                 key={app.id}
+                                title={`Abrir ${app.name}`}
                                 onClick={() => handleAppClick(app.view)}
                                 className="group relative flex flex-col items-center gap-3 md:gap-4 transition-all duration-300 hover:-translate-y-1 md:hover:-translate-y-2 tap-highlight-transparent"
                             >
@@ -269,6 +277,7 @@ export default function ControlPanelView({
                     <div className="mt-8 md:mt-12 flex flex-col items-center gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500">
                         <button
                             onClick={onExit}
+                            title="Cerrar Sesión"
                             className="group flex flex-col items-center gap-3"
                         >
                             <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-red-500/10 border border-red-500/20 backdrop-blur-md flex items-center justify-center group-hover:bg-red-500 group-hover:border-red-500 transition-all duration-300 shadow-lg shadow-red-500/0 group-hover:shadow-red-500/20">
