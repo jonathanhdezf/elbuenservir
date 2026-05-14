@@ -245,7 +245,7 @@ export default function RepartidorView({
       {/* Header */}
       <div className="bg-gray-900 text-white p-5 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-4">
-          <button onClick={() => setViewState('selector')} className="p-2 hover:bg-white/10 rounded-xl transition-colors">
+          <button onClick={() => setViewState('selector')} title="Volver al selector" className="p-2 hover:bg-white/10 rounded-xl transition-colors">
             <ChevronLeft className="w-5 h-5 text-white/60" />
           </button>
           <div className="w-10 h-10 bg-teal-500 rounded-xl flex items-center justify-center">
