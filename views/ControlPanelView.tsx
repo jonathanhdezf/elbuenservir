@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     ChefHat,
     Truck,
@@ -11,7 +11,10 @@ import {
     Bell,
     Search,
     Power,
-    Bike
+    Bike,
+    Palette,
+    Sparkles,
+    Check
 } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
 
@@ -19,9 +22,23 @@ interface ControlPanelViewProps {
     onNavigate: (view: 'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch' | 'driver_portal') => void;
     onExit: () => void;
     isDarkMode: boolean;
+    systemBgColor: string;
+    setSystemBgColor: (color: string) => void;
+    systemBgEffect: 'none' | 'gradient' | 'animated-blobs' | 'stars';
+    setSystemBgEffect: (effect: 'none' | 'gradient' | 'animated-blobs' | 'stars') => void;
 }
 
-export default function ControlPanelView({ onNavigate, onExit, isDarkMode }: ControlPanelViewProps) {
+export default function ControlPanelView({
+    onNavigate,
+    onExit,
+    isDarkMode,
+    systemBgColor,
+    setSystemBgColor,
+    systemBgEffect,
+    setSystemBgEffect
+}: ControlPanelViewProps) {
+    const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
     const apps = [
         {
             id: 'admin',
@@ -78,27 +95,127 @@ export default function ControlPanelView({ onNavigate, onExit, isDarkMode }: Con
         onNavigate(view);
     };
 
+    const renderSettingsModal = () => (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-md" onClick={() => setIsSettingsOpen(false)}></div>
+            <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[40px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300">
+                <div className="p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-white/5">
+                    <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">Personalización</h3>
+                    <button onClick={() => setIsSettingsOpen(false)} className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+
+                <div className="p-8 space-y-8">
+                    {/* Background Color */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-gray-400">
+                            <Palette className="w-4 h-4" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Color de Fondo</span>
+                        </div>
+                        <div className="grid grid-cols-5 gap-3">
+                            {['#0f172a', '#1e1b4b', '#312e81', '#111827', '#000000'].map(color => (
+                                <button
+                                    key={color}
+                                    onClick={() => { setSystemBgColor(color); soundManager.play('click'); }}
+                                    className={`w-full aspect-square rounded-2xl border-4 transition-all ${systemBgColor === color ? 'border-primary-500 scale-110 shadow-lg shadow-primary-500/20' : 'border-transparent hover:scale-105'}`}
+                                    style={{ backgroundColor: color }}
+                                >
+                                    {systemBgColor === color && <Check className="w-4 h-4 text-white mx-auto" />}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex items-center gap-3 mt-4">
+                            <input
+                                type="color"
+                                value={systemBgColor}
+                                onChange={(e) => setSystemBgColor(e.target.value)}
+                                className="w-12 h-12 rounded-xl bg-transparent border-none cursor-pointer p-0"
+                            />
+                            <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">{systemBgColor}</span>
+                        </div>
+                    </div>
+
+                    {/* Background Effects */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 text-gray-400">
+                            <Sparkles className="w-4 h-4" />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Efectos Visuales</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            {[
+                                { id: 'none', label: 'Sin Efectos' },
+                                { id: 'gradient', label: 'Degradado Suave' },
+                                { id: 'animated-blobs', label: 'Blobs Animados' },
+                                { id: 'stars', label: 'Cielo Estrellado' }
+                            ].map(effect => (
+                                <button
+                                    key={effect.id}
+                                    onClick={() => { setSystemBgEffect(effect.id as any); soundManager.play('click'); }}
+                                    className={`p-4 rounded-2xl border-2 font-bold text-[10px] uppercase tracking-widest transition-all ${systemBgEffect === effect.id ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600' : 'border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-200'}`}
+                                >
+                                    {effect.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center font-sans bg-gray-900">
-            {/* Dynamic Background */}
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 overflow-hidden">
-                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/20 rounded-full blur-[120px] animate-pulse"></div>
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/20 rounded-full blur-[120px] animate-pulse delay-700"></div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center font-sans overflow-hidden" style={{ backgroundColor: systemBgColor }}>
+            {/* Dynamic Background Effects */}
+            <div className="absolute inset-0 pointer-events-none">
+                {systemBgEffect === 'gradient' && (
+                    <div className="absolute inset-0 bg-gradient-to-br from-black/0 via-primary-500/10 to-black/30"></div>
+                )}
+
+                {systemBgEffect === 'animated-blobs' && (
+                    <>
+                        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/20 rounded-full blur-[120px] animate-pulse"></div>
+                        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-500/20 rounded-full blur-[120px] animate-pulse delay-700"></div>
+                        <div className="absolute top-[20%] right-[10%] w-[30%] h-[30%] bg-purple-500/10 rounded-full blur-[100px] animate-bounce duration-[10s]"></div>
+                    </>
+                )}
+
+                {systemBgEffect === 'stars' && (
+                    <div className="absolute inset-0">
+                        {[...Array(50)].map((_, i) => (
+                            <div
+                                key={i}
+                                className="absolute bg-white rounded-full animate-pulse"
+                                style={{
+                                    width: Math.random() * 3 + 'px',
+                                    height: Math.random() * 3 + 'px',
+                                    top: Math.random() * 100 + '%',
+                                    left: Math.random() * 100 + '%',
+                                    animationDelay: Math.random() * 5 + 's',
+                                    opacity: Math.random() * 0.5 + 0.2
+                                }}
+                            ></div>
+                        ))}
+                    </div>
+                )}
             </div>
 
             {/* Top Bar (OS Style) */}
-            <div className="absolute top-0 left-0 w-full p-4 md:p-6 flex justify-between items-center text-white/50 z-20 pointer-events-none">
-                <div className="flex items-center gap-4 pointer-events-auto">
+            <div className="absolute top-0 left-0 w-full p-4 md:p-6 flex justify-between items-center text-white/50 z-20">
+                <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-white/5 backdrop-blur-md rounded-full border border-white/10">
                         <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-500 rounded-full animate-ping"></div>
                         <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-emerald-400">Sistema Activo</span>
                     </div>
                     <span className="hidden md:inline text-[10px] font-bold uppercase tracking-[0.3em]">v2.4.0 Premium</span>
                 </div>
-                <div className="flex items-center gap-4 md:gap-6 pointer-events-auto">
-                    <Bell className="w-4 h-4 hover:text-white transition-colors cursor-pointer" />
-                    <Search className="w-4 h-4 hover:text-white transition-colors cursor-pointer" />
-                    <Settings className="w-4 h-4 hover:text-white transition-colors cursor-pointer" />
+                <div className="flex items-center gap-4 md:gap-6">
+                    <Bell className="w-4 h-4 hover:text-white transition-colors cursor-pointer" onClick={() => soundManager.play('click')} />
+                    <Search className="w-4 h-4 hover:text-white transition-colors cursor-pointer" onClick={() => soundManager.play('click')} />
+                    <Settings
+                        className={`w-4 h-4 hover:text-white transition-all cursor-pointer ${isSettingsOpen ? 'rotate-90 text-primary-400' : ''}`}
+                        onClick={() => { setIsSettingsOpen(true); soundManager.play('click'); }}
+                    />
                     <div className="w-px h-4 bg-white/10"></div>
                     <span className="text-xs md:text-sm font-bold">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
@@ -162,6 +279,8 @@ export default function ControlPanelView({ onNavigate, onExit, isDarkMode }: Con
                     </div>
                 </div>
             </div>
+
+            {isSettingsOpen && renderSettingsModal()}
         </div>
     );
 }

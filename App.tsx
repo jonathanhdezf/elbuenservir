@@ -346,6 +346,8 @@ export default function App() {
   const [logs, setLogs] = useState<SiteLog[]>(INITIAL_LOGS);
   const [tpvEditOrder, setTpvEditOrder] = useState<Order | null>(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [systemBgColor, setSystemBgColor] = useState('#0f172a');
+  const [systemBgEffect, setSystemBgEffect] = useState<'none' | 'gradient' | 'animated-blobs' | 'stars'>('gradient');
 
   useEffect(() => {
     if (isDarkMode) {
@@ -414,6 +416,10 @@ export default function App() {
         onNavigate={(newView) => setView(newView as any)}
         onExit={() => setView('public')}
         isDarkMode={isDarkMode}
+        systemBgColor={systemBgColor}
+        setSystemBgColor={setSystemBgColor}
+        systemBgEffect={systemBgEffect}
+        setSystemBgEffect={setSystemBgEffect}
       />
     );
   }
