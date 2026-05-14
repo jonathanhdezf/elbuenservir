@@ -227,6 +227,40 @@ export default function AdminView({
     }
   }, [playUISound, recordLog]);
 
+  const updateCustomerStats = useCallback((customerName: string, customerPhone: string, amount: number, isAdding: boolean = true) => {
+    if (!customerPhone || customerPhone === 'N/A') return;
+
+    setCustomers(prev => {
+      const customerIndex = prev.findIndex(c => c.phone === customerPhone);
+      
+      if (customerIndex === -1) {
+        if (!isAdding) return prev;
+        const newCustomer: Customer = {
+          id: `cust-${Date.now()}`,
+          name: customerName || 'Cliente Nuevo',
+          phone: customerPhone,
+          totalOrders: 1,
+          totalSpent: amount,
+          lastOrderDate: new Date().toISOString(),
+          addresses: []
+        };
+        return [...prev, newCustomer];
+      }
+
+      const newCustomers = [...prev];
+      const customer = newCustomers[customerIndex];
+      
+      newCustomers[customerIndex] = {
+        ...customer,
+        totalOrders: Math.max(0, (customer.totalOrders || 0) + (isAdding ? 1 : -1)),
+        totalSpent: Math.max(0, (customer.totalSpent || 0) + (isAdding ? amount : -amount)),
+        lastOrderDate: isAdding ? new Date().toISOString() : customer.lastOrderDate
+      };
+      
+      return newCustomers;
+    });
+  }, []);
+
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [foundCustomer, setFoundCustomer] = useState<Customer | null>(null);
   const [isRegisteringCustomer, setIsRegisteringCustomer] = useState(false);
@@ -380,6 +414,7 @@ export default function AdminView({
     };
 
     setOrders(prev => prev.map(o => o.id === orderId ? updatedOrder : o));
+    updateCustomerStats(updatedOrder.customerName, updatedOrder.customerPhone, updatedOrder.total, true);
     addNotification(`Pago de ${orderId} confirmado`, 'success');
     recordLog('Pago Confirmado', `Se confirmó el pago de $${updatedOrder.total.toFixed(2)} para el pedido ${orderId} via ${tempPaymentMethod?.toUpperCase()}`, 'success');
 
@@ -408,6 +443,7 @@ export default function AdminView({
 
     if (order.paymentStatus === 'paid') {
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, paymentStatus: 'pending', paidAt: undefined } : o));
+      updateCustomerStats(order.customerName, order.customerPhone, order.total, false);
       addNotification(`Pago de ${orderId} revertido a Pendiente`, 'info');
     } else {
       setIsConfirmingPayment(true);
@@ -1332,14 +1368,16 @@ export default function AdminView({
                             return;
                           }
                           // Mark as delivered and paid
-                          setOrders(prev => prev.map(o => o.id === currentOrder.id ? {
+                          const updatedOrder: Order = {
                             ...o,
                             status: 'delivered',
                             paymentStatus: 'paid',
                             paidAt: new Date().toISOString(),
                             ticketNumber: input.ticket || undefined,
                             operationNumber: input.operation || undefined
-                          } : o));
+                          };
+                          setOrders(prev => prev.map(o => o.id === currentOrder.id ? updatedOrder : o));
+                          updateCustomerStats(updatedOrder.customerName, updatedOrder.customerPhone, updatedOrder.total, true);
                           setDrivers(prev => prev.map(d => d.id === driver.id ? { ...d, status: 'active' } : d));
                           setDriverInputs(prev => {
                             const newInputs = { ...prev };
@@ -1658,6 +1696,10 @@ export default function AdminView({
             </button>
             <button
               onClick={() => {
+                const order = orders.find(o => o.id === orderToDelete);
+                if (order && order.paymentStatus === 'paid') {
+                  updateCustomerStats(order.customerName, order.customerPhone, order.total, false);
+                }
                 setOrders(prev => prev.filter(order => order.id !== orderToDelete));
                 addNotification(`Pedido ${orderToDelete} eliminado del sistema`, 'error');
                 playUISound('error');
@@ -2163,14 +2205,29 @@ export default function AdminView({
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4 text-center">
-              <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-2xl">
-                <p className="text-[10px] uppercase tracking-widest text-gray-400">Pedidos</p>
-                <p className="font-black text-lg">{customer.totalOrders}</p>
+              <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-3xl">
+                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Pedidos</p>
+                <p className="font-black text-xl text-gray-900 dark:text-white">{customer.totalOrders || 0}</p>
               </div>
-              <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded-2xl">
-                <p className="text-[10px] uppercase tracking-widest text-gray-400">Total</p>
-                <p className="font-black text-lg">${customer.totalSpent?.toFixed(2) || '0.00'}</p>
+              <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-3xl">
+                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Total Gastado</p>
+                <p className="font-black text-xl text-primary-500">${customer.totalSpent?.toFixed(2) || '0.00'}</p>
               </div>
+            </div>
+            
+            <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-3xl flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-white dark:bg-gray-800 flex items-center justify-center text-gray-400 shadow-sm">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Última Compra</p>
+                  <p className="text-[10px] font-bold text-gray-600 dark:text-gray-300">
+                    {customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'SIN COMPRAS'}
+                  </p>
+                </div>
+              </div>
+              <ChevronRight className="w-4 h-4 text-gray-300" />
             </div>
             <div className="mt-6 grid grid-cols-2 gap-3">
               <button
