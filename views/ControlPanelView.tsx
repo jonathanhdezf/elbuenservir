@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     ChefHat,
     Truck,
@@ -38,6 +38,15 @@ export default function ControlPanelView({
     setSystemBgEffect
 }: ControlPanelViewProps) {
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [showWelcome, setShowWelcome] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setShowWelcome(true);
+            soundManager.play('alert');
+        }, 2000);
+        return () => clearTimeout(timer);
+    }, []);
 
     const apps = [
         {
@@ -216,13 +225,41 @@ export default function ControlPanelView({
                     <span className="hidden md:inline text-[10px] font-bold uppercase tracking-[0.3em]">v2.4.0 Premium</span>
                 </div>
                 <div className="flex items-center gap-4 md:gap-6">
-                    <button
-                        title="Notificaciones"
-                        onClick={() => soundManager.play('click')}
-                        className="p-1 text-white/50 hover:text-white transition-colors"
-                    >
-                        <Bell className="w-4 h-4" />
-                    </button>
+                    <div className="relative">
+                        <button
+                            title="Notificaciones"
+                            onClick={() => {
+                                setShowWelcome(!showWelcome);
+                                soundManager.play('click');
+                            }}
+                            className={`p-1 transition-colors ${showWelcome ? 'text-primary-400' : 'text-white/50 hover:text-white'}`}
+                        >
+                            <Bell className={`w-4 h-4 ${showWelcome ? 'animate-bounce' : ''}`} />
+                            <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-gray-900"></div>
+                        </button>
+
+                        {showWelcome && (
+                            <div className="absolute right-0 mt-4 w-72 bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 p-5 animate-in slide-in-from-top-2 fade-in duration-300 z-[210]">
+                                <div className="flex gap-4">
+                                    <div className="w-10 h-10 rounded-2xl bg-primary-500 flex items-center justify-center text-white shadow-lg shadow-primary-500/20 shrink-0">
+                                        <Bell className="w-5 h-5 animate-swing" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <div className="flex justify-between items-start mb-1">
+                                            <p className="text-[10px] font-black text-primary-500 uppercase tracking-widest">Sistemas Listos</p>
+                                            <button onClick={() => setShowWelcome(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                                <X className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                        <p className="text-sm font-bold text-gray-800 dark:text-white leading-tight">
+                                            Bienvenido Miguel los sistemas estan listos, es un gusto trabajar contigo. :)
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="absolute -top-2 right-4 w-4 h-4 bg-white dark:bg-gray-900 border-t border-l border-gray-100 dark:border-gray-800 rotate-45"></div>
+                            </div>
+                        )}
+                    </div>
                     <button
                         title="Buscar"
                         onClick={() => soundManager.play('click')}
