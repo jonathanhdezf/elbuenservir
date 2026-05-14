@@ -336,7 +336,7 @@ const INITIAL_LOGS: SiteLog[] = [
   }
 ];
 export default function App() {
-  const [view, setView] = useState<'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch' | 'control_panel'>('public');
+  const [view, setView] = useState<'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch' | 'control_panel' | 'driver_portal'>('public');
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(INITIAL_ITEMS);
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
