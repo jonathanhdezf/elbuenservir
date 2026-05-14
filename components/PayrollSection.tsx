@@ -240,6 +240,7 @@ export const PayrollSection: React.FC<PayrollSectionProps> = ({
             </div>
             <button
               onClick={() => activeTab === 'loans' ? setIsAddingLoan(true) : setIsAddingEntry(true)}
+              title={activeTab === 'loans' ? "Nuevo Préstamo" : "Nuevo Pago"}
               className="p-4 bg-primary-500 text-white rounded-2xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-primary-500/20"
             >
               <Plus className="w-5 h-5" />
@@ -413,7 +414,10 @@ export const PayrollSection: React.FC<PayrollSectionProps> = ({
                           </span>
                         </td>
                         <td className="px-8 py-6 text-right">
-                          <button className="p-3 bg-gray-50 dark:bg-gray-900 text-gray-400 rounded-xl hover:text-primary-500 transition-colors">
+                          <button 
+                            title="Descargar Comprobante"
+                            className="p-3 bg-gray-50 dark:bg-gray-900 text-gray-400 rounded-xl hover:text-primary-500 transition-colors"
+                          >
                             <Download className="w-4 h-4" />
                           </button>
                         </td>
@@ -448,13 +452,15 @@ export const PayrollSection: React.FC<PayrollSectionProps> = ({
                 <h4 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">Nuevo Pago</h4>
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Periodo Actual</p>
               </div>
-              <button onClick={() => setIsAddingEntry(false)} className="p-3 bg-gray-50 dark:bg-gray-900 rounded-2xl text-gray-400 hover:text-red-500 transition-all"><X className="w-5 h-5" /></button>
+              <button onClick={() => setIsAddingEntry(false)} title="Cerrar" className="p-3 bg-gray-50 dark:bg-gray-900 rounded-2xl text-gray-400 hover:text-red-500 transition-all"><X className="w-5 h-5" /></button>
             </div>
             
             <form onSubmit={handleCreateEntry} className="p-6 md:p-8 space-y-5 overflow-y-auto custom-scrollbar">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Empleado</label>
+                <label htmlFor="payroll-staff" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Empleado</label>
                 <select
+                  id="payroll-staff"
+                  title="Seleccionar empleado"
                   required
                   value={selectedStaffId}
                   onChange={(e) => setSelectedStaffId(e.target.value)}
@@ -469,8 +475,10 @@ export const PayrollSection: React.FC<PayrollSectionProps> = ({
 
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Periodo</label>
+                  <label htmlFor="payroll-period" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Periodo</label>
                   <select
+                    id="payroll-period"
+                    title="Seleccionar periodo"
                     value={period}
                     onChange={(e) => setPeriod(e.target.value as PayrollPeriod)}
                     className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-primary-500 rounded-3xl px-6 py-4 font-black text-sm outline-none transition-all"
@@ -550,13 +558,15 @@ export const PayrollSection: React.FC<PayrollSectionProps> = ({
                 <h4 className="text-2xl md:text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">Nuevo Préstamo</h4>
                 <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Registro de crédito</p>
               </div>
-              <button onClick={() => setIsAddingLoan(false)} className="p-3 bg-gray-50 dark:bg-gray-900 rounded-2xl text-gray-400 hover:text-red-500 transition-all"><X className="w-5 h-5" /></button>
+              <button onClick={() => setIsAddingLoan(false)} title="Cerrar" className="p-3 bg-gray-50 dark:bg-gray-900 rounded-2xl text-gray-400 hover:text-red-500 transition-all"><X className="w-5 h-5" /></button>
             </div>
             
             <form onSubmit={handleCreateLoan} className="p-6 md:p-8 space-y-5 overflow-y-auto custom-scrollbar">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Empleado</label>
+                <label htmlFor="loan-staff" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-4">Empleado</label>
                 <select
+                  id="loan-staff"
+                  title="Seleccionar empleado"
                   required
                   value={loanStaffId}
                   onChange={(e) => setLoanStaffId(e.target.value)}
