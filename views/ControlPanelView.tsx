@@ -216,13 +216,27 @@ export default function ControlPanelView({
                     <span className="hidden md:inline text-[10px] font-bold uppercase tracking-[0.3em]">v2.4.0 Premium</span>
                 </div>
                 <div className="flex items-center gap-4 md:gap-6">
-                    <Bell className="w-4 h-4 hover:text-white transition-colors cursor-pointer" title="Notificaciones" onClick={() => soundManager.play('click')} />
-                    <Search className="w-4 h-4 hover:text-white transition-colors cursor-pointer" title="Buscar" onClick={() => soundManager.play('click')} />
-                    <Settings
+                    <button
+                        title="Notificaciones"
+                        onClick={() => soundManager.play('click')}
+                        className="p-1 text-white/50 hover:text-white transition-colors"
+                    >
+                        <Bell className="w-4 h-4" />
+                    </button>
+                    <button
+                        title="Buscar"
+                        onClick={() => soundManager.play('click')}
+                        className="p-1 text-white/50 hover:text-white transition-colors"
+                    >
+                        <Search className="w-4 h-4" />
+                    </button>
+                    <button
                         title="Configuración de Sistema"
-                        className={`w-4 h-4 hover:text-white transition-all cursor-pointer ${isSettingsOpen ? 'rotate-90 text-primary-400' : ''}`}
                         onClick={() => { setIsSettingsOpen(true); soundManager.play('click'); }}
-                    />
+                        className={`p-1 transition-all ${isSettingsOpen ? 'rotate-90 text-primary-400' : 'text-white/50 hover:text-white'}`}
+                    >
+                        <Settings className="w-4 h-4" />
+                    </button>
                     <div className="w-px h-4 bg-white/10"></div>
                     <span className="text-xs md:text-sm font-bold">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
