@@ -1840,11 +1840,13 @@ export default function AdminView({
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Entregas Totales</label>
+                <label htmlFor="driver-deliveries" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Entregas Totales</label>
                 <div className="relative">
                   <Package className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary-500" />
                   <input
+                    id="driver-deliveries"
                     type="number"
+                    placeholder="0"
                     value={editingDriver.deliveriesCompleted || 0}
                     onChange={e => setEditingDriver({ ...editingDriver, deliveriesCompleted: parseInt(e.target.value) || 0 })}
                     className="w-full pl-10 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-primary-500 rounded-3xl outline-none transition-all font-bold dark:text-white"
@@ -1852,14 +1854,16 @@ export default function AdminView({
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Puntaje (Estrellas)</label>
+                <label htmlFor="driver-rating" className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Puntaje (Estrellas)</label>
                 <div className="relative">
                   <Star className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400" />
                   <input
+                    id="driver-rating"
                     type="number"
                     step="0.1"
                     min="1"
                     max="5"
+                    placeholder="5.0"
                     value={editingDriver.rating || 5}
                     onChange={e => setEditingDriver({ ...editingDriver, rating: parseFloat(e.target.value) || 5 })}
                     className="w-full pl-10 pr-4 py-4 bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-primary-500 rounded-3xl outline-none transition-all font-bold dark:text-white"
