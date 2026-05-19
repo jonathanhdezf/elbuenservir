@@ -25,6 +25,7 @@ import { LocalDispatchSection } from '../components/LocalDispatch';
 import ReportsSection from '../components/ReportsSection';
 import LogsSection from '../components/LogsSection';
 import { PayrollSection } from '../components/PayrollSection';
+import { useMobileBack } from '../hooks/useMobileBack';
 
 interface AdminViewProps {
   categories: Category[];
@@ -270,41 +271,26 @@ export default function AdminView({
   }, [badges, playUISound]);
 
   // Mobile Back Button Navigation Logic
-  useEffect(() => {
-    // Add a dummy state to history
-    window.history.pushState({ modal: 'root' }, '');
+  const hasOpenAdminModal = !!(viewingOrderId || editingDriver || assigningOrderId || isConfirmingPayment || orderToDelete || customerToDelete || verifyingDispatchOrderId || isSidebarOpen || showPreview);
+  const handleCloseAdminModal = () => {
+    if (viewingOrderId) setViewingOrderId(null);
+    if (editingDriver) setEditingDriver(null);
+    if (assigningOrderId) setAssigningOrderId(null);
+    if (isConfirmingPayment) setIsConfirmingPayment(false);
+    if (orderToDelete) setOrderToDelete(null);
+    if (customerToDelete) setCustomerToDelete(null);
+    if (verifyingDispatchOrderId) setVerifyingDispatchOrderId(null);
+    if (isSidebarOpen) setIsSidebarOpen(false);
+    if (showPreview) setShowPreview(false);
+  };
 
-    const handlePopState = (event: PopStateEvent) => {
-      // Check for any open modal or temporary state
-      if (viewingOrderId || editingDriver || assigningOrderId || isConfirmingPayment) {
-        setViewingOrderId(null);
-        setEditingDriver(null);
-        setAssigningOrderId(null);
-        setIsConfirmingPayment(false);
-        // Push state back so we can intercept AGAIN
-        window.history.pushState({ modal: 'root' }, '');
-        return;
-      }
-
-      // If in a sub-section (not dashboard), go back to dashboard
-      if (activeSection !== 'dashboard') {
-        setActiveSection('dashboard');
-        window.history.pushState({ modal: 'root' }, '');
-        return;
-      }
-
-      // Final exit confirmation if at root
-      if (confirm('¿Deseas salir de la aplicación?')) {
-        // Here we let it go back (exit)
-      } else {
-        // Push state back to stay here
-        window.history.pushState({ modal: 'root' }, '');
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [viewingOrderId, editingDriver, assigningOrderId, isConfirmingPayment, activeSection]);
+  useMobileBack({
+    hasOpenModal: hasOpenAdminModal,
+    onCloseModal: handleCloseAdminModal,
+    hasSubSection: activeSection !== 'dashboard',
+    onBackSubSection: () => setActiveSection('dashboard'),
+    onExit
+  });
 
 
 

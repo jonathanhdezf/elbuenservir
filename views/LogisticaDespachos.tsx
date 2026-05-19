@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Order, OrderStatus, DeliveryDriver } from '../types';
 import { soundManager } from '../utils/soundManager';
+import { useMobileBack } from '../hooks/useMobileBack';
 
 interface LogisticaDespachosProps {
     orders: Order[];
@@ -55,6 +56,18 @@ export default function LogisticaDespachos({
             clearInterval(slideTimer);
         };
     }, [verifyingDispatchOrderId]);
+
+    useMobileBack({
+        hasOpenModal: !!verifyingDispatchOrderId,
+        onCloseModal: () => setVerifyingDispatchOrderId(null),
+        onExit: () => {
+            if (isAuthenticated) {
+                setIsAuthenticated(false);
+            } else {
+                onExit();
+            }
+        }
+    });
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();

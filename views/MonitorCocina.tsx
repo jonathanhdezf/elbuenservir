@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Order, OrderItem, OrderStatus } from '../types';
 import { soundManager } from '../utils/soundManager';
+import { useMobileBack } from '../hooks/useMobileBack';
 
 interface MonitorCocinaProps {
     orders: Order[];
@@ -34,6 +35,16 @@ export default function MonitorCocina({
         const timer = setInterval(() => setCurrentTime(new Date()), 10000);
         return () => clearInterval(timer);
     }, []);
+
+    useMobileBack({
+        onExit: () => {
+            if (isAuthenticated) {
+                setIsAuthenticated(false);
+            } else {
+                onExit();
+            }
+        }
+    });
 
     const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();

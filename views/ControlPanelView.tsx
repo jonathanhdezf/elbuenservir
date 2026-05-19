@@ -17,6 +17,7 @@ import {
     Check
 } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
+import { useMobileBack } from '../hooks/useMobileBack';
 
 interface ControlPanelViewProps {
     onNavigate: (view: 'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch' | 'driver_portal') => void;
@@ -56,6 +57,12 @@ export default function ControlPanelView({
             return () => clearTimeout(hideTimer);
         }
     }, [showWelcome]);
+
+    useMobileBack({
+        hasOpenModal: isSettingsOpen,
+        onCloseModal: () => setIsSettingsOpen(false),
+        onExit
+    });
 
     const apps = [
         {

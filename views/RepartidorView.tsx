@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { DeliveryDriver, Order, PaymentMethod } from '../types';
 import { soundManager } from '../utils/soundManager';
+import { useMobileBack } from '../hooks/useMobileBack';
 
 interface RepartidorViewProps {
   drivers: DeliveryDriver[];
@@ -43,6 +44,16 @@ export default function RepartidorView({
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
+
+  useMobileBack({
+    hasSubSection: viewState !== 'selector',
+    onBackSubSection: () => {
+      setViewState('selector');
+      setPin('');
+      setPinError(false);
+    },
+    onExit
+  });
 
   const activeDrivers = drivers.filter(d => !d.isDisabled);
 

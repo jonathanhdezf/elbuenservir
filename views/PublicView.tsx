@@ -4,6 +4,7 @@ import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock,
 import { Category, MenuItem, Customer, Order } from '../types';
 import { soundManager } from '../utils/soundManager';
 import LiveOrderModal from '../components/LiveOrderModal';
+import { useMobileBack } from '../hooks/useMobileBack';
 
 interface PublicViewProps {
   categories: Category[];
@@ -52,6 +53,35 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
   const [selectedAddress, setSelectedAddress] = useState('');
   const [tableNumber, setTableNumber] = useState('');
   const [isDeliverySelectionOpen, setIsDeliverySelectionOpen] = useState(false);
+
+  // Mobile Back Button Navigation Logic
+  const hasOpenPublicModal = !!(extraModalType || isOrderModalOpen || isAuthModalOpen || isLiveOrderOpen || isDeliverySelectionOpen || isMobileMenuOpen);
+  const handleClosePublicModal = () => {
+    if (extraModalType) {
+      setExtraModalType(null);
+    } else if (isOrderModalOpen) {
+      if (orderStep > 1) {
+        setOrderStep(orderStep - 1);
+      } else {
+        setIsOrderModalOpen(false);
+      }
+    } else if (isAuthModalOpen) {
+      setIsAuthModalOpen(false);
+    } else if (isLiveOrderOpen) {
+      setIsLiveOrderOpen(false);
+    } else if (isDeliverySelectionOpen) {
+      setIsDeliverySelectionOpen(false);
+    } else if (isMobileMenuOpen) {
+      setIsMobileMenuOpen(false);
+    }
+  };
+
+  useMobileBack({
+    hasOpenModal: hasOpenPublicModal,
+    onCloseModal: handleClosePublicModal,
+    isRoot: true,
+    confirmExitMessage: '¿Deseas salir de la aplicación?'
+  });
 
   const handleAuthSubmit = (e: React.FormEvent) => {
     e.preventDefault();

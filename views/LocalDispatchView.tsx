@@ -14,6 +14,7 @@ import {
     AlertCircle
 } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
+import { useMobileBack } from '../hooks/useMobileBack';
 
 interface LocalDispatchViewProps {
     orders: Order[];
@@ -43,6 +44,19 @@ const LocalDispatchView: React.FC<LocalDispatchViewProps> = ({
     const [cashReceived, setCashReceived] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'tarjeta' | 'transferencia'>('efectivo');
     const [paymentError, setPaymentError] = useState<string | null>(null);
+
+    // Mobile Back Button Navigation Logic
+    const hasOpenLocalModal = isAuthModalOpen || isPaymentModalOpen;
+    const handleCloseLocalModal = () => {
+        if (isAuthModalOpen) setIsAuthModalOpen(false);
+        if (isPaymentModalOpen) setIsPaymentModalOpen(false);
+    };
+
+    useMobileBack({
+        hasOpenModal: hasOpenLocalModal,
+        onCloseModal: handleCloseLocalModal,
+        onExit: () => setView('control_panel')
+    });
 
     // TABLES: 1 to 5
     const tables = Array.from({ length: 5 }, (_, i) => (i + 1).toString());

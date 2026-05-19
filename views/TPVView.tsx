@@ -10,6 +10,7 @@ import {
 import { MenuItem, Category, Order, OrderItem, Staff, Customer, PaymentMethod } from '../types';
 import { soundManager } from '../utils/soundManager';
 import { generateTicket } from '../utils/printTicket';
+import { useMobileBack } from '../hooks/useMobileBack';
 
 interface TPVViewProps {
     categories: Category[];
@@ -80,6 +81,24 @@ export default function TPVView({
             });
         }
     };
+
+    // Mobile Back Button Navigation Logic
+    const hasOpenTpvModal = modalType !== 'none';
+    const handleCloseTpvModal = () => setModalType('none');
+
+    useMobileBack({
+        hasOpenModal: hasOpenTpvModal,
+        onCloseModal: handleCloseTpvModal,
+        hasSubSection: activePosView === 'cart',
+        onBackSubSection: () => setActivePosView('menu'),
+        onExit: () => {
+            if (loggedInStaff) {
+                setLoggedInStaff(null);
+            } else {
+                onExit();
+            }
+        }
+    });
 
     // Initial Order Logic
     React.useEffect(() => {
