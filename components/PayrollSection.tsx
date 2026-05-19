@@ -347,7 +347,7 @@ export const PayrollSection: React.FC<PayrollSectionProps> = ({
                     <div className="w-full bg-gray-100 dark:bg-gray-900 h-2.5 rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-primary-500 transition-all duration-1000" 
-                        style={{ width: `${((loan.amount - loan.remainingBalance) / loan.amount) * 100}%` }}
+                        ref={(el) => { if (el) el.style.width = `${((loan.amount - loan.remainingBalance) / loan.amount) * 100}%`; }}
                       ></div>
                     </div>
 

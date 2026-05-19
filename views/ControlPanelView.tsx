@@ -147,9 +147,10 @@ export default function ControlPanelView({
                                 <button
                                     key={color}
                                     title={`Cambiar fondo a ${color}`}
+                                    aria-label={`Cambiar fondo a ${color}`}
                                     onClick={() => { setSystemBgColor(color); soundManager.play('click'); }}
                                     className={`w-full aspect-square rounded-2xl border-4 transition-all ${systemBgColor === color ? 'border-primary-500 scale-110 shadow-lg shadow-primary-500/20' : 'border-transparent hover:scale-105'}`}
-                                    style={{ backgroundColor: color }}
+                                    ref={(el) => { if (el) el.style.backgroundColor = color; }}
                                 >
                                     {systemBgColor === color && <Check className="w-4 h-4 text-white mx-auto" />}
                                 </button>
@@ -196,7 +197,7 @@ export default function ControlPanelView({
     );
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center font-sans overflow-hidden" style={{ backgroundColor: systemBgColor }}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center font-sans overflow-hidden" data-bg={systemBgColor} ref={(el) => { if (el) el.style.backgroundColor = systemBgColor; }}>
             {/* Dynamic Background Effects */}
             <div className="absolute inset-0 pointer-events-none">
                 {systemBgEffect === 'gradient' && (
@@ -217,13 +218,15 @@ export default function ControlPanelView({
                             <div
                                 key={i}
                                 className="absolute bg-white rounded-full animate-pulse"
-                                style={{
-                                    width: Math.random() * 3 + 'px',
-                                    height: Math.random() * 3 + 'px',
-                                    top: Math.random() * 100 + '%',
-                                    left: Math.random() * 100 + '%',
-                                    animationDelay: Math.random() * 5 + 's',
-                                    opacity: Math.random() * 0.5 + 0.2
+                                ref={(el) => {
+                                    if (el) {
+                                        el.style.width = Math.random() * 3 + 'px';
+                                        el.style.height = el.style.width;
+                                        el.style.top = Math.random() * 100 + '%';
+                                        el.style.left = Math.random() * 100 + '%';
+                                        el.style.animationDelay = Math.random() * 5 + 's';
+                                        el.style.opacity = String(Math.random() * 0.5 + 0.2);
+                                    }
                                 }}
                             ></div>
                         ))}
@@ -263,7 +266,7 @@ export default function ControlPanelView({
                                     <div className="flex-1">
                                         <div className="flex justify-between items-start mb-1">
                                             <p className="text-[10px] font-black text-primary-500 uppercase tracking-widest">Sistemas Listos</p>
-                                            <button onClick={() => setShowWelcome(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                            <button title="Cerrar notificación" aria-label="Cerrar notificación" onClick={() => setShowWelcome(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                                                 <X className="w-3 h-3" />
                                             </button>
                                         </div>
