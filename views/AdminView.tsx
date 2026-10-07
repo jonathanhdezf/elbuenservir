@@ -45,6 +45,7 @@ interface AdminViewProps {
   isDarkMode: boolean;
   setIsDarkMode: (val: boolean) => void;
   onExit: () => void;
+  initialSection?: AdminSection;
 }
 
 interface Notification {
@@ -80,7 +81,8 @@ export default function AdminView({
   updateDriverStats,
   isDarkMode,
   setIsDarkMode,
-  onExit
+  onExit,
+  initialSection = 'dashboard'
 }: AdminViewProps) {
   const STATUS_CONFIG: Record<OrderStatus, { label: string, color: string, icon: any }> = {
     pending: { label: 'Pendiente', color: 'bg-gray-100 text-gray-700', icon: Clock },
@@ -115,8 +117,14 @@ export default function AdminView({
     walking: { label: 'A pie', icon: Navigation }
   };
 
-  const [activeSection, setActiveSection] = useState<AdminSection>('dashboard');
+  const [activeSection, setActiveSection] = useState<AdminSection>(initialSection);
   const [activeTab, setActiveTab] = useState<TabId>(categories[0]?.id || '');
+
+  useEffect(() => {
+    if (initialSection) {
+      setActiveSection(initialSection);
+    }
+  }, [initialSection]);
   const isFullScreen = true;
 
   // Modal states
@@ -3304,6 +3312,7 @@ export default function AdminView({
           notifications={notificationHistory}
           onClearNotifications={() => setNotificationHistory([])}
           onRemoveNotification={(id) => setNotificationHistory(prev => prev.filter(n => n.id !== id))}
+          onBackToPanel={onExit}
           title={
             activeSection === 'menu' ? 'Editor de Menú' :
               activeSection === 'kds' ? 'Comandas' :

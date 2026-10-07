@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { MenuItem, Category, TabId, Order, Customer, DeliveryDriver, Staff, SiteLog } from './types';
+import { MenuItem, Category, TabId, Order, Customer, DeliveryDriver, Staff, SiteLog, AdminSection } from './types';
 import AdminView from './views/AdminView';
 import PublicView from './views/PublicView';
 import MonitorCocina from './views/MonitorCocina';
@@ -348,6 +348,8 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [systemBgColor, setSystemBgColor] = useState('#0f172a');
   const [systemBgEffect, setSystemBgEffect] = useState<'none' | 'gradient' | 'animated-blobs' | 'stars'>('gradient');
+  const [adminInitialSection, setAdminInitialSection] = useState<AdminSection>('dashboard');
+  const [panelMode, setPanelMode] = useState<'basic' | 'advanced'>('basic');
 
   useEffect(() => {
     if (isDarkMode) {
@@ -413,13 +415,22 @@ export default function App() {
   if (view === 'control_panel') {
     return (
       <ControlPanelView
-        onNavigate={(newView) => setView(newView as any)}
+        onNavigate={(newView, section) => {
+          if (section) {
+            setAdminInitialSection(section);
+          } else {
+            setAdminInitialSection('dashboard');
+          }
+          setView(newView as any);
+        }}
         onExit={() => setView('public')}
         isDarkMode={isDarkMode}
         systemBgColor={systemBgColor}
         setSystemBgColor={setSystemBgColor}
         systemBgEffect={systemBgEffect}
         setSystemBgEffect={setSystemBgEffect}
+        panelMode={panelMode}
+        setPanelMode={setPanelMode}
       />
     );
   }
@@ -468,6 +479,7 @@ export default function App() {
   if (view === 'admin') {
     return (
       <AdminView
+        initialSection={adminInitialSection}
         categories={categories}
         setCategories={setCategories}
         menuItems={menuItems}

@@ -14,19 +14,24 @@ import {
     Bike,
     Palette,
     Sparkles,
-    Check
+    Check,
+    UtensilsCrossed,
+    ArrowRight
 } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
 import { useMobileBack } from '../hooks/useMobileBack';
+import { AdminSection } from '../types';
 
 interface ControlPanelViewProps {
-    onNavigate: (view: 'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch' | 'driver_portal') => void;
+    onNavigate: (view: 'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch' | 'driver_portal', section?: AdminSection) => void;
     onExit: () => void;
     isDarkMode: boolean;
     systemBgColor: string;
     setSystemBgColor: (color: string) => void;
     systemBgEffect: 'none' | 'gradient' | 'animated-blobs' | 'stars';
     setSystemBgEffect: (effect: 'none' | 'gradient' | 'animated-blobs' | 'stars') => void;
+    panelMode?: 'basic' | 'advanced';
+    setPanelMode?: (mode: 'basic' | 'advanced') => void;
 }
 
 export default function ControlPanelView({
@@ -36,10 +41,24 @@ export default function ControlPanelView({
     systemBgColor,
     setSystemBgColor,
     systemBgEffect,
-    setSystemBgEffect
+    setSystemBgEffect,
+    panelMode: propPanelMode,
+    setPanelMode: propSetPanelMode
 }: ControlPanelViewProps) {
+    const [localPanelMode, setLocalPanelMode] = useState<'basic' | 'advanced'>('basic');
+    const panelMode = propPanelMode ?? localPanelMode;
+
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [showWelcome, setShowWelcome] = useState(false);
+
+    const changePanelMode = (mode: 'basic' | 'advanced') => {
+        soundManager.play('click');
+        if (propSetPanelMode) {
+            propSetPanelMode(mode);
+        } else {
+            setLocalPanelMode(mode);
+        }
+    };
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -64,14 +83,24 @@ export default function ControlPanelView({
         onExit
     });
 
-    const apps = [
+    const advancedApps = [
         {
             id: 'admin',
             name: 'Administración',
             icon: Lock,
             color: 'bg-blue-500',
             description: 'Gestión total del sistema',
-            view: 'admin' as const
+            view: 'admin' as const,
+            section: 'dashboard' as const
+        },
+        {
+            id: 'menu',
+            name: 'Editor de Menú',
+            icon: UtensilsCrossed,
+            color: 'bg-amber-500',
+            description: 'Platillos, precios y categorías',
+            view: 'admin' as const,
+            section: 'menu' as const
         },
         {
             id: 'tpv',
@@ -85,7 +114,7 @@ export default function ControlPanelView({
             id: 'kitchen',
             name: 'Monitor KDS',
             icon: ChefHat,
-            color: 'bg-amber-500',
+            color: 'bg-orange-500',
             description: 'Control de cocina en tiempo real',
             view: 'kitchen' as const
         },
@@ -115,9 +144,9 @@ export default function ControlPanelView({
         }
     ];
 
-    const handleAppClick = (view: any) => {
+    const handleAppClick = (view: any, section?: AdminSection) => {
         soundManager.play('navigation');
-        onNavigate(view);
+        onNavigate(view, section);
     };
 
     const renderSettingsModal = () => (
@@ -129,7 +158,7 @@ export default function ControlPanelView({
                     <button 
                         onClick={() => setIsSettingsOpen(false)} 
                         title="Cerrar personalización"
-                        className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
+                        className="p-2 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors cursor-pointer"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -149,7 +178,7 @@ export default function ControlPanelView({
                                     title={`Cambiar fondo a ${color}`}
                                     aria-label={`Cambiar fondo a ${color}`}
                                     onClick={() => { setSystemBgColor(color); soundManager.play('click'); }}
-                                    className={`w-full aspect-square rounded-2xl border-4 transition-all ${systemBgColor === color ? 'border-primary-500 scale-110 shadow-lg shadow-primary-500/20' : 'border-transparent hover:scale-105'}`}
+                                    className={`w-full aspect-square rounded-2xl border-4 transition-all cursor-pointer ${systemBgColor === color ? 'border-primary-500 scale-110 shadow-lg shadow-primary-500/20' : 'border-transparent hover:scale-105'}`}
                                     ref={(el) => { if (el) el.style.backgroundColor = color; }}
                                 >
                                     {systemBgColor === color && <Check className="w-4 h-4 text-white mx-auto" />}
@@ -184,7 +213,7 @@ export default function ControlPanelView({
                                 <button
                                     key={effect.id}
                                     onClick={() => { setSystemBgEffect(effect.id as any); soundManager.play('click'); }}
-                                    className={`p-4 rounded-2xl border-2 font-bold text-[10px] uppercase tracking-widest transition-all ${systemBgEffect === effect.id ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600' : 'border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-200'}`}
+                                    className={`p-4 rounded-2xl border-2 font-bold text-[10px] uppercase tracking-widest transition-all cursor-pointer ${systemBgEffect === effect.id ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600' : 'border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-200'}`}
                                 >
                                     {effect.label}
                                 </button>
@@ -236,14 +265,17 @@ export default function ControlPanelView({
 
             {/* Top Bar (OS Style) */}
             <div className="absolute top-0 left-0 w-full p-4 md:p-6 flex justify-between items-center text-white/50 z-20">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3 sm:gap-4">
                     <div className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-white/5 backdrop-blur-md rounded-full border border-white/10">
-                        <div className="w-1.5 h-1.5 md:w-2 md:h-2 bg-emerald-500 rounded-full animate-ping"></div>
-                        <span className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-emerald-400">Sistema Activo</span>
+                        <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full animate-ping ${panelMode === 'basic' ? 'bg-amber-400' : 'bg-emerald-500'}`}></div>
+                        <span className={`text-[9px] md:text-[10px] font-black uppercase tracking-widest ${panelMode === 'basic' ? 'text-amber-400' : 'text-emerald-400'}`}>
+                            {panelMode === 'basic' ? 'Vista Básica' : 'Vista Avanzada'}
+                        </span>
                     </div>
                     <span className="hidden md:inline text-[10px] font-bold uppercase tracking-[0.3em]">v2.4.0 Premium</span>
                 </div>
-                <div className="flex items-center gap-4 md:gap-6">
+
+                <div className="flex items-center gap-3 sm:gap-6">
                     <div className="relative">
                         <button
                             title="Notificaciones"
@@ -251,27 +283,32 @@ export default function ControlPanelView({
                                 setShowWelcome(!showWelcome);
                                 soundManager.play('click');
                             }}
-                            className={`p-1 transition-colors ${showWelcome ? 'text-primary-400' : 'text-white/50 hover:text-white'}`}
+                            className={`p-1 transition-colors cursor-pointer ${showWelcome ? 'text-primary-400' : 'text-white/50 hover:text-white'}`}
                         >
                             <Bell className={`w-4 h-4 ${showWelcome ? 'animate-bounce' : ''}`} />
                             <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-gray-900"></div>
                         </button>
 
                         {showWelcome && (
-                            <div className="absolute right-0 mt-4 w-72 bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 p-5 animate-in slide-in-from-top-2 fade-in duration-300 z-[210]">
+                            <div className="absolute right-0 mt-4 w-72 sm:w-80 bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 p-5 animate-in slide-in-from-top-2 fade-in duration-300 z-[210]">
                                 <div className="flex gap-4">
                                     <div className="w-10 h-10 rounded-2xl bg-primary-500 flex items-center justify-center text-white shadow-lg shadow-primary-500/20 shrink-0">
                                         <Bell className="w-5 h-5 animate-swing" />
                                     </div>
                                     <div className="flex-1">
                                         <div className="flex justify-between items-start mb-1">
-                                            <p className="text-[10px] font-black text-primary-500 uppercase tracking-widest">Sistemas Listos</p>
-                                            <button title="Cerrar notificación" aria-label="Cerrar notificación" onClick={() => setShowWelcome(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                            <p className="text-[10px] font-black text-primary-500 uppercase tracking-widest">
+                                                {panelMode === 'basic' ? 'Vista Básica Activa' : 'Sistemas Listos'}
+                                            </p>
+                                            <button title="Cerrar notificación" aria-label="Cerrar notificación" onClick={() => setShowWelcome(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer">
                                                 <X className="w-3 h-3" />
                                             </button>
                                         </div>
                                         <p className="text-sm font-bold text-gray-800 dark:text-white leading-tight">
-                                            Bienvenido Miguel 👋 los sistemas estan listos, es un gusto trabajar contigo. :)
+                                            {panelMode === 'basic'
+                                                ? 'Estás en la vista básica con acceso al Editor de Menú. Puedes cambiar a la vista avanzada para ver todos los sistemas.'
+                                                : 'Bienvenido Miguel 👋 los sistemas están listos, es un gusto trabajar contigo. :)'
+                                            }
                                         </p>
                                     </div>
                                 </div>
@@ -282,14 +319,14 @@ export default function ControlPanelView({
                     <button
                         title="Buscar"
                         onClick={() => soundManager.play('click')}
-                        className="p-1 text-white/50 hover:text-white transition-colors"
+                        className="p-1 text-white/50 hover:text-white transition-colors cursor-pointer"
                     >
                         <Search className="w-4 h-4" />
                     </button>
                     <button
                         title="Configuración de Sistema"
                         onClick={() => { setIsSettingsOpen(true); soundManager.play('click'); }}
-                        className={`p-1 transition-all ${isSettingsOpen ? 'rotate-90 text-primary-400' : 'text-white/50 hover:text-white'}`}
+                        className={`p-1 transition-all cursor-pointer ${isSettingsOpen ? 'rotate-90 text-primary-400' : 'text-white/50 hover:text-white'}`}
                     >
                         <Settings className="w-4 h-4" />
                     </button>
@@ -299,59 +336,160 @@ export default function ControlPanelView({
             </div>
 
             <div className="relative w-full h-full flex flex-col items-center justify-center overflow-y-auto custom-scrollbar">
-                <div className="flex flex-col items-center justify-center w-full max-w-6xl p-6 py-32 md:py-32 min-h-min">
+                <div className="flex flex-col items-center justify-center w-full max-w-6xl p-6 py-28 md:py-32 min-h-min">
 
                     {/* Logo and Header */}
-                    <div className="text-center mb-8 md:mb-12 animate-in fade-in slide-in-from-top-4 duration-700">
-                        <div className="relative inline-block mb-3 md:mb-6">
-                            <div className="absolute -inset-4 bg-gradient-to-tr from-blue-500 to-emerald-500 rounded-full blur-2xl opacity-30 animate-pulse"></div>
+                    <div className="text-center mb-6 md:mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
+                        <div className="relative inline-block mb-3 md:mb-5">
+                            <div className={`absolute -inset-4 rounded-full blur-2xl opacity-30 animate-pulse ${
+                                panelMode === 'basic' ? 'bg-gradient-to-tr from-amber-500 to-orange-500' : 'bg-gradient-to-tr from-blue-500 to-emerald-500'
+                            }`}></div>
                             <img
                                 src={`${(import.meta as any).env.BASE_URL}logo.png`}
                                 alt="System Logo"
-                                className="relative w-16 h-16 md:w-24 md:h-24 rounded-[28px] md:rounded-[32px] shadow-2xl border-2 border-white/20 object-cover"
+                                className="relative w-16 h-16 md:w-20 md:h-20 rounded-[28px] md:rounded-[32px] shadow-2xl border-2 border-white/20 object-cover"
                             />
                         </div>
-                        <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-white tracking-tighter uppercase mb-2">
-                            Panel de <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Control</span>
+                        <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tighter uppercase mb-2">
+                            Panel de <span className={`text-transparent bg-clip-text ${
+                                panelMode === 'basic' 
+                                    ? 'bg-gradient-to-r from-amber-400 to-orange-400'
+                                    : 'bg-gradient-to-r from-blue-400 to-emerald-400'
+                            }`}>Control</span>
                         </h1>
-                        <p className="text-white/40 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] md:tracking-[0.4em]">Sistema Operativo "El Buen Servir"</p>
+                        <p className="text-white/40 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] md:tracking-[0.4em]">
+                            {panelMode === 'basic' ? 'Vista Básica • Editor de Menú' : 'Vista Avanzada • Sistema Operativo "El Buen Servir"'}
+                        </p>
                     </div>
 
-                    {/* App Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 md:gap-8 w-full animate-in fade-in zoom-in-95 duration-700 delay-200">
-                        {apps.map((app, index) => (
+                    {/* View Switcher Toggle (Vista Básica vs Vista Avanzada) */}
+                    <div className="mb-8 md:mb-10 inline-flex p-1.5 bg-black/40 backdrop-blur-xl border border-white/15 rounded-2xl shadow-2xl animate-in fade-in duration-500">
+                        <button
+                            type="button"
+                            onClick={() => changePanelMode('basic')}
+                            className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+                                panelMode === 'basic'
+                                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 scale-[1.02]'
+                                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                            }`}
+                        >
+                            <Sparkles className="w-4 h-4 text-amber-200" />
+                            <span>Vista Básica</span>
+                            <span className="hidden sm:inline text-[9px] bg-black/25 px-2 py-0.5 rounded-md text-amber-200">Por Defecto</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => changePanelMode('advanced')}
+                            className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
+                                panelMode === 'advanced'
+                                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/30 scale-[1.02]'
+                                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                            }`}
+                        >
+                            <LayoutDashboard className="w-4 h-4 text-blue-200" />
+                            <span>Vista Avanzada</span>
+                            <span className="hidden sm:inline text-[9px] bg-black/25 px-2 py-0.5 rounded-md text-blue-200">Completa</span>
+                        </button>
+                    </div>
+
+                    {/* Basic View: Only Menu Editor Option */}
+                    {panelMode === 'basic' ? (
+                        <div className="flex flex-col items-center w-full max-w-lg mx-auto animate-in fade-in zoom-in-95 duration-500">
                             <button
-                                key={app.id}
-                                title={`Abrir ${app.name}`}
-                                onClick={() => handleAppClick(app.view)}
-                                className="group relative flex flex-col items-center gap-3 md:gap-4 transition-all duration-300 hover:-translate-y-1 md:hover:-translate-y-2 tap-highlight-transparent"
+                                onClick={() => handleAppClick('admin', 'menu')}
+                                title="Abrir Editor de Menú"
+                                className="group relative w-full flex flex-col sm:flex-row items-center gap-6 p-6 sm:p-8 rounded-[36px] bg-white/5 backdrop-blur-xl border border-white/15 hover:border-amber-500/50 hover:bg-white/10 transition-all duration-300 shadow-2xl hover:shadow-amber-500/20 hover:-translate-y-1.5 text-left cursor-pointer"
                             >
-                                <div className={`
-                    relative w-20 h-20 md:w-32 md:h-32 rounded-[32px] md:rounded-[40px] flex items-center justify-center
-                    bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl
-                    group-hover:bg-white/10 group-hover:border-white/20 group-hover:shadow-${app.color.split('-')[1]}-500/20
-                    transition-all duration-500
-                  `}>
-                                    <div className={`absolute inset-0 rounded-[32px] md:rounded-[40px] ${app.color} opacity-0 group-hover:opacity-10 transition-opacity`}></div>
-                                    <app.icon className={`w-8 h-8 md:w-14 md:h-14 text-white group-hover:scale-110 transition-transform duration-500`} />
+                                <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-[28px] bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center shrink-0 shadow-xl shadow-amber-500/25 group-hover:scale-105 transition-transform duration-300">
+                                    <UtensilsCrossed className="w-12 h-12 text-white" />
+                                    <div className="absolute -inset-1 bg-amber-400 rounded-[30px] blur opacity-30 group-hover:opacity-60 transition-opacity"></div>
                                 </div>
-                                <div className="text-center">
-                                    <p className="text-[10px] md:text-sm font-black text-white uppercase tracking-widest group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-white/50">{app.name}</p>
-                                    <p className="hidden md:block text-[9px] text-white/30 font-bold uppercase mt-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300 transform translate-y-2 group-hover:translate-y-0">{app.description}</p>
+                                
+                                <div className="flex-1 text-center sm:text-left">
+                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[10px] font-black uppercase tracking-widest mb-2">
+                                        <Sparkles className="w-3 h-3" />
+                                        Módulo Principal
+                                    </div>
+                                    <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight group-hover:text-amber-400 transition-colors">
+                                        Editor de Menú
+                                    </h2>
+                                    <p className="text-white/60 text-xs sm:text-sm font-medium mt-1 leading-relaxed">
+                                        Gestiona platillos, actualiza precios, organiza categorías y controla la disponibilidad en el restaurante.
+                                    </p>
+                                    <div className="mt-4 inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-400 group-hover:translate-x-1 transition-transform">
+                                        <span>Abrir Editor de Menú</span>
+                                        <ArrowRight className="w-4 h-4" />
+                                    </div>
                                 </div>
                             </button>
-                        ))}
-                    </div>
 
-                    {/* Bottom Dock Control */}
-                    <div className="mt-8 md:mt-12 flex flex-col items-center gap-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500">
+                            {/* Helpful Banner to Switch to Advanced View */}
+                            <div className="mt-8 p-4 sm:p-5 w-full rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4">
+                                <div className="text-center sm:text-left">
+                                    <p className="text-xs font-bold text-white">¿Necesitas Punto de Venta, Cocina o Logística?</p>
+                                    <p className="text-[11px] text-white/50">Cambia a la Vista Avanzada para acceder a todas las funciones del sistema.</p>
+                                </div>
+                                <button
+                                    onClick={() => changePanelMode('advanced')}
+                                    className="shrink-0 px-4 py-2 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 border border-blue-500/30 text-blue-300 text-xs font-black uppercase tracking-wider transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                                >
+                                    <LayoutDashboard className="w-3.5 h-3.5" />
+                                    <span>Ir a Vista Avanzada</span>
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        /* Advanced View: Full System Apps Grid */
+                        <div className="flex flex-col items-center w-full animate-in fade-in zoom-in-95 duration-500">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 w-full max-w-5xl">
+                                {advancedApps.map((app) => (
+                                    <button
+                                        key={app.id}
+                                        title={`Abrir ${app.name}`}
+                                        onClick={() => handleAppClick(app.view, app.section)}
+                                        className="group relative flex flex-col items-center gap-3 md:gap-4 p-4 rounded-3xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-300 hover:-translate-y-1.5 shadow-xl cursor-pointer"
+                                    >
+                                        <div className={`
+                                            relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-[28px] flex items-center justify-center
+                                            bg-white/10 backdrop-blur-xl border border-white/10 shadow-lg
+                                            group-hover:scale-105 transition-all duration-300
+                                        `}>
+                                            <div className={`absolute inset-0 rounded-2xl sm:rounded-[28px] ${app.color} opacity-20 group-hover:opacity-40 transition-opacity`}></div>
+                                            <app.icon className="w-7 h-7 sm:w-9 sm:h-9 text-white transition-transform duration-300" />
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-[11px] sm:text-xs font-black text-white uppercase tracking-wider group-hover:text-primary-300 transition-colors">
+                                                {app.name}
+                                            </p>
+                                            <p className="hidden sm:block text-[9px] text-white/40 font-bold uppercase mt-0.5 max-w-[150px] truncate">
+                                                {app.description}
+                                            </p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+
+                            <div className="mt-8">
+                                <button
+                                    onClick={() => changePanelMode('basic')}
+                                    className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
+                                >
+                                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                                    <span>Regresar a Vista Básica</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Bottom Exit Button */}
+                    <div className="mt-10 md:mt-12 flex flex-col items-center gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-300">
                         <button
                             onClick={onExit}
-                            title="Cerrar Sesión"
-                            className="group flex flex-col items-center gap-3"
+                            title="Cerrar Sesión y Volver al Sitio Público"
+                            className="group flex flex-col items-center gap-2 cursor-pointer"
                         >
-                            <div className="w-12 h-12 md:w-16 md:h-16 rounded-full bg-red-500/10 border border-red-500/20 backdrop-blur-md flex items-center justify-center group-hover:bg-red-500 group-hover:border-red-500 transition-all duration-300 shadow-lg shadow-red-500/0 group-hover:shadow-red-500/20">
-                                <Power className="w-5 h-5 md:w-6 md:h-6 text-red-500 group-hover:text-white transition-colors" />
+                            <div className="w-12 h-12 md:w-14 md:h-14 rounded-full bg-red-500/10 border border-red-500/20 backdrop-blur-md flex items-center justify-center group-hover:bg-red-500 group-hover:border-red-500 transition-all duration-300 shadow-lg shadow-red-500/0 group-hover:shadow-red-500/20">
+                                <Power className="w-5 h-5 text-red-500 group-hover:text-white transition-colors" />
                             </div>
                             <span className="text-[9px] md:text-[10px] font-black text-white/40 uppercase tracking-[0.3em] group-hover:text-red-400 transition-colors">Cerrar Sesión</span>
                         </button>

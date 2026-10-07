@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Menu, Eye, Bell, Clock, Calendar,
-  X, CheckCircle2, AlertCircle, Info, Trash2
+  X, CheckCircle2, AlertCircle, Info, Trash2, LayoutDashboard
 } from 'lucide-react';
 
 interface Notification {
@@ -21,6 +21,7 @@ interface HeaderProps {
   notifications?: Notification[];
   onClearNotifications?: () => void;
   onRemoveNotification?: (id: number) => void;
+  onBackToPanel?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -31,7 +32,8 @@ const Header: React.FC<HeaderProps> = ({
   currentTime = new Date(),
   notifications = [],
   onClearNotifications,
-  onRemoveNotification
+  onRemoveNotification,
+  onBackToPanel
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -76,15 +78,26 @@ const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 h-20 flex items-center justify-between px-4 md:px-8 sticky top-0 z-30 transition-colors">
-      <div className="flex items-center">
+      <div className="flex items-center gap-2 sm:gap-3">
         <button
           title="Abrir menú"
           onClick={onOpenSidebar}
-          className={`${!isFullScreen ? 'lg:hidden' : ''} p-2.5 mr-3 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors`}
+          className={`${!isFullScreen ? 'lg:hidden' : ''} p-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors cursor-pointer`}
         >
           <Menu className="w-6 h-6" />
         </button>
-        <h2 className="text-xl md:text-2xl font-extrabold text-gray-800 dark:text-white tracking-tight">{title}</h2>
+        <h2 className="text-lg md:text-2xl font-extrabold text-gray-800 dark:text-white tracking-tight">{title}</h2>
+        {onBackToPanel && (
+          <button
+            onClick={onBackToPanel}
+            title="Volver al Panel de Control"
+            className="flex items-center gap-1.5 ml-2 sm:ml-4 px-3 py-1.5 text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-xl transition-all cursor-pointer shadow-sm active:scale-95"
+          >
+            <LayoutDashboard className="w-3.5 h-3.5 text-primary-500" />
+            <span className="hidden sm:inline">Panel de Control</span>
+            <span className="sm:hidden text-[10px]">Panel</span>
+          </button>
+        )}
       </div>
 
       <div className="flex items-center space-x-3 md:space-x-8">
