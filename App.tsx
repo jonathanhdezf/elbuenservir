@@ -9,6 +9,7 @@ import TPVView from './views/TPVView';
 import LocalDispatchView from './views/LocalDispatchView.tsx';
 import ControlPanelView from './views/ControlPanelView';
 import RepartidorView from './views/RepartidorView';
+import { ControlPanelAuthModal } from './components/ControlPanelAuthModal';
 
 const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-3', name: 'Menú del Día' },
@@ -351,6 +352,34 @@ export default function App() {
   const [adminInitialSection, setAdminInitialSection] = useState<AdminSection>('dashboard');
   const [panelMode, setPanelMode] = useState<'basic' | 'advanced'>('basic');
 
+  const [isPanelAuthenticated, setIsPanelAuthenticated] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem('el_buen_servir_cp_auth') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  const handleEnterControlPanel = () => {
+    if (isPanelAuthenticated) {
+      setView('control_panel');
+    } else {
+      setIsAuthModalOpen(true);
+    }
+  };
+
+  const handleAuthSuccess = () => {
+    setIsPanelAuthenticated(true);
+    try {
+      sessionStorage.setItem('el_buen_servir_cp_auth', 'true');
+    } catch {
+      // ignore
+    }
+    setIsAuthModalOpen(false);
+    setView('control_panel');
+  };
+
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -413,6 +442,28 @@ export default function App() {
   }, []);
 
   if (view === 'control_panel') {
+    if (!isPanelAuthenticated) {
+      return (
+        <>
+          <PublicView
+            categories={categories}
+            menuItems={menuItems}
+            customers={customers}
+            onAddCustomer={(customer) => setCustomers(prev => [...prev, customer])}
+            onAddOrder={(order) => setOrders(prev => [order, ...prev])}
+            onEnterControlPanel={handleEnterControlPanel}
+            isDarkMode={isDarkMode}
+            setIsDarkMode={setIsDarkMode}
+          />
+          <ControlPanelAuthModal
+            isOpen={true}
+            onClose={() => setView('public')}
+            onSuccess={handleAuthSuccess}
+          />
+        </>
+      );
+    }
+
     return (
       <ControlPanelView
         onNavigate={(newView, section) => {
@@ -423,7 +474,15 @@ export default function App() {
           }
           setView(newView as any);
         }}
-        onExit={() => setView('public')}
+        onExit={() => {
+          setIsPanelAuthenticated(false);
+          try {
+            sessionStorage.removeItem('el_buen_servir_cp_auth');
+          } catch {
+            // ignore
+          }
+          setView('public');
+        }}
         isDarkMode={isDarkMode}
         systemBgColor={systemBgColor}
         setSystemBgColor={setSystemBgColor}
@@ -557,16 +616,23 @@ export default function App() {
   }
 
   return (
-    <PublicView
-      categories={categories}
-      menuItems={menuItems}
-      customers={customers}
-      onAddCustomer={(customer) => setCustomers(prev => [...prev, customer])}
-      onAddOrder={(order) => setOrders(prev => [order, ...prev])}
-      onEnterControlPanel={() => setView('control_panel')}
-      isDarkMode={isDarkMode}
-      setIsDarkMode={setIsDarkMode}
-    />
+    <>
+      <PublicView
+        categories={categories}
+        menuItems={menuItems}
+        customers={customers}
+        onAddCustomer={(customer) => setCustomers(prev => [...prev, customer])}
+        onAddOrder={(order) => setOrders(prev => [order, ...prev])}
+        onEnterControlPanel={handleEnterControlPanel}
+        isDarkMode={isDarkMode}
+        setIsDarkMode={setIsDarkMode}
+      />
+      <ControlPanelAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={handleAuthSuccess}
+      />
+    </>
   );
 }
 
