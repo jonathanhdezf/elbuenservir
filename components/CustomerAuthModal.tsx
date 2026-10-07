@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Customer } from '../types';
 import { soundManager } from '../utils/soundManager';
+import { CustomerAvatar } from './CustomerAvatar';
 
 interface CustomerAuthModalProps {
   isOpen: boolean;
@@ -338,15 +339,27 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                   Foto o Avatar de Perfil
                 </label>
                 <div className="flex items-center gap-3">
-                  <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-primary-500 shrink-0 bg-gray-100 dark:bg-gray-800 flex items-center justify-center shadow-md">
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <User className="w-6 h-6 text-gray-400" />
-                    )}
-                  </div>
+                  <CustomerAvatar
+                    avatarUrl={avatarUrl}
+                    name={name || 'Nuevo'}
+                    className="w-12 h-12 shadow-md"
+                  />
 
                   <div className="flex items-center gap-2 overflow-x-auto py-1">
+                    {/* Default Animated Lottie Avatar Option */}
+                    <button
+                      type="button"
+                      onClick={() => { setAvatarUrl(''); soundManager.play('click'); }}
+                      title="Avatar animado oficial por defecto"
+                      className={`relative w-8 h-8 rounded-full transition-all shrink-0 cursor-pointer ${
+                        !avatarUrl || avatarUrl === 'default_lottie'
+                          ? 'scale-110 shadow-md ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900'
+                          : 'opacity-70 hover:opacity-100'
+                      }`}
+                    >
+                      <CustomerAvatar avatarUrl="" name="Default" className="w-8 h-8" />
+                    </button>
+
                     {PRESET_AVATARS.slice(0, 4).map((url, i) => (
                       <button
                         key={i}

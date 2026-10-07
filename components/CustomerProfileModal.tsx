@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { Customer, Order, OrderStatus } from '../types';
 import { soundManager } from '../utils/soundManager';
+import { CustomerAvatar } from './CustomerAvatar';
 
 interface CustomerProfileModalProps {
   isOpen: boolean;
@@ -189,13 +190,13 @@ export const CustomerProfileModal: React.FC<CustomerProfileModalProps> = ({
         {/* Top Header */}
         <div className="p-6 pb-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-black/20">
           <div className="flex items-center gap-3">
-            <div className="relative w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-primary-500/20 overflow-hidden shrink-0">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt={customer.name} className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-lg font-black">{customer.name.charAt(0).toUpperCase()}</span>
-              )}
-            </div>
+            <CustomerAvatar
+              avatarUrl={avatarUrl}
+              name={name || customer.name}
+              className="w-12 h-12"
+              showOnlineBadge={true}
+              badgeClassName="w-3 h-3"
+            />
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight truncate max-w-[200px] sm:max-w-xs">
@@ -277,20 +278,16 @@ export const CustomerProfileModal: React.FC<CustomerProfileModalProps> = ({
               {/* Avatar section */}
               <div className="flex flex-col sm:flex-row items-center gap-5 p-5 bg-gray-50 dark:bg-gray-800/40 rounded-3xl border border-gray-100 dark:border-gray-800">
                 <div className="relative group shrink-0">
-                  <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-4 border-primary-500 shadow-xl bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                    {avatarUrl ? (
-                      <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-3xl font-black text-gray-500 dark:text-gray-300">
-                        {name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
+                  <CustomerAvatar
+                    avatarUrl={avatarUrl}
+                    name={name}
+                    className="w-20 h-20 sm:w-24 sm:h-24 shadow-xl"
+                  />
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     title="Subir foto de perfil"
-                    className="absolute bottom-0 right-0 p-2 bg-primary-500 hover:bg-primary-600 text-white rounded-full shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+                    className="absolute bottom-0 right-0 p-2 bg-primary-500 hover:bg-primary-600 text-white rounded-full shadow-lg transition-transform hover:scale-110 active:scale-95 cursor-pointer z-10"
                   >
                     <Camera className="w-4 h-4" />
                   </button>
@@ -304,15 +301,36 @@ export const CustomerProfileModal: React.FC<CustomerProfileModalProps> = ({
                 </div>
 
                 <div className="flex-1 text-center sm:text-left">
-                  <p className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">
-                    Foto de Perfil
-                  </p>
+                  <div className="flex items-center justify-center sm:justify-start gap-2">
+                    <p className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">
+                      Foto o Avatar de Perfil
+                    </p>
+                    {(!avatarUrl || avatarUrl === 'default_lottie') && (
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-primary-500/10 text-primary-600 dark:text-primary-400 border border-primary-500/20">
+                        Animado (Por Defecto)
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
-                    Elige una foto predefinida o sube una imagen desde tu dispositivo.
+                    Elige el avatar animado oficial, una foto sugerida o sube tu propia imagen.
                   </p>
                   
                   {/* Preset Avatar Pills */}
-                  <div className="flex items-center justify-center sm:justify-start gap-2 mt-3 flex-wrap">
+                  <div className="flex items-center justify-center sm:justify-start gap-2.5 mt-3 flex-wrap">
+                    {/* Default Animated Lottie Avatar Option */}
+                    <button
+                      type="button"
+                      onClick={() => { setAvatarUrl(''); soundManager.play('click'); }}
+                      title="Avatar animado oficial por defecto"
+                      className={`relative w-8 h-8 rounded-full transition-all cursor-pointer ${
+                        !avatarUrl || avatarUrl === 'default_lottie'
+                          ? 'scale-115 shadow-md ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-gray-900'
+                          : 'opacity-60 hover:opacity-100'
+                      }`}
+                    >
+                      <CustomerAvatar avatarUrl="" name="Default" className="w-8 h-8" />
+                    </button>
+
                     {PRESET_AVATARS.map((url, i) => (
                       <button
                         key={i}
@@ -331,9 +349,10 @@ export const CustomerProfileModal: React.FC<CustomerProfileModalProps> = ({
                       <button
                         type="button"
                         onClick={() => { setAvatarUrl(''); soundManager.play('click'); }}
-                        className="px-2 py-1 text-[9px] font-black uppercase text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
+                        className="px-2.5 py-1 text-[9px] font-black uppercase text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-950/30 rounded-lg transition-colors cursor-pointer"
+                        title="Restablecer al avatar animado oficial"
                       >
-                        Quitar
+                        Restablecer
                       </button>
                     )}
                   </div>

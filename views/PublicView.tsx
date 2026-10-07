@@ -10,6 +10,7 @@ import { InstallPwaModal } from '../components/InstallPwaModal';
 import LegalModal, { LegalDocType } from '../components/LegalModal';
 import { CustomerAuthModal } from '../components/CustomerAuthModal';
 import { CustomerProfileModal } from '../components/CustomerProfileModal';
+import { CustomerAvatar } from '../components/CustomerAvatar';
 
 interface PublicViewProps {
   categories: Category[];
@@ -377,20 +378,13 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                     : 'bg-white/15 backdrop-blur-md border-white/30 text-white hover:bg-white/25'
                 }`}
               >
-                <div className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-primary-500 bg-primary-100 dark:bg-primary-950 flex items-center justify-center shrink-0">
-                  {loggedCustomer.avatarUrl ? (
-                    <img
-                      src={loggedCustomer.avatarUrl}
-                      alt={loggedCustomer.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-xs font-black text-primary-600 dark:text-primary-400">
-                      {loggedCustomer.name.charAt(0).toUpperCase()}
-                    </span>
-                  )}
-                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-gray-900" />
-                </div>
+                <CustomerAvatar
+                  avatarUrl={loggedCustomer.avatarUrl}
+                  name={loggedCustomer.name}
+                  className="w-8 h-8"
+                  showOnlineBadge={true}
+                  badgeClassName="w-2.5 h-2.5"
+                />
                 <div className="hidden sm:flex flex-col text-left">
                   <span className="text-xs font-black truncate max-w-[100px] leading-tight">
                     {loggedCustomer.name.split(' ')[0]}
@@ -459,20 +453,13 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                       }}
                       className="flex items-center gap-3 text-left cursor-pointer flex-1"
                     >
-                      <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-primary-500 bg-primary-100 dark:bg-primary-950 flex items-center justify-center shrink-0">
-                        {loggedCustomer.avatarUrl ? (
-                          <img
-                            src={loggedCustomer.avatarUrl}
-                            alt={loggedCustomer.name}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-base font-black text-primary-600 dark:text-primary-400">
-                            {loggedCustomer.name.charAt(0).toUpperCase()}
-                          </span>
-                        )}
-                        <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white dark:border-gray-900" />
-                      </div>
+                      <CustomerAvatar
+                        avatarUrl={loggedCustomer.avatarUrl}
+                        name={loggedCustomer.name}
+                        className="w-12 h-12"
+                        showOnlineBadge={true}
+                        badgeClassName="w-3 h-3"
+                      />
                       <div>
                         <p className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">{loggedCustomer.name}</p>
                         <p className="text-[10px] font-bold text-primary-500 uppercase tracking-wider">Mi Perfil & Historial</p>
