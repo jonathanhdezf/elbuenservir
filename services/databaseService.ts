@@ -109,7 +109,8 @@ export const mapCustomerFromDb = (row: any): Customer => ({
   totalSpent: parseFloat(row.total_spent) || 0,
   lastOrderDate: row.last_order_date || undefined,
   addresses: Array.isArray(row.addresses) ? row.addresses : [],
-  password: row.password || undefined
+  password: row.password || undefined,
+  avatarUrl: row.avatar_url || undefined
 });
 
 // Convert Customer to DB row
@@ -122,7 +123,8 @@ export const mapCustomerToDb = (cust: Customer) => ({
   total_spent: cust.totalSpent || 0,
   last_order_date: cust.lastOrderDate || null,
   addresses: cust.addresses || [],
-  password: cust.password || null
+  password: cust.password || null,
+  avatar_url: cust.avatarUrl || null
 });
 
 // Convert DB row to DeliveryDriver

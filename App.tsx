@@ -779,7 +779,9 @@ export default function App() {
               categories={categories}
               menuItems={menuItems}
               customers={customers}
+              orders={orders}
               onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
+              onUpdateCustomer={(updated) => handleSetCustomers(prev => prev.map(c => c.id === updated.id ? updated : c))}
               onAddOrder={(order) => {
                 handleSetOrders(prev => [order, ...prev]);
                 if (notificationService.isAdmin()) {
@@ -787,6 +789,7 @@ export default function App() {
                 }
               }}
               onEnterControlPanel={handleEnterControlPanel}
+              onViewDigitalTicket={handleOpenDigitalTicket}
               isDarkMode={isDarkMode}
               setIsDarkMode={setIsDarkMode}
             />
@@ -954,7 +957,9 @@ export default function App() {
           categories={categories}
           menuItems={menuItems}
           customers={customers}
+          orders={orders}
           onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
+          onUpdateCustomer={(updated) => handleSetCustomers(prev => prev.map(c => c.id === updated.id ? updated : c))}
           onAddOrder={(order) => {
             handleSetOrders(prev => [order, ...prev]);
             if (notificationService.isAdmin()) {
@@ -962,6 +967,7 @@ export default function App() {
             }
           }}
           onEnterControlPanel={handleEnterControlPanel}
+          onViewDigitalTicket={handleOpenDigitalTicket}
           isDarkMode={isDarkMode}
           setIsDarkMode={setIsDarkMode}
         />

@@ -73,6 +73,7 @@ export interface Customer {
   lastOrderDate?: string;
   addresses: string[];
   password?: string;
+  avatarUrl?: string;
 }
 
 export type VehicleType = 'moto' | 'bici' | 'auto' | 'walking';

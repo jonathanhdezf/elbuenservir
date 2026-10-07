@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap, Mic, Download, Smartphone, Sparkles } from 'lucide-react';
+import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap, Mic, Download, Smartphone, Sparkles, User } from 'lucide-react';
 import { Category, MenuItem, Customer, Order } from '../types';
 import { soundManager } from '../utils/soundManager';
 import LiveOrderModal from '../components/LiveOrderModal';
@@ -8,20 +8,25 @@ import { useMobileBack } from '../hooks/useMobileBack';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import { InstallPwaModal } from '../components/InstallPwaModal';
 import LegalModal, { LegalDocType } from '../components/LegalModal';
+import { CustomerAuthModal } from '../components/CustomerAuthModal';
+import { CustomerProfileModal } from '../components/CustomerProfileModal';
 
 interface PublicViewProps {
   categories: Category[];
   menuItems: MenuItem[];
   customers: Customer[];
+  orders?: Order[];
   onAddCustomer: (customer: Customer) => void;
+  onUpdateCustomer?: (customer: Customer) => void;
   onAddOrder?: (order: Order) => void;
   onEnterControlPanel?: () => void;
+  onViewDigitalTicket?: (order: Order) => void;
   isPreview?: boolean;
   isDarkMode?: boolean;
   setIsDarkMode?: (isDark: boolean) => void;
 }
 
-export default function PublicView({ categories, menuItems, customers, onAddCustomer, onAddOrder, onEnterControlPanel, isPreview, isDarkMode, setIsDarkMode }: PublicViewProps) {
+export default function PublicView({ categories, menuItems, customers, orders = [], onAddCustomer, onUpdateCustomer, onAddOrder, onEnterControlPanel, onViewDigitalTicket, isPreview, isDarkMode, setIsDarkMode }: PublicViewProps) {
   const { isInstalled, isIos, showInstructions, setShowInstructions, installApp } = usePwaInstall();
   const [showFloatingBanner, setShowFloatingBanner] = useState(false);
   const [hasTriggeredInstallBanner, setHasTriggeredInstallBanner] = useState(false);
@@ -63,13 +68,19 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
 
   const [quickSearch, setQuickSearch] = useState('');
 
-  // Auth States
-  const [loggedCustomer, setLoggedCustomer] = useState<Customer | null>(null);
+  // Auth & Profile States
+  const [loggedCustomer, setLoggedCustomer] = useState<Customer | null>(() => {
+    try {
+      const saved = localStorage.getItem('el_buen_servir_customer');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
-  const [authForm, setAuthForm] = useState({ name: '', phone: '', password: '', address: '' });
-  const [authError, setAuthError] = useState('');
-  const [authIntent, setAuthIntent] = useState<'order' | 'live'>('order'); // track WHY auth modal was opened
+  const [authIntent, setAuthIntent] = useState<'order' | 'live' | 'profile'>('profile');
   const [isLiveOrderOpen, setIsLiveOrderOpen] = useState(false);
 
   // Delivery Choice States
@@ -78,8 +89,51 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
   const [tableNumber, setTableNumber] = useState('');
   const [isDeliverySelectionOpen, setIsDeliverySelectionOpen] = useState(false);
 
+  const handleSetLoggedCustomer = (customer: Customer | null) => {
+    setLoggedCustomer(customer);
+    try {
+      if (customer) {
+        localStorage.setItem('el_buen_servir_customer', JSON.stringify(customer));
+      } else {
+        localStorage.removeItem('el_buen_servir_customer');
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleUpdateCustomer = (updated: Customer) => {
+    handleSetLoggedCustomer(updated);
+    if (onUpdateCustomer) {
+      onUpdateCustomer(updated);
+    }
+  };
+
+  const handleLogout = () => {
+    soundManager.play('click');
+    handleSetLoggedCustomer(null);
+    setIsProfileModalOpen(false);
+  };
+
+  const handleLoginSuccess = (customer: Customer) => {
+    handleSetLoggedCustomer(customer);
+    setIsAuthModalOpen(false);
+    if (authIntent === 'order') {
+      setIsDeliverySelectionOpen(true);
+    } else if (authIntent === 'live') {
+      setIsLiveOrderOpen(true);
+    } else {
+      setIsProfileModalOpen(true);
+    }
+  };
+
+  const handleRegisterCustomer = (newCustomer: Customer) => {
+    onAddCustomer(newCustomer);
+    handleSetLoggedCustomer(newCustomer);
+  };
+
   // Mobile Back Button Navigation Logic
-  const hasOpenPublicModal = !!(extraModalType || isOrderModalOpen || isAuthModalOpen || isLiveOrderOpen || isDeliverySelectionOpen || isMobileMenuOpen);
+  const hasOpenPublicModal = !!(extraModalType || isOrderModalOpen || isAuthModalOpen || isProfileModalOpen || isLiveOrderOpen || isDeliverySelectionOpen || isMobileMenuOpen);
   const handleClosePublicModal = () => {
     if (extraModalType) {
       setExtraModalType(null);
@@ -89,6 +143,8 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
       } else {
         setIsOrderModalOpen(false);
       }
+    } else if (isProfileModalOpen) {
+      setIsProfileModalOpen(false);
     } else if (isAuthModalOpen) {
       setIsAuthModalOpen(false);
     } else if (isLiveOrderOpen) {
@@ -106,47 +162,6 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
     isRoot: true,
     confirmExitMessage: '¿Deseas salir de la aplicación?'
   });
-
-  const handleAuthSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError('');
-
-    const onSuccess = (customer: Customer) => {
-      setLoggedCustomer(customer);
-      setIsAuthModalOpen(false);
-      setAuthForm({ name: '', phone: '', password: '', address: '' });
-      if (authIntent === 'live') {
-        setIsLiveOrderOpen(true);
-      } else {
-        setIsDeliverySelectionOpen(true);
-      }
-    };
-
-    if (authMode === 'login') {
-      const customer = customers.find(c => c.phone === authForm.phone && c.password === authForm.password);
-      if (customer) {
-        onSuccess(customer);
-      } else {
-        setAuthError('Teléfono o contraseña incorrectos');
-      }
-    } else {
-      if (!authForm.name || !authForm.phone || !authForm.password) {
-        setAuthError('Por favor completa los campos obligatorios');
-        return;
-      }
-      const newCustomer: Customer = {
-        id: `cust-${Date.now()}`,
-        name: authForm.name,
-        phone: authForm.phone,
-        password: authForm.password,
-        addresses: authForm.address ? [authForm.address] : [],
-        totalOrders: 0,
-        totalSpent: 0
-      };
-      onAddCustomer(newCustomer);
-      onSuccess(newCustomer);
-    }
-  };
 
   const sendWhatsAppOrder = (customer: Customer) => {
     const number = "2311024672";
@@ -347,6 +362,65 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
               </button>
             )}
 
+            {/* Customer Profile / Login Button */}
+            {loggedCustomer ? (
+              <button
+                type="button"
+                onClick={() => {
+                  soundManager.play('click');
+                  setIsProfileModalOpen(true);
+                }}
+                title={`Mi Perfil (${loggedCustomer.name})`}
+                className={`flex items-center gap-2.5 p-1.5 sm:px-3 sm:py-1.5 rounded-full border transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer ${
+                  isScrolled || isPreview
+                    ? 'bg-white dark:bg-gray-900 border-primary-500/40 text-gray-900 dark:text-white hover:border-primary-500 shadow-primary-500/5'
+                    : 'bg-white/15 backdrop-blur-md border-white/30 text-white hover:bg-white/25'
+                }`}
+              >
+                <div className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-primary-500 bg-primary-100 dark:bg-primary-950 flex items-center justify-center shrink-0">
+                  {loggedCustomer.avatarUrl ? (
+                    <img
+                      src={loggedCustomer.avatarUrl}
+                      alt={loggedCustomer.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-xs font-black text-primary-600 dark:text-primary-400">
+                      {loggedCustomer.name.charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-gray-900" />
+                </div>
+                <div className="hidden sm:flex flex-col text-left">
+                  <span className="text-xs font-black truncate max-w-[100px] leading-tight">
+                    {loggedCustomer.name.split(' ')[0]}
+                  </span>
+                  <span className="text-[9px] font-bold text-primary-500 dark:text-primary-400 uppercase tracking-wider leading-none">
+                    Mi Cuenta
+                  </span>
+                </div>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  soundManager.play('click');
+                  setAuthIntent('profile');
+                  setAuthMode('login');
+                  setIsAuthModalOpen(true);
+                }}
+                title="Iniciar sesión de cliente"
+                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl border transition-all hover:scale-105 active:scale-95 shadow-sm font-black text-xs uppercase tracking-wider cursor-pointer ${
+                  isScrolled || isPreview
+                    ? 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 hover:border-primary-500 hover:text-primary-500'
+                    : 'border-white/20 bg-white/10 text-white hover:bg-white/20 backdrop-blur-md'
+                }`}
+              >
+                <User className="w-4 h-4 text-primary-500" />
+                <span className="hidden sm:inline">Entrar</span>
+              </button>
+            )}
+
             <button
               onClick={() => {
                 setOrderStep(1);
@@ -373,6 +447,77 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
           isMobileMenuOpen && (
             <div className="lg:hidden absolute top-full left-0 w-full bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 p-8 shadow-2xl animate-in slide-in-from-top-4 duration-300">
               <div className="flex flex-col space-y-6">
+                {/* Mobile Customer Profile Card */}
+                {loggedCustomer ? (
+                  <div className="p-4 bg-gradient-to-r from-primary-500/10 via-amber-500/5 to-transparent border border-primary-500/20 rounded-[24px] flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundManager.play('click');
+                        setIsMobileMenuOpen(false);
+                        setIsProfileModalOpen(true);
+                      }}
+                      className="flex items-center gap-3 text-left cursor-pointer flex-1"
+                    >
+                      <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-primary-500 bg-primary-100 dark:bg-primary-950 flex items-center justify-center shrink-0">
+                        {loggedCustomer.avatarUrl ? (
+                          <img
+                            src={loggedCustomer.avatarUrl}
+                            alt={loggedCustomer.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="text-base font-black text-primary-600 dark:text-primary-400">
+                            {loggedCustomer.name.charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                        <span className="absolute bottom-0 right-0 w-3 h-3 rounded-full bg-emerald-500 border-2 border-white dark:border-gray-900" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">{loggedCustomer.name}</p>
+                        <p className="text-[10px] font-bold text-primary-500 uppercase tracking-wider">Mi Perfil & Historial</p>
+                      </div>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleLogout();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      title="Cerrar sesión"
+                      className="p-2 text-gray-400 hover:text-red-500 rounded-xl"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundManager.play('click');
+                      setIsMobileMenuOpen(false);
+                      setAuthIntent('profile');
+                      setAuthMode('login');
+                      setIsAuthModalOpen(true);
+                    }}
+                    className="w-full flex items-center justify-between p-4 bg-primary-50 dark:bg-primary-950/40 border border-primary-500/30 rounded-[24px] text-left cursor-pointer hover:border-primary-500 transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary-500 text-white flex items-center justify-center shadow-md shadow-primary-500/30">
+                        <User className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-tight">Iniciar Sesión de Cliente</p>
+                        <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400">Accede a tus pedidos y direcciones</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-wider px-3.5 py-1.5 bg-primary-500 text-white rounded-xl shadow-sm">
+                      Entrar
+                    </span>
+                  </button>
+                )}
+
+                <hr className="border-gray-100 dark:border-gray-800" />
                 {[
                   { label: 'INICIO', id: 'inicio' },
                   { label: 'NUESTRA HISTORIA', id: 'pasion-por-lo-que-hacemos' },
@@ -1280,6 +1425,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                     <button
                       onClick={() => {
                         if (!loggedCustomer) {
+                          setAuthIntent('order');
                           setIsAuthModalOpen(true);
                           return;
                         }
@@ -1464,106 +1610,32 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
         }}
       />
 
-      {/* Authentication Modal */}
-      {isAuthModalOpen && (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center p-4 animate-in fade-in duration-300">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsAuthModalOpen(false)}></div>
-          <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[32px] shadow-2xl relative z-10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
-            <div className="p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-              <div>
-                <h4 className="font-black text-2xl text-gray-900 dark:text-white uppercase tracking-tighter">
-                  {authMode === 'login' ? 'Iniciar Sesión' : 'Crea tu Cuenta'}
-                </h4>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-                  {authMode === 'login' ? 'Bienvenido de nuevo' : 'Únete a El Buen Servir'}
-                </p>
-              </div>
-              <button
-                title="Cerrar"
-                onClick={() => setIsAuthModalOpen(false)}
-                className="p-2 bg-gray-100 dark:bg-gray-800 text-gray-400 rounded-xl hover:text-red-500 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      {/* Customer Authentication Modal */}
+      <CustomerAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        customers={customers}
+        onLoginSuccess={handleLoginSuccess}
+        onRegisterCustomer={handleRegisterCustomer}
+        initialMode={authMode}
+      />
 
-            <form onSubmit={handleAuthSubmit} className="p-8 space-y-5">
-              {authMode === 'register' && (
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nombre Completo</label>
-                  <input
-                    type="text"
-                    required
-                    value={authForm.name}
-                    onChange={(e) => setAuthForm({ ...authForm, name: e.target.value })}
-                    className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl outline-none transition-all dark:text-white"
-                    placeholder="Ej. Juan Pérez"
-                  />
-                </div>
-              )}
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Número de Teléfono</label>
-                <input
-                  type="tel"
-                  required
-                  value={authForm.phone}
-                  onChange={(e) => setAuthForm({ ...authForm, phone: e.target.value })}
-                  className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl outline-none transition-all dark:text-white"
-                  placeholder="Tu número a 10 dígitos"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Contraseña</label>
-                <input
-                  type="password"
-                  required
-                  value={authForm.password}
-                  onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })}
-                  className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl outline-none transition-all dark:text-white"
-                  placeholder="********"
-                />
-              </div>
-
-              {authMode === 'register' && (
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dirección (Opcional)</label>
-                  <input
-                    type="text"
-                    value={authForm.address}
-                    onChange={(e) => setAuthForm({ ...authForm, address: e.target.value })}
-                    className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl outline-none transition-all dark:text-white"
-                    placeholder="Calle, Número, Colonia"
-                  />
-                </div>
-              )}
-
-              {authError && (
-                <p className="text-red-500 text-[10px] font-black uppercase text-center">{authError}</p>
-              )}
-
-              <button
-                type="submit"
-                className="w-full py-5 bg-gray-900 dark:bg-primary-500 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl shadow-primary-500/20"
-              >
-                {authMode === 'login' ? 'Entrar y Enviar Pedido' : 'Registrarme y Finalizar'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthMode(authMode === 'login' ? 'register' : 'login');
-                  setAuthError('');
-                }}
-                className="w-full text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-primary-500 transition-colors"
-                title={authMode === 'login' ? 'Si no tienes cuenta, presiona aquí para registrarte' : 'Si ya tienes cuenta, presiona aquí para iniciar sesión'}
-              >
-                {authMode === 'login' ? '¿No tienes cuenta? Regístrate aquí' : '¿Ya tienes cuenta? Inicia sesión'}
-              </button>
-            </form>
-          </div>
-        </div>
+      {/* Customer Profile & Order History Modal */}
+      {loggedCustomer && (
+        <CustomerProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+          customer={loggedCustomer}
+          orders={orders || []}
+          onUpdateCustomer={handleUpdateCustomer}
+          onLogout={handleLogout}
+          onViewDigitalTicket={onViewDigitalTicket}
+          onRepeatOrder={() => {
+            setIsProfileModalOpen(false);
+            setOrderStep(1);
+            setIsOrderModalOpen(true);
+          }}
+        />
       )}
 
       {/* Delivery Selection Modal */}
