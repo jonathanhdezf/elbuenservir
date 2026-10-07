@@ -191,16 +191,16 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
       <div className="bg-white dark:bg-gray-900 w-full max-w-md rounded-[36px] shadow-2xl relative z-10 overflow-hidden border border-gray-100 dark:border-gray-800 animate-in zoom-in-95 duration-300">
         
         {/* Top Header */}
-        <div className="p-6 pb-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-black/20">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-primary-500/20">
+        <div className="p-4 sm:p-6 pb-3 sm:pb-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-black/20 gap-2">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-primary-500/20 shrink-0">
               <User className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight">
+            <div className="min-w-0 flex-1">
+              <h3 className="text-base sm:text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight truncate">
                 {mode === 'login' ? 'Acceso de Cliente' : 'Crear Cuenta'}
               </h3>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate">
                 El Buen Servir • Restaurante
               </p>
             </div>
@@ -208,7 +208,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+            className="p-2 text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer shrink-0"
             title="Cerrar"
           >
             <X className="w-5 h-5" />
