@@ -384,6 +384,8 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   className="w-8 h-8"
                   showOnlineBadge={true}
                   badgeClassName="w-2.5 h-2.5"
+                  alternateWithInitial={true}
+                  alternateIntervalMs={3200}
                 />
                 <div className="hidden sm:flex flex-col text-left">
                   <span className="text-xs font-black truncate max-w-[100px] leading-tight">
@@ -459,6 +461,8 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                         className="w-12 h-12"
                         showOnlineBadge={true}
                         badgeClassName="w-3 h-3"
+                        alternateWithInitial={true}
+                        alternateIntervalMs={3200}
                       />
                       <div>
                         <p className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight">{loggedCustomer.name}</p>
