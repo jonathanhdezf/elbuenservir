@@ -20,6 +20,8 @@ const SOUNDS = {
     confirm_generic: '/elbuenservir/sonidos/confirm-generic.mp3',
 
     // Alerts for new items
+    alert: 'https://assets.mixkit.co/active_storage/sfx/2577/2577-preview.mp3',
+    notification: '/elbuenservir/sonidos/confirm-local.mp3',
     alert_kds: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', // Tech Alert
     alert_dds: 'https://assets.mixkit.co/active_storage/sfx/2580/2580-preview.mp3', // Digital notice
     alert_local: 'https://assets.mixkit.co/active_storage/sfx/2577/2577-preview.mp3', // Notification

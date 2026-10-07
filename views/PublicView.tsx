@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap, Mic, Download, Smartphone } from 'lucide-react';
+import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap, Mic, Download, Smartphone, Sparkles } from 'lucide-react';
 import { Category, MenuItem, Customer, Order } from '../types';
 import { soundManager } from '../utils/soundManager';
 import LiveOrderModal from '../components/LiveOrderModal';
@@ -22,7 +22,8 @@ interface PublicViewProps {
 
 export default function PublicView({ categories, menuItems, customers, onAddCustomer, onAddOrder, onEnterControlPanel, isPreview, isDarkMode, setIsDarkMode }: PublicViewProps) {
   const { isInstalled, isIos, showInstructions, setShowInstructions, installApp } = usePwaInstall();
-  const [showFloatingBanner, setShowFloatingBanner] = useState(true);
+  const [showFloatingBanner, setShowFloatingBanner] = useState(false);
+  const [hasTriggeredInstallBanner, setHasTriggeredInstallBanner] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id || '');
   const [isScrolled, setIsScrolled] = useState(false);
   const [visibleItemsCount, setVisibleItemsCount] = useState(6);
@@ -211,10 +212,30 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
   }, [activeCategory]);
 
   useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 80);
-    window.addEventListener('scroll', handleScroll);
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 80);
+
+      // Trigger install banner notification when user has viewed 90% of the page
+      if (!isInstalled && !hasTriggeredInstallBanner && !isPreview) {
+        const scrollTop = window.scrollY || document.documentElement.scrollTop;
+        const windowHeight = window.innerHeight;
+        const docHeight = document.documentElement.scrollHeight;
+        const totalScrollable = docHeight - windowHeight;
+
+        if (totalScrollable > 80) {
+          const scrollPercent = (scrollTop / totalScrollable) * 100;
+          if (scrollPercent >= 90) {
+            setHasTriggeredInstallBanner(true);
+            setShowFloatingBanner(true);
+            soundManager.play('notification');
+          }
+        }
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [isInstalled, hasTriggeredInstallBanner, isPreview]);
 
   const filteredItems = menuItems.filter(item => {
     if (!item.isActive) return false;
@@ -1629,55 +1650,64 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
         </div>
       )}
 
-      {/* Floating PWA Install Invite Banner (disappears if already installed or dismissed) */}
+      {/* Floating PWA Install Notification (Appears at 90% scroll with sound, disappears if already installed) */}
       {!isInstalled && showFloatingBanner && !isPreview && (
         <aside
-          aria-label="Invitación para instalar la app"
-          className="fixed bottom-5 right-5 left-5 sm:left-auto sm:w-96 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-2 border-primary-500/30 shadow-2xl rounded-3xl p-4.5 animate-in slide-in-from-bottom-5 duration-300"
+          aria-label="Notificación para instalar la aplicación"
+          className="fixed bottom-6 right-4 left-4 sm:left-auto sm:right-8 sm:w-[440px] z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl border-2 border-primary-500/40 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] dark:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] rounded-[32px] p-6 sm:p-7 animate-in slide-in-from-bottom-10 fade-in duration-500 ring-1 ring-black/5 dark:ring-white/10"
         >
-          <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-2xl bg-primary-500 text-white flex items-center justify-center shadow-lg shadow-primary-500/30 shrink-0">
-              <Smartphone className="w-6 h-6" />
+          {/* Top row with category badge and spacious close button */}
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-primary-500/15 text-primary-600 dark:text-primary-400 border border-primary-500/25">
+              <Sparkles className="w-3 h-3 text-primary-500 animate-pulse" />
+              Notificación • Menú Digital
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowFloatingBanner(false)}
+              className="p-1.5 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+              title="Cerrar notificación"
+              aria-label="Cerrar notificación de instalación"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Main content with generous breathing room */}
+          <div className="flex items-start gap-4 sm:gap-5 mb-5">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-primary-400 via-primary-500 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-primary-500/30 shrink-0 ring-4 ring-primary-500/15">
+              <Smartphone className="w-7 h-7 sm:w-8 sm:h-8" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-1">
-                <h5 className="font-black text-xs uppercase tracking-tight text-gray-900 dark:text-white truncate">
-                  Instala El Buen Servir
-                </h5>
-                <button
-                  type="button"
-                  onClick={() => setShowFloatingBanner(false)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 cursor-pointer"
-                  title="Cerrar aviso"
-                  aria-label="Cerrar aviso de instalación"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-              <p className="text-[11px] text-gray-500 dark:text-gray-400 font-bold leading-tight mt-0.5 mb-3">
-                Accede a nuestro menú digital con un solo toque desde tu celular o computadora.
+              <h5 className="font-black text-base sm:text-lg uppercase tracking-tight text-gray-900 dark:text-white leading-tight">
+                Instala El Buen Servir
+              </h5>
+              <p className="text-xs text-gray-600 dark:text-gray-300 font-medium leading-relaxed mt-1.5">
+                Ten el menú digital siempre a mano en tu celular. Haz pedidos directo a WhatsApp en un solo toque sin descargas pesadas.
               </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    soundManager.play('click');
-                    installApp();
-                  }}
-                  className="flex-1 py-2 px-3 bg-primary-500 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-primary-600 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-primary-500/20 active:scale-95 cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Instalar App</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowFloatingBanner(false)}
-                  className="py-2 px-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl font-bold text-xs uppercase hover:bg-gray-200 dark:hover:bg-gray-700 transition-all cursor-pointer"
-                >
-                  Más tarde
-                </button>
-              </div>
             </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => {
+                soundManager.play('click');
+                installApp();
+              }}
+              className="flex-1 py-3.5 px-5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-500/25 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              <Download className="w-4 h-4" />
+              <span>Instalar Ahora</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowFloatingBanner(false)}
+              className="py-3.5 px-4 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-2xl font-bold text-xs uppercase tracking-wider hover:bg-gray-200 dark:hover:bg-gray-700 transition-all cursor-pointer"
+            >
+              Más tarde
+            </button>
           </div>
         </aside>
       )}
