@@ -122,7 +122,13 @@ export function usePwaInstall(): UsePwaInstallReturn {
 
   const installApp = useCallback(async (): Promise<boolean> => {
     // 1. Get active prompt from React state or window global
-    const activePrompt = deferredPrompt || (typeof window !== 'undefined' ? (window as any).deferredPrompt : null);
+    let activePrompt = deferredPrompt || (typeof window !== 'undefined' ? (window as any).deferredPrompt : null);
+
+    // If prompt is not yet in memory and not iOS, wait up to 400ms in case the event is just arriving
+    if (!activePrompt && typeof window !== 'undefined' && !isIos) {
+      await new Promise(r => setTimeout(r, 400));
+      activePrompt = (window as any).deferredPrompt || deferredPrompt;
+    }
 
     if (activePrompt) {
       try {
@@ -152,11 +158,11 @@ export function usePwaInstall(): UsePwaInstallReturn {
       return false;
     }
 
-    // 2. If prompt is not available, show manual instructions modal
-    // (Crucial for iOS Safari which doesn't support programmatic prompt, or browsers without prompt API)
+    // 2. If prompt is genuinely not available, show manual instructions modal
+    // (Crucial for iOS Safari which doesn't support programmatic prompt, or in-app webviews)
     setShowInstructions(true);
     return false;
-  }, [deferredPrompt]);
+  }, [deferredPrompt, isIos]);
 
   return {
     isInstalled,

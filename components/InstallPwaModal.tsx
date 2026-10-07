@@ -10,6 +10,9 @@ interface InstallPwaModalProps {
 export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({ isOpen, onClose, isIos }) => {
   if (!isOpen) return null;
 
+  const ua = typeof navigator !== 'undefined' ? (navigator.userAgent || '') : '';
+  const isInApp = /FBAN|FBAV|Instagram|WhatsApp|Line|Twitter|Snapchat/i.test(ua);
+
   return (
     <div className="fixed inset-0 z-[650] flex items-center justify-center p-4 animate-in fade-in duration-300">
       <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose}></div>
@@ -45,7 +48,46 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({ isOpen, onClos
             Instala nuestra aplicación web en tu dispositivo para abrir el menú con un solo toque y pedir más rápido sin ocupar espacio de memoria.
           </p>
 
-          {isIos ? (
+          {isInApp ? (
+            /* In-App Browser (WhatsApp, Instagram, Facebook) */
+            <div className="space-y-3.5 bg-amber-50 dark:bg-amber-950/40 p-4.5 rounded-2xl border border-amber-200 dark:border-amber-800/60">
+              <p className="text-[11px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                <span>⚠️ Abierto dentro de WhatsApp / Red Social:</span>
+              </p>
+              <p className="text-xs text-amber-800 dark:text-amber-200 font-medium leading-relaxed">
+                El navegador interno de WhatsApp bloquea la instalación de aplicaciones. Para instalarla:
+              </p>
+
+              <div className="space-y-3 text-xs font-bold text-gray-700 dark:text-gray-200">
+                <div className="flex items-center gap-3">
+                  <span className="w-6 h-6 rounded-full bg-amber-500 text-white font-black text-xs flex items-center justify-center shrink-0">1</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span>Toca los</span>
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-black">
+                      <MoreVertical className="w-3.5 h-3.5" /> 3 puntos
+                    </span>
+                    <span>o el icono de Compartir arriba a la derecha.</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="w-6 h-6 rounded-full bg-amber-500 text-white font-black text-xs flex items-center justify-center shrink-0">2</span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span>Selecciona</span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded bg-gray-200 dark:bg-gray-700 font-black">
+                      Abrir en Chrome
+                    </span>
+                    <span>o Safari.</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <span className="w-6 h-6 rounded-full bg-amber-500 text-white font-black text-xs flex items-center justify-center shrink-0">3</span>
+                  <span>¡Desde allí el botón instalará la app en un toque!</span>
+                </div>
+              </div>
+            </div>
+          ) : isIos ? (
             /* iOS Safari Instructions */
             <div className="space-y-3.5 bg-gray-50 dark:bg-gray-800/70 p-4.5 rounded-2xl border border-gray-100 dark:border-gray-700">
               <p className="text-[11px] font-black uppercase tracking-wider text-primary-600 dark:text-primary-400 flex items-center gap-2">

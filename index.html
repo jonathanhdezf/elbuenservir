@@ -7,15 +7,15 @@
   <title>El Buen Servir | Gastronomía con Alma</title>
   <meta name="description"
     content="Experimenta el sabor de la tradición con un toque contemporáneo. Reserva tu mesa en El Buen Servir." />
-  <link rel="icon" type="image/png" href="./icons/icon-192x192.png" />
-  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/png" href="%BASE_URL%icons/icon-192x192.png" />
+  <link rel="manifest" href="%BASE_URL%manifest.json" />
   <meta name="theme-color" content="#f59e0b" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="El Buen Servir" />
-  <link rel="apple-touch-icon" href="./icons/icon-192x192.png" />
-  <link rel="apple-touch-icon" sizes="512x512" href="./icons/icon-512x512.png" />
+  <link rel="apple-touch-icon" href="%BASE_URL%icons/icon-192x192.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="%BASE_URL%icons/icon-512x512.png" />
 
   <script>
     // Capture PWA install prompt early on window before any scripts run
@@ -151,9 +151,15 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch(function (err) {
-          console.warn('SW registration failed:', err);
-        });
+        navigator.serviceWorker.register('%BASE_URL%sw.js', { scope: '%BASE_URL%' })
+          .then((reg) => {
+            // Force update check
+            reg.update();
+            console.log('[PWA SW] Registered with scope:', reg.scope);
+          })
+          .catch(function (err) {
+            console.warn('[PWA SW] Registration failed:', err);
+          });
       });
     }
   </script>
