@@ -17,7 +17,8 @@ import {
     Check,
     UtensilsCrossed,
     ArrowRight,
-    Download
+    Download,
+    ShieldCheck
 } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
 import { useMobileBack } from '../hooks/useMobileBack';
@@ -92,59 +93,129 @@ export default function ControlPanelView({
         {
             id: 'admin',
             name: 'Administración',
+            badge: 'Control Total',
+            badgeIcon: ShieldCheck,
             icon: Lock,
-            color: 'bg-blue-500',
-            description: 'Gestión total del sistema',
+            gradient: 'from-blue-600 to-indigo-600',
+            glowColor: 'bg-blue-400',
+            shadowColor: 'shadow-blue-500/25',
+            borderHover: 'hover:border-blue-500/50',
+            shadowHover: 'hover:shadow-blue-500/20',
+            badgeStyle: 'bg-blue-500/20 border-blue-500/30 text-blue-300',
+            titleHover: 'group-hover:text-blue-400',
+            actionColor: 'text-blue-400',
+            description: 'Métricas del negocio, cortes de caja, usuarios y auditoría global.',
+            actionText: 'Abrir Administración',
             view: 'admin' as const,
             section: 'dashboard' as const
         },
         {
             id: 'menu',
             name: 'Editor de Menú',
+            badge: 'Catálogo & Precios',
+            badgeIcon: Sparkles,
             icon: UtensilsCrossed,
-            color: 'bg-amber-500',
-            description: 'Platillos, precios y categorías',
+            gradient: 'from-amber-500 to-orange-500',
+            glowColor: 'bg-amber-400',
+            shadowColor: 'shadow-amber-500/25',
+            borderHover: 'hover:border-amber-500/50',
+            shadowHover: 'hover:shadow-amber-500/20',
+            badgeStyle: 'bg-amber-500/20 border-amber-500/30 text-amber-300',
+            titleHover: 'group-hover:text-amber-400',
+            actionColor: 'text-amber-400',
+            description: 'Gestiona platillos, actualiza precios, organiza categorías y disponibilidad.',
+            actionText: 'Abrir Editor de Menú',
             view: 'admin' as const,
             section: 'menu' as const
         },
         {
             id: 'tpv',
             name: 'Punto de Venta',
+            badge: 'Caja & Cobros',
+            badgeIcon: Monitor,
             icon: Monitor,
-            color: 'bg-emerald-500',
-            description: 'Toma de pedidos y cobros',
+            gradient: 'from-emerald-500 to-teal-600',
+            glowColor: 'bg-emerald-400',
+            shadowColor: 'shadow-emerald-500/25',
+            borderHover: 'hover:border-emerald-500/50',
+            shadowHover: 'hover:shadow-emerald-500/20',
+            badgeStyle: 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300',
+            titleHover: 'group-hover:text-emerald-400',
+            actionColor: 'text-emerald-400',
+            description: 'Toma rápida de pedidos, cobros en caja, tickets de venta y facturación.',
+            actionText: 'Abrir Punto de Venta',
             view: 'tpv' as const
         },
         {
             id: 'kitchen',
-            name: 'Monitor KDS',
+            name: 'Monitor Cocina KDS',
+            badge: 'Producción en Vivo',
+            badgeIcon: ChefHat,
             icon: ChefHat,
-            color: 'bg-orange-500',
-            description: 'Control de cocina en tiempo real',
+            gradient: 'from-orange-500 to-rose-600',
+            glowColor: 'bg-orange-400',
+            shadowColor: 'shadow-orange-500/25',
+            borderHover: 'hover:border-orange-500/50',
+            shadowHover: 'hover:shadow-orange-500/20',
+            badgeStyle: 'bg-orange-500/20 border-orange-500/30 text-orange-300',
+            titleHover: 'group-hover:text-orange-400',
+            actionColor: 'text-orange-400',
+            description: 'Comandas en tiempo real para cocina, tiempos de preparación y pase.',
+            actionText: 'Abrir Monitor KDS',
             view: 'kitchen' as const
         },
         {
             id: 'local_dispatch',
             name: 'Despacho Local',
+            badge: 'Salón & Mesas',
+            badgeIcon: Utensils,
             icon: Utensils,
-            color: 'bg-rose-500',
-            description: 'Gestión de mesas y barra',
+            gradient: 'from-rose-500 to-pink-600',
+            glowColor: 'bg-rose-400',
+            shadowColor: 'shadow-rose-500/25',
+            borderHover: 'hover:border-rose-500/50',
+            shadowHover: 'hover:shadow-rose-500/20',
+            badgeStyle: 'bg-rose-500/20 border-rose-500/30 text-rose-300',
+            titleHover: 'group-hover:text-rose-400',
+            actionColor: 'text-rose-400',
+            description: 'Gestión de mesas activas, servicio en barra y entrega de comida para llevar.',
+            actionText: 'Abrir Despacho',
             view: 'local_dispatch' as const
         },
         {
             id: 'logistics',
-            name: 'Logística',
+            name: 'Logística y Envíos',
+            badge: 'Flota & Domicilio',
+            badgeIcon: Truck,
             icon: Truck,
-            color: 'bg-indigo-500',
-            description: 'Repartos y última milla',
+            gradient: 'from-indigo-500 to-purple-600',
+            glowColor: 'bg-indigo-400',
+            shadowColor: 'shadow-indigo-500/25',
+            borderHover: 'hover:border-indigo-500/50',
+            shadowHover: 'hover:shadow-indigo-500/20',
+            badgeStyle: 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300',
+            titleHover: 'group-hover:text-indigo-400',
+            actionColor: 'text-indigo-400',
+            description: 'Asignación de pedidos a domicilio, rutas inteligentes y monitoreo de flota.',
+            actionText: 'Abrir Logística',
             view: 'logistics' as const
         },
         {
             id: 'driver_portal',
             name: 'Portal Repartidor',
+            badge: 'Turno & Rutas',
+            badgeIcon: Bike,
             icon: Bike,
-            color: 'bg-teal-500',
-            description: 'Turno y entregas personales',
+            gradient: 'from-teal-500 to-cyan-600',
+            glowColor: 'bg-teal-400',
+            shadowColor: 'shadow-teal-500/25',
+            borderHover: 'hover:border-teal-500/50',
+            shadowHover: 'hover:shadow-teal-500/20',
+            badgeStyle: 'bg-teal-500/20 border-teal-500/30 text-teal-300',
+            titleHover: 'group-hover:text-teal-400',
+            actionColor: 'text-teal-400',
+            description: 'Acceso para repartidores: entregas asignadas, navegación y liquidación.',
+            actionText: 'Abrir Portal Repartidor',
             view: 'driver_portal' as const
         }
     ];
@@ -354,8 +425,8 @@ export default function ControlPanelView({
                 </div>
             </div>
 
-            <div className="relative w-full h-full flex flex-col items-center justify-center overflow-y-auto custom-scrollbar">
-                <div className="flex flex-col items-center justify-center w-full max-w-6xl p-6 py-28 md:py-32 min-h-min">
+            <div className="relative w-full h-full flex flex-col items-center overflow-y-auto custom-scrollbar">
+                <div className="flex flex-col items-center w-full max-w-5xl px-4 sm:px-6 pt-24 pb-16 md:pt-28 md:pb-20 my-auto min-h-min">
 
                     {/* Logo and Header */}
                     <div className="text-center mb-6 md:mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
@@ -413,7 +484,7 @@ export default function ControlPanelView({
 
                     {/* Basic View: Only Menu Editor Option */}
                     {panelMode === 'basic' ? (
-                        <div className="flex flex-col items-center w-full max-w-lg mx-auto animate-in fade-in zoom-in-95 duration-500">
+                        <div className="flex flex-col items-center w-full max-w-xl mx-auto animate-in fade-in zoom-in-95 duration-500">
                             <button
                                 onClick={() => handleAppClick('admin', 'menu')}
                                 title="Abrir Editor de Menú"
@@ -458,40 +529,51 @@ export default function ControlPanelView({
                             </div>
                         </div>
                     ) : (
-                        /* Advanced View: Full System Apps Grid */
+                        /* Advanced View: Full System Apps Grid styled like Basic Panel */
                         <div className="flex flex-col items-center w-full animate-in fade-in zoom-in-95 duration-500">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6 w-full max-w-5xl">
-                                {advancedApps.map((app) => (
-                                    <button
-                                        key={app.id}
-                                        title={`Abrir ${app.name}`}
-                                        onClick={() => handleAppClick(app.view, app.section)}
-                                        className="group relative flex flex-col items-center gap-3 md:gap-4 p-4 rounded-3xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 transition-all duration-300 hover:-translate-y-1.5 shadow-xl cursor-pointer"
-                                    >
-                                        <div className={`
-                                            relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-[28px] flex items-center justify-center
-                                            bg-white/10 backdrop-blur-xl border border-white/10 shadow-lg
-                                            group-hover:scale-105 transition-all duration-300
-                                        `}>
-                                            <div className={`absolute inset-0 rounded-2xl sm:rounded-[28px] ${app.color} opacity-20 group-hover:opacity-40 transition-opacity`}></div>
-                                            <app.icon className="w-7 h-7 sm:w-9 sm:h-9 text-white transition-transform duration-300" />
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="text-[11px] sm:text-xs font-black text-white uppercase tracking-wider group-hover:text-primary-300 transition-colors">
-                                                {app.name}
-                                            </p>
-                                            <p className="hidden sm:block text-[9px] text-white/40 font-bold uppercase mt-0.5 max-w-[150px] truncate">
-                                                {app.description}
-                                            </p>
-                                        </div>
-                                    </button>
-                                ))}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 w-full">
+                                {advancedApps.map((app, index) => {
+                                    const isLastOdd = index === advancedApps.length - 1 && advancedApps.length % 2 !== 0;
+                                    return (
+                                        <button
+                                            key={app.id}
+                                            title={`Abrir ${app.name}`}
+                                            onClick={() => handleAppClick(app.view, app.section)}
+                                            className={`group relative w-full flex flex-col sm:flex-row items-center sm:items-center gap-5 p-5 sm:p-6 rounded-[30px] sm:rounded-[36px] bg-white/5 backdrop-blur-xl border border-white/15 ${app.borderHover} hover:bg-white/10 transition-all duration-300 shadow-xl ${app.shadowHover} hover:-translate-y-1.5 text-left cursor-pointer ${
+                                                isLastOdd ? 'md:col-span-2 md:max-w-2xl md:mx-auto' : ''
+                                            }`}
+                                        >
+                                            <div className={`relative w-20 h-20 sm:w-24 sm:h-24 rounded-[24px] sm:rounded-[28px] bg-gradient-to-tr ${app.gradient} flex items-center justify-center shrink-0 shadow-xl ${app.shadowColor} group-hover:scale-105 transition-transform duration-300`}>
+                                                <app.icon className="w-10 h-10 sm:w-11 sm:h-11 text-white" />
+                                                <div className={`absolute -inset-1 ${app.glowColor} rounded-[26px] sm:rounded-[30px] blur opacity-30 group-hover:opacity-60 transition-opacity`}></div>
+                                            </div>
+                                            
+                                            <div className="flex-1 text-center sm:text-left min-w-0">
+                                                <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full ${app.badgeStyle} text-[10px] font-black uppercase tracking-widest mb-1.5`}>
+                                                    <app.badgeIcon className="w-3 h-3" />
+                                                    {app.badge}
+                                                </div>
+                                                <h3 className={`text-xl sm:text-2xl font-black text-white uppercase tracking-tight ${app.titleHover} transition-colors truncate`}>
+                                                    {app.name}
+                                                </h3>
+                                                <p className="text-white/60 text-xs sm:text-sm font-medium mt-1 leading-relaxed">
+                                                    {app.description}
+                                                </p>
+                                                <div className={`mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider ${app.actionColor} group-hover:translate-x-1 transition-transform`}>
+                                                    <span>{app.actionText}</span>
+                                                    <ArrowRight className="w-4 h-4" />
+                                                </div>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
                             </div>
 
-                            <div className="mt-8">
+                            {/* Return to Basic View button */}
+                            <div className="mt-8 sm:mt-10">
                                 <button
                                     onClick={() => changePanelMode('basic')}
-                                    className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/60 hover:text-white text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer"
+                                    className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 cursor-pointer shadow-lg hover:border-amber-500/30 active:scale-95"
                                 >
                                     <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                                     <span>Regresar a Vista Básica</span>
