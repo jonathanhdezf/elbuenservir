@@ -700,45 +700,45 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
       {
         !isPreview && (
           <section id="cta" className="py-20 md:py-28 px-4 sm:px-6 md:px-12 relative bg-white dark:bg-gray-950 transition-colors duration-300">
-            <div className="w-full max-w-6xl mx-auto bg-gray-900 dark:bg-gradient-to-br dark:from-gray-900/95 dark:via-gray-950 dark:to-gray-900/90 rounded-[40px] md:rounded-[56px] p-8 sm:p-12 md:p-20 relative overflow-hidden flex flex-col items-center text-center border border-gray-800 dark:border-white/10 dark:shadow-[0_0_80px_rgba(16,185,129,0.15)] shadow-2xl backdrop-blur-2xl">
+            <div className="w-full max-w-6xl mx-auto bg-gradient-to-br from-amber-50/90 via-white to-primary-50/70 dark:from-gray-900/95 dark:via-gray-950 dark:to-gray-900/90 rounded-[40px] md:rounded-[56px] p-8 sm:p-12 md:p-20 relative overflow-hidden flex flex-col items-center text-center border-2 border-primary-200/70 dark:border-white/10 shadow-2xl shadow-primary-900/5 dark:shadow-[0_0_80px_rgba(16,185,129,0.15)] backdrop-blur-2xl transition-all duration-300">
               
-              {/* Dynamic Ambient Glows for Dark Mode */}
-              <div className="absolute -top-32 -right-32 w-80 sm:w-96 h-80 sm:h-96 bg-primary-500/20 dark:bg-primary-500/15 rounded-full blur-[100px] md:blur-[120px] pointer-events-none"></div>
-              <div className="absolute -bottom-32 -left-32 w-80 sm:w-96 h-80 sm:h-96 bg-emerald-500/20 dark:bg-emerald-500/25 rounded-full blur-[100px] md:blur-[120px] pointer-events-none"></div>
+              {/* Dynamic Ambient Glows */}
+              <div className="absolute -top-32 -right-32 w-80 sm:w-96 h-80 sm:h-96 bg-primary-500/10 dark:bg-primary-500/15 rounded-full blur-[100px] md:blur-[120px] pointer-events-none"></div>
+              <div className="absolute -bottom-32 -left-32 w-80 sm:w-96 h-80 sm:h-96 bg-emerald-500/10 dark:bg-emerald-500/25 rounded-full blur-[100px] md:blur-[120px] pointer-events-none"></div>
               
-              {/* Subtle Tech Grid Pattern for Dark Mode */}
-              <div className="absolute inset-0 bg-[radial-gradient(#ffffff08_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none opacity-50 dark:opacity-80"></div>
+              {/* Subtle Tech / Pattern Texture */}
+              <div className="absolute inset-0 bg-[radial-gradient(#f59e0b25_1px,transparent_1px)] dark:bg-[radial-gradient(#ffffff08_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none opacity-60 dark:opacity-80"></div>
 
               <div className="relative z-10 max-w-3xl flex flex-col items-center">
                 {/* Badge */}
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 dark:border-emerald-400/30 text-emerald-400 dark:text-emerald-300 text-xs font-black uppercase tracking-widest mb-6 shadow-sm dark:shadow-[0_0_20px_rgba(16,185,129,0.2)] backdrop-blur-md">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
-                  <MessageCircle className="w-4 h-4 text-emerald-400 dark:text-emerald-300" />
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 dark:bg-emerald-500/20 border border-emerald-200/80 dark:border-emerald-400/30 text-emerald-700 dark:text-emerald-300 text-xs font-black uppercase tracking-widest mb-6 shadow-sm dark:shadow-[0_0_20px_rgba(16,185,129,0.2)] backdrop-blur-md">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-ping"></span>
+                  <MessageCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-300" />
                   <span>Menú Digital • Pedidos a WhatsApp</span>
                 </div>
 
                 {/* Title */}
-                <h2 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-white mb-6 md:mb-8 tracking-tighter leading-tight">
-                  ¿Listo para una <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-primary-400 to-emerald-400 dark:from-emerald-300 dark:via-teal-200 dark:to-primary-400 font-serif italic font-normal">experiencia digital</span> con nuestro menú?
+                <h2 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-gray-900 dark:text-white mb-6 md:mb-8 tracking-tighter leading-tight">
+                  ¿Listo para una <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-primary-600 to-emerald-600 dark:from-emerald-300 dark:via-teal-200 dark:to-primary-400 font-serif italic font-normal">experiencia digital</span> con nuestro menú?
                 </h2>
 
                 {/* Subtitle */}
-                <p className="text-base sm:text-lg md:text-xl text-white/70 dark:text-gray-300 mb-8 md:mb-10 leading-relaxed max-w-2xl">
+                <p className="text-base sm:text-lg md:text-xl text-gray-600 dark:text-gray-300 mb-8 md:mb-10 leading-relaxed max-w-2xl font-medium">
                   Explora nuestros platillos, arma tu pedido en segundos desde el menú digital y envíalo directamente a nuestro WhatsApp sin filas ni demoras.
                 </p>
 
-                {/* Micro-feature pills for dark mode */}
+                {/* Micro-feature pills */}
                 <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 mb-10 md:mb-12">
-                  <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 text-white/80 dark:text-gray-300 text-xs font-semibold backdrop-blur-sm">
-                    <Zap className="w-3.5 h-3.5 text-amber-400 dark:text-amber-300" />
+                  <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/90 dark:bg-white/5 border border-amber-200/80 dark:border-white/10 text-gray-700 dark:text-gray-300 text-xs font-bold shadow-sm shadow-amber-900/5 backdrop-blur-sm">
+                    <Zap className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300" />
                     <span>Sin registros ni apps</span>
                   </div>
-                  <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 text-white/80 dark:text-gray-300 text-xs font-semibold backdrop-blur-sm">
-                    <Check className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-300" />
+                  <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/90 dark:bg-white/5 border border-amber-200/80 dark:border-white/10 text-gray-700 dark:text-gray-300 text-xs font-bold shadow-sm shadow-amber-900/5 backdrop-blur-sm">
+                    <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" />
                     <span>Precios y menú en vivo</span>
                   </div>
-                  <div className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 dark:bg-white/5 border border-white/10 dark:border-white/10 text-white/80 dark:text-gray-300 text-xs font-semibold backdrop-blur-sm">
-                    <MessageCircle className="w-3.5 h-3.5 text-emerald-400 dark:text-emerald-300" />
+                  <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/90 dark:bg-white/5 border border-amber-200/80 dark:border-white/10 text-gray-700 dark:text-gray-300 text-xs font-bold shadow-sm shadow-amber-900/5 backdrop-blur-sm">
+                    <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" />
                     <span>Atención inmediata</span>
                   </div>
                 </div>
@@ -750,18 +750,18 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                       setOrderStep(1);
                       setIsOrderModalOpen(true);
                     }}
-                    className="w-full sm:w-auto bg-white text-gray-900 hover:bg-emerald-500 hover:text-white dark:bg-gradient-to-r dark:from-emerald-500 dark:to-emerald-600 dark:text-white dark:hover:from-emerald-400 dark:hover:to-emerald-500 px-8 sm:px-12 py-5 sm:py-6 rounded-3xl text-sm sm:text-base md:text-lg font-black uppercase tracking-widest transition-all duration-300 hover:scale-105 active:scale-95 shadow-2xl dark:shadow-[0_0_35px_rgba(16,185,129,0.35)] dark:hover:shadow-[0_0_50px_rgba(16,185,129,0.55)] dark:border dark:border-emerald-400/30 flex items-center justify-center gap-3 cursor-pointer group"
+                    className="w-full sm:w-auto bg-emerald-500 hover:bg-emerald-600 text-white dark:bg-gradient-to-r dark:from-emerald-500 dark:to-emerald-600 dark:text-white dark:hover:from-emerald-400 dark:hover:to-emerald-500 px-8 sm:px-12 py-5 sm:py-6 rounded-3xl text-sm sm:text-base md:text-lg font-black uppercase tracking-widest transition-all duration-300 hover:scale-105 active:scale-95 shadow-xl shadow-emerald-500/25 dark:shadow-[0_0_35px_rgba(16,185,129,0.35)] dark:hover:shadow-[0_0_50px_rgba(16,185,129,0.55)] dark:border dark:border-emerald-400/30 flex items-center justify-center gap-3 cursor-pointer group"
                   >
-                    <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-500 dark:text-white group-hover:scale-110 transition-transform" />
+                    <MessageCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white group-hover:scale-110 transition-transform" />
                     <span>Ordenar por WhatsApp</span>
                   </button>
 
                   <a 
                     href="tel:+522311808272" 
-                    className="w-full sm:w-auto flex items-center justify-center space-x-3 px-6 py-4 sm:py-5 rounded-3xl bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10 border border-white/10 dark:border-white/10 text-white dark:text-gray-200 hover:text-emerald-400 dark:hover:text-emerald-300 transition-all hover:scale-105 active:scale-95 cursor-pointer group"
+                    className="w-full sm:w-auto flex items-center justify-center space-x-3 px-6 py-4 sm:py-5 rounded-3xl bg-white hover:bg-amber-50/70 dark:bg-white/5 dark:hover:bg-white/10 border-2 border-amber-200/80 hover:border-emerald-400 dark:border-white/10 text-gray-800 dark:text-gray-200 hover:text-emerald-600 dark:hover:text-emerald-300 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-md shadow-amber-900/5 group"
                   >
-                    <div className="w-10 h-10 sm:w-11 sm:h-11 bg-white/10 dark:bg-white/10 rounded-full flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
-                      <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-400 dark:text-emerald-300" />
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 bg-emerald-100 dark:bg-white/10 rounded-full flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
+                      <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 dark:text-emerald-300" />
                     </div>
                     <span className="text-sm sm:text-base font-bold">+522311808272</span>
                   </a>
