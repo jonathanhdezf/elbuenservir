@@ -10,6 +10,7 @@ import LocalDispatchView from './views/LocalDispatchView.tsx';
 import ControlPanelView from './views/ControlPanelView';
 import RepartidorView from './views/RepartidorView';
 import { ControlPanelAuthModal } from './components/ControlPanelAuthModal';
+import { databaseService, mapOrderFromDb, mapMenuItemFromDb, mapCategoryFromDb } from './services/databaseService';
 
 const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-3', name: 'Menú del Día' },
@@ -388,10 +389,169 @@ export default function App() {
     }
   }, [isDarkMode]);
 
+  // Load and sync from Supabase PostgreSQL Database with Realtime
+  useEffect(() => {
+    let isMounted = true;
+
+    databaseService.loadAll(
+      INITIAL_CATEGORIES,
+      INITIAL_ITEMS,
+      INITIAL_DRIVERS,
+      INITIAL_CUSTOMERS,
+      INITIAL_STAFF
+    ).then((result) => {
+      if (!isMounted || !result) return;
+      if (result.categories?.length) setCategories(result.categories);
+      if (result.menuItems?.length) setMenuItems(result.menuItems);
+      if (result.orders) setOrders(result.orders);
+      if (result.customers?.length) setCustomers(result.customers);
+      if (result.drivers?.length) setDrivers(result.drivers);
+      if (result.staff?.length) setStaff(result.staff);
+    });
+
+    const unsubscribe = databaseService.subscribeToChanges({
+      onOrderChange: (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newOrder = mapOrderFromDb(payload.new);
+          setOrders(prev => {
+            if (prev.some(o => o.id === newOrder.id)) return prev;
+            return [newOrder, ...prev];
+          });
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedOrder = mapOrderFromDb(payload.new);
+          setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+        } else if (payload.eventType === 'DELETE') {
+          setOrders(prev => prev.filter(o => o.id !== payload.old?.id));
+        }
+      },
+      onMenuItemChange: (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newItem = mapMenuItemFromDb(payload.new);
+          setMenuItems(prev => [...prev.filter(i => i.id !== newItem.id), newItem]);
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedItem = mapMenuItemFromDb(payload.new);
+          setMenuItems(prev => prev.map(i => i.id === updatedItem.id ? updatedItem : i));
+        } else if (payload.eventType === 'DELETE') {
+          setMenuItems(prev => prev.filter(i => i.id !== payload.old?.id));
+        }
+      },
+      onCategoryChange: (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newCat = mapCategoryFromDb(payload.new);
+          setCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat]);
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedCat = mapCategoryFromDb(payload.new);
+          setCategories(prev => prev.map(c => c.id === updatedCat.id ? updatedCat : c));
+        } else if (payload.eventType === 'DELETE') {
+          setCategories(prev => prev.filter(c => c.id !== payload.old?.id));
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
+  // Sync state mutation handlers with Supabase
+  const handleSetOrders: React.Dispatch<React.SetStateAction<Order[]>> = (action) => {
+    setOrders(prev => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      const changed = next.filter(nextOrder => {
+        const oldOrder = prev.find(p => p.id === nextOrder.id);
+        return !oldOrder || JSON.stringify(oldOrder) !== JSON.stringify(nextOrder);
+      });
+      changed.forEach(order => databaseService.upsertOrder(order));
+
+      const deleted = prev.filter(p => !next.some(n => n.id === p.id));
+      deleted.forEach(order => databaseService.deleteOrder(order.id));
+
+      return next;
+    });
+  };
+
+  const handleSetMenuItems: React.Dispatch<React.SetStateAction<MenuItem[]>> = (action) => {
+    setMenuItems(prev => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      const changed = next.filter(nextItem => {
+        const oldItem = prev.find(p => p.id === nextItem.id);
+        return !oldItem || JSON.stringify(oldItem) !== JSON.stringify(nextItem);
+      });
+      changed.forEach(item => databaseService.upsertMenuItem(item));
+
+      const deleted = prev.filter(p => !next.some(n => n.id === p.id));
+      deleted.forEach(item => databaseService.deleteMenuItem(item.id));
+
+      return next;
+    });
+  };
+
+  const handleSetCategories: React.Dispatch<React.SetStateAction<Category[]>> = (action) => {
+    setCategories(prev => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      const changed = next.filter(nextCat => {
+        const oldCat = prev.find(p => p.id === nextCat.id);
+        return !oldCat || JSON.stringify(oldCat) !== JSON.stringify(nextCat);
+      });
+      changed.forEach(cat => databaseService.upsertCategory(cat));
+
+      const deleted = prev.filter(p => !next.some(n => n.id === p.id));
+      deleted.forEach(cat => databaseService.deleteCategory(cat.id));
+
+      return next;
+    });
+  };
+
+  const handleSetCustomers: React.Dispatch<React.SetStateAction<Customer[]>> = (action) => {
+    setCustomers(prev => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      const changed = next.filter(nextCust => {
+        const oldCust = prev.find(p => p.id === nextCust.id);
+        return !oldCust || JSON.stringify(oldCust) !== JSON.stringify(nextCust);
+      });
+      changed.forEach(cust => databaseService.upsertCustomer(cust));
+      return next;
+    });
+  };
+
+  const handleSetDrivers: React.Dispatch<React.SetStateAction<DeliveryDriver[]>> = (action) => {
+    setDrivers(prev => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      const changed = next.filter(nextD => {
+        const oldD = prev.find(p => p.id === nextD.id);
+        return !oldD || JSON.stringify(oldD) !== JSON.stringify(nextD);
+      });
+      changed.forEach(driver => databaseService.upsertDriver(driver));
+      return next;
+    });
+  };
+
+  const handleSetStaff: React.Dispatch<React.SetStateAction<Staff[]>> = (action) => {
+    setStaff(prev => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      const changed = next.filter(nextS => {
+        const oldS = prev.find(p => p.id === nextS.id);
+        return !oldS || JSON.stringify(oldS) !== JSON.stringify(nextS);
+      });
+      changed.forEach(s => databaseService.upsertStaff(s));
+      return next;
+    });
+  };
+
+  const handleSetLogs: React.Dispatch<React.SetStateAction<SiteLog[]>> = (action) => {
+    setLogs(prev => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      const newLogs = next.filter(n => !prev.some(p => p.id === n.id));
+      newLogs.forEach(l => databaseService.insertLog(l));
+      return next;
+    });
+  };
+
   const updateCustomerStats = React.useCallback((customerName: string, customerPhone: string, amount: number, isAdding: boolean = true) => {
     if (!customerPhone || customerPhone === 'N/A' || customerPhone === '0000000000') return;
 
-    setCustomers(prev => {
+    handleSetCustomers(prev => {
       const customerIndex = prev.findIndex(c => {
         const cPhone = c.phone.replace(/\D/g, '').slice(-10);
         const oPhone = customerPhone.replace(/\D/g, '').slice(-10);
@@ -427,10 +587,9 @@ export default function App() {
   }, []);
 
   const updateDriverStats = React.useCallback((driverId: string, rating: number, isAdding: boolean = true) => {
-    setDrivers(prev => prev.map(d => {
+    handleSetDrivers(prev => prev.map(d => {
       if (d.id === driverId) {
         const newCount = Math.max(0, d.deliveriesCompleted + (isAdding ? 1 : -1));
-        // Simple moving average for rating if needed, but for now we just update it
         return {
           ...d,
           deliveriesCompleted: newCount,
@@ -449,8 +608,8 @@ export default function App() {
             categories={categories}
             menuItems={menuItems}
             customers={customers}
-            onAddCustomer={(customer) => setCustomers(prev => [...prev, customer])}
-            onAddOrder={(order) => setOrders(prev => [order, ...prev])}
+            onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
+            onAddOrder={(order) => handleSetOrders(prev => [order, ...prev])}
             onEnterControlPanel={handleEnterControlPanel}
             isDarkMode={isDarkMode}
             setIsDarkMode={setIsDarkMode}
@@ -498,9 +657,9 @@ export default function App() {
     return (
       <RepartidorView
         drivers={drivers}
-        setDrivers={setDrivers}
+        setDrivers={handleSetDrivers}
         orders={orders}
-        setOrders={setOrders}
+        setOrders={handleSetOrders}
         updateCustomerStats={updateCustomerStats}
         updateDriverStats={updateDriverStats}
         isDarkMode={isDarkMode}
@@ -514,7 +673,7 @@ export default function App() {
     return (
       <MonitorCocina
         orders={orders}
-        setOrders={setOrders}
+        setOrders={handleSetOrders}
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
         onExit={() => setView('control_panel')}
@@ -525,9 +684,9 @@ export default function App() {
     return (
       <LogisticaDespachos
         orders={orders}
-        setOrders={setOrders}
+        setOrders={handleSetOrders}
         drivers={drivers}
-        setDrivers={setDrivers}
+        setDrivers={handleSetDrivers}
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
         onExit={() => setView('control_panel')}
@@ -540,17 +699,17 @@ export default function App() {
       <AdminView
         initialSection={adminInitialSection}
         categories={categories}
-        setCategories={setCategories}
+        setCategories={handleSetCategories}
         menuItems={menuItems}
-        setMenuItems={setMenuItems}
+        setMenuItems={handleSetMenuItems}
         orders={orders}
-        setOrders={setOrders}
+        setOrders={handleSetOrders}
         drivers={drivers}
-        setDrivers={setDrivers}
+        setDrivers={handleSetDrivers}
         logs={logs}
-        setLogs={setLogs}
+        setLogs={handleSetLogs}
         customers={customers}
-        setCustomers={setCustomers}
+        setCustomers={handleSetCustomers}
         updateCustomerStats={updateCustomerStats}
         updateDriverStats={updateDriverStats}
         isDarkMode={isDarkMode}
@@ -565,10 +724,10 @@ export default function App() {
       <TPVView
         categories={categories}
         menuItems={menuItems}
-        staff={INITIAL_STAFF}
+        staff={staff}
         customers={customers}
         orders={orders}
-        onAddCustomer={(customer) => setCustomers(prev => [...prev, customer])}
+        onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
         updateCustomerStats={updateCustomerStats}
         onAddOrder={(order) => {
           const fullOrder: Order = {
@@ -580,11 +739,11 @@ export default function App() {
             paymentMethod: order.paymentMethod || 'efectivo',
             source: 'tpv'
           } as Order;
-          setOrders(prev => [fullOrder, ...prev]);
+          handleSetOrders(prev => [fullOrder, ...prev]);
           setTpvEditOrder(null);
         }}
         onUpdateOrder={(order) => {
-          setOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...order } : o));
+          handleSetOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...order } : o));
           setTpvEditOrder(null);
           setView('local_dispatch');
         }}
@@ -605,7 +764,7 @@ export default function App() {
         orders={orders}
         staff={staff}
         updateCustomerStats={updateCustomerStats}
-        onUpdateOrder={(updated) => setOrders(orders.map(o => o.id === updated.id ? { ...o, ...updated } : o))}
+        onUpdateOrder={(updated) => handleSetOrders(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o))}
         onEditOrder={(order) => {
           setTpvEditOrder(order);
           setView('tpv');
@@ -621,8 +780,8 @@ export default function App() {
         categories={categories}
         menuItems={menuItems}
         customers={customers}
-        onAddCustomer={(customer) => setCustomers(prev => [...prev, customer])}
-        onAddOrder={(order) => setOrders(prev => [order, ...prev])}
+        onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
+        onAddOrder={(order) => handleSetOrders(prev => [order, ...prev])}
         onEnterControlPanel={handleEnterControlPanel}
         isDarkMode={isDarkMode}
         setIsDarkMode={setIsDarkMode}
