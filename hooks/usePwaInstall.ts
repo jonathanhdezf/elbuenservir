@@ -11,7 +11,13 @@ export interface UsePwaInstallReturn {
 }
 
 export function usePwaInstall(): UsePwaInstallReturn {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(() => {
+    if (typeof window !== 'undefined' && (window as any).deferredPrompt) {
+      return (window as any).deferredPrompt;
+    }
+    return null;
+  });
+
   const [isInstalled, setIsInstalled] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     
@@ -19,8 +25,9 @@ export function usePwaInstall(): UsePwaInstallReturn {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
     const isIosStandalone = (window.navigator as any).standalone === true;
     const isTwa = document.referrer.includes('android-app://');
+    const localSaved = localStorage.getItem('pwa_installed') === 'true';
 
-    return isStandalone || isIosStandalone || isTwa;
+    return isStandalone || isIosStandalone || isTwa || localSaved;
   });
 
   const [isIos, setIsIos] = useState<boolean>(false);
@@ -39,12 +46,18 @@ export function usePwaInstall(): UsePwaInstallReturn {
       const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
       const isIosStandalone = (window.navigator as any).standalone === true;
       const isTwa = document.referrer.includes('android-app://');
-      if (isStandalone || isIosStandalone || isTwa) {
+      const localSaved = localStorage.getItem('pwa_installed') === 'true';
+      if (isStandalone || isIosStandalone || isTwa || localSaved) {
         setIsInstalled(true);
       }
     };
 
     checkInstalled();
+
+    // Check if early capture in index.html already got the event
+    if ((window as any).deferredPrompt) {
+      setDeferredPrompt((window as any).deferredPrompt);
+    }
 
     // Listen for media query change (e.g., app launched as standalone)
     const mediaQuery = window.matchMedia('(display-mode: standalone)');
@@ -64,13 +77,23 @@ export function usePwaInstall(): UsePwaInstallReturn {
     // Listen for beforeinstallprompt
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
+      (window as any).deferredPrompt = e;
       setDeferredPrompt(e);
+    };
+
+    // Listen for custom event dispatched from index.html early capture
+    const handlePromptAvailable = (e: any) => {
+      const promptObj = e?.detail || (window as any).deferredPrompt;
+      if (promptObj) {
+        setDeferredPrompt(promptObj);
+      }
     };
 
     // Listen for appinstalled
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setDeferredPrompt(null);
+      (window as any).deferredPrompt = null;
       setShowInstructions(false);
       try {
         localStorage.setItem('pwa_installed', 'true');
@@ -80,7 +103,9 @@ export function usePwaInstall(): UsePwaInstallReturn {
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('pwa-prompt-available', handlePromptAvailable);
     window.addEventListener('appinstalled', handleAppInstalled);
+    window.addEventListener('pwa-installed', handleAppInstalled);
 
     return () => {
       try {
@@ -89,18 +114,26 @@ export function usePwaInstall(): UsePwaInstallReturn {
         mediaQuery.removeListener(handleMediaChange);
       }
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('pwa-prompt-available', handlePromptAvailable);
       window.removeEventListener('appinstalled', handleAppInstalled);
+      window.removeEventListener('pwa-installed', handleAppInstalled);
     };
   }, []);
 
   const installApp = useCallback(async (): Promise<boolean> => {
-    if (deferredPrompt) {
+    // 1. Get active prompt from React state or window global
+    const activePrompt = deferredPrompt || (typeof window !== 'undefined' ? (window as any).deferredPrompt : null);
+
+    if (activePrompt) {
       try {
-        await deferredPrompt.prompt();
-        const choiceResult = await deferredPrompt.userChoice;
+        // Trigger native browser install dialog directly
+        await activePrompt.prompt();
+        const choiceResult = await activePrompt.userChoice;
+        
         if (choiceResult && choiceResult.outcome === 'accepted') {
           setIsInstalled(true);
           setDeferredPrompt(null);
+          if (typeof window !== 'undefined') (window as any).deferredPrompt = null;
           setShowInstructions(false);
           try {
             localStorage.setItem('pwa_installed', 'true');
@@ -112,11 +145,15 @@ export function usePwaInstall(): UsePwaInstallReturn {
       } catch (err) {
         console.error('Error al invocar instalación PWA:', err);
       }
+      
+      // Prompt was shown (or closed)
       setDeferredPrompt(null);
+      if (typeof window !== 'undefined') (window as any).deferredPrompt = null;
       return false;
     }
 
-    // If deferredPrompt is not available (e.g., iOS or browser already prompted/disabled)
+    // 2. If prompt is not available, show manual instructions modal
+    // (Crucial for iOS Safari which doesn't support programmatic prompt, or browsers without prompt API)
     setShowInstructions(true);
     return false;
   }, [deferredPrompt]);
@@ -124,7 +161,7 @@ export function usePwaInstall(): UsePwaInstallReturn {
   return {
     isInstalled,
     canInstall: !isInstalled,
-    hasPrompt: !!deferredPrompt,
+    hasPrompt: !!deferredPrompt || (typeof window !== 'undefined' && !!(window as any).deferredPrompt),
     isIos,
     showInstructions,
     setShowInstructions,

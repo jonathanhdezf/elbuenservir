@@ -7,13 +7,32 @@
   <title>El Buen Servir | Gastronomía con Alma</title>
   <meta name="description"
     content="Experimenta el sabor de la tradición con un toque contemporáneo. Reserva tu mesa en El Buen Servir." />
-  <link rel="icon" type="image/png" href="./logo.png" />
+  <link rel="icon" type="image/png" href="./icons/icon-192x192.png" />
   <link rel="manifest" href="./manifest.json" />
   <meta name="theme-color" content="#f59e0b" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="El Buen Servir" />
-  <link rel="apple-touch-icon" href="./assets/logo_nuevo.png" />
+  <link rel="apple-touch-icon" href="./icons/icon-192x192.png" />
+  <link rel="apple-touch-icon" sizes="512x512" href="./icons/icon-512x512.png" />
+
+  <script>
+    // Capture PWA install prompt early on window before any scripts run
+    window.deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.deferredPrompt = e;
+      window.dispatchEvent(new CustomEvent('pwa-prompt-available', { detail: e }));
+    });
+    window.addEventListener('appinstalled', function () {
+      window.deferredPrompt = null;
+      try {
+        localStorage.setItem('pwa_installed', 'true');
+      } catch (err) {}
+      window.dispatchEvent(new CustomEvent('pwa-installed'));
+    });
+  </script>
 
   <!-- Tailwind and Typography -->
   <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>

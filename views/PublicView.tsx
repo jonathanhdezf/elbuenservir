@@ -255,6 +255,12 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
     return () => window.removeEventListener('scroll', handleScroll);
   }, [isInstalled, hasTriggeredInstallBanner, isPreview]);
 
+  useEffect(() => {
+    if (isInstalled) {
+      setShowFloatingBanner(false);
+    }
+  }, [isInstalled]);
+
   const filteredItems = menuItems.filter(item => {
     if (!item.isActive) return false;
     if (activeCategory === 'cat-3') {
@@ -1742,9 +1748,12 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
           <div className="flex items-center gap-3 pt-1">
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 soundManager.play('click');
-                installApp();
+                const installed = await installApp();
+                if (installed) {
+                  setShowFloatingBanner(false);
+                }
               }}
               className="flex-1 py-3.5 px-5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-500/25 hover:scale-[1.02] active:scale-[0.98] cursor-pointer animate-shimmer-sweep"
             >
