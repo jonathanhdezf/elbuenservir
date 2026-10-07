@@ -24,6 +24,17 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
   const { isInstalled, isIos, showInstructions, setShowInstructions, installApp } = usePwaInstall();
   const [showFloatingBanner, setShowFloatingBanner] = useState(false);
   const [hasTriggeredInstallBanner, setHasTriggeredInstallBanner] = useState(false);
+  const [isBannerClosing, setIsBannerClosing] = useState(false);
+
+  const handleDismissBanner = () => {
+    soundManager.play('click');
+    setIsBannerClosing(true);
+    setTimeout(() => {
+      setShowFloatingBanner(false);
+      setIsBannerClosing(false);
+    }, 350);
+  };
+
   const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id || '');
   const [isScrolled, setIsScrolled] = useState(false);
   const [visibleItemsCount, setVisibleItemsCount] = useState(6);
@@ -1654,17 +1665,22 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
       {!isInstalled && showFloatingBanner && !isPreview && (
         <aside
           aria-label="Notificación para instalar la aplicación"
-          className="fixed bottom-6 right-4 left-4 sm:left-auto sm:right-8 sm:w-[440px] z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl border-2 border-primary-500/40 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] dark:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] rounded-[32px] p-6 sm:p-7 animate-in slide-in-from-bottom-10 fade-in duration-500 ring-1 ring-black/5 dark:ring-white/10"
+          className={`fixed bottom-6 right-4 left-4 sm:left-auto sm:right-8 sm:w-[440px] z-50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-2xl border-2 border-primary-500/40 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] dark:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] rounded-[32px] p-6 sm:p-7 ring-1 ring-black/5 dark:ring-white/10 ${
+            isBannerClosing ? 'animate-notification-exit' : 'animate-notification-pop'
+          }`}
         >
+          {/* Subtle glowing halo behind banner */}
+          <div className="absolute -inset-1 bg-gradient-to-r from-primary-500/20 via-amber-500/20 to-emerald-500/20 rounded-[34px] blur-xl -z-10 animate-ambient-glow pointer-events-none" />
+
           {/* Top row with category badge and spacious close button */}
           <div className="flex items-center justify-between gap-3 mb-4">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-primary-500/15 text-primary-600 dark:text-primary-400 border border-primary-500/25">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-primary-500/15 text-primary-600 dark:text-primary-400 border border-primary-500/25 shadow-sm">
               <Sparkles className="w-3 h-3 text-primary-500 animate-pulse" />
               Notificación • Menú Digital
             </span>
             <button
               type="button"
-              onClick={() => setShowFloatingBanner(false)}
+              onClick={handleDismissBanner}
               className="p-1.5 rounded-full text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
               title="Cerrar notificación"
               aria-label="Cerrar notificación de instalación"
@@ -1676,7 +1692,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
           {/* Main content with generous breathing room */}
           <div className="flex items-start gap-4 sm:gap-5 mb-5">
             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-primary-400 via-primary-500 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-primary-500/30 shrink-0 ring-4 ring-primary-500/15">
-              <Smartphone className="w-7 h-7 sm:w-8 sm:h-8" />
+              <Smartphone className="w-7 h-7 sm:w-8 sm:h-8 animate-phone-wiggle" />
             </div>
             <div className="flex-1 min-w-0">
               <h5 className="font-black text-base sm:text-lg uppercase tracking-tight text-gray-900 dark:text-white leading-tight">
@@ -1696,14 +1712,14 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                 soundManager.play('click');
                 installApp();
               }}
-              className="flex-1 py-3.5 px-5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-500/25 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="flex-1 py-3.5 px-5 bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary-500/25 hover:scale-[1.02] active:scale-[0.98] cursor-pointer animate-shimmer-sweep"
             >
               <Download className="w-4 h-4" />
               <span>Instalar Ahora</span>
             </button>
             <button
               type="button"
-              onClick={() => setShowFloatingBanner(false)}
+              onClick={handleDismissBanner}
               className="py-3.5 px-4 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-2xl font-bold text-xs uppercase tracking-wider hover:bg-gray-200 dark:hover:bg-gray-700 transition-all cursor-pointer"
             >
               Más tarde
