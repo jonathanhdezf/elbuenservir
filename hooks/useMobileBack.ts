@@ -42,10 +42,23 @@ export function useMobileBack({
   });
 
   useEffect(() => {
+    let lastHash = window.location.hash;
+
+    const handleHashChange = () => {
+      lastHash = window.location.hash;
+    };
+    window.addEventListener('hashchange', handleHashChange);
+
     // Push trap state only once when the view mounts
     window.history.pushState({ modal: 'trap' }, '');
 
     const handlePopState = (event: PopStateEvent) => {
+      // If popstate was triggered by an in-page hash change, ignore it
+      if (window.location.hash !== lastHash) {
+        lastHash = window.location.hash;
+        return;
+      }
+
       const {
         hasOpenModal,
         onCloseModal,
@@ -101,6 +114,7 @@ export function useMobileBack({
     window.addEventListener('popstate', handlePopState);
     return () => {
       window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('hashchange', handleHashChange);
     };
   }, []);
 }

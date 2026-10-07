@@ -219,12 +219,19 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
     return item.categoryId === activeCategory;
   });
 
+  const scrollToSection = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-primary-200">
       {/* Navigation */}
       <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${isScrolled || isPreview ? 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl shadow-lg py-4 border-b border-gray-100 dark:border-gray-800' : 'bg-transparent py-8'}`}>
         <div className="w-full mx-auto px-6 md:px-12 flex justify-between items-center">
-          <div className="flex items-center space-x-3 group cursor-pointer">
+          <div className="flex items-center space-x-3 group cursor-pointer" onClick={() => scrollToSection('inicio')}>
             <img
               src={`${(import.meta as any).env.BASE_URL}assets/logo_nuevo.png`}
               alt="El Buen Servir"
@@ -238,10 +245,20 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
 
           {/* Desktop Menu */}
           <div className="hidden lg:flex items-center space-x-10 text-sm font-bold uppercase tracking-widest">
-            {[{label: 'INICIO', href: '#inicio'}, {label: 'NUESTRA HISTORIA', href: '#pasion-por-lo-que-hacemos'}, {label: 'NUESTRO MENU', href: '#menu'}, {label: 'CONTACTANOS', href: '#cta'}].map(item => (
-              <a key={item.label} href={item.href} className={`transition-all hover:text-primary-500 ${isScrolled || isPreview ? 'text-gray-600 dark:text-gray-300' : 'text-white/80'}`}>
+            {[
+              { label: 'INICIO', id: 'inicio' },
+              { label: 'NUESTRA HISTORIA', id: 'pasion-por-lo-que-hacemos' },
+              { label: 'NUESTRO MENU', id: 'menu' },
+              { label: 'CONTACTANOS', id: 'cta' }
+            ].map(item => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => scrollToSection(item.id)}
+                className={`transition-all hover:text-primary-500 cursor-pointer ${isScrolled || isPreview ? 'text-gray-600 dark:text-gray-300' : 'text-white/80'}`}
+              >
                 {item.label}
-              </a>
+              </button>
             ))}
           </div>
           <div className="flex items-center space-x-4 md:space-x-6">
@@ -287,15 +304,23 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
           isMobileMenuOpen && (
             <div className="lg:hidden absolute top-full left-0 w-full bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 p-8 shadow-2xl animate-in slide-in-from-top-4 duration-300">
               <div className="flex flex-col space-y-6">
-                {[{label: 'INICIO', href: '#inicio'}, {label: 'NUESTRA HISTORIA', href: '#pasion-por-lo-que-hacemos'}, {label: 'NUESTRO MENU', href: '#menu'}, {label: 'CONTACTANOS', href: '#cta'}].map(item => (
-                  <a
+                {[
+                  { label: 'INICIO', id: 'inicio' },
+                  { label: 'NUESTRA HISTORIA', id: 'pasion-por-lo-que-hacemos' },
+                  { label: 'NUESTRO MENU', id: 'menu' },
+                  { label: 'CONTACTANOS', id: 'cta' }
+                ].map(item => (
+                  <button
                     key={item.label}
-                    href={item.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="text-2xl font-black uppercase tracking-tighter text-gray-900 dark:text-white hover:text-primary-500 transition-colors"
+                    type="button"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      scrollToSection(item.id);
+                    }}
+                    className="text-left text-2xl font-black uppercase tracking-tighter text-gray-900 dark:text-white hover:text-primary-500 transition-colors cursor-pointer"
                   >
                     {item.label}
-                  </a>
+                  </button>
                 ))}
                 <hr className="border-gray-50 dark:border-gray-800" />
                 <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-[24px]">
@@ -374,20 +399,29 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                   Cada plato cuenta una historia. Descubre la fusión perfecta entre técnicas tradicionales y una visión culinaria moderna.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center gap-4">
-                  <a href="#menu" className="w-full sm:w-auto bg-primary-500 hover:bg-primary-600 text-white px-12 py-6 rounded-3xl text-lg font-black uppercase tracking-widest shadow-2xl shadow-primary-500/40 transition-all hover:-translate-y-1 active:scale-95 text-center">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection('menu')}
+                    className="w-full sm:w-auto bg-primary-500 hover:bg-primary-600 text-white px-12 py-6 rounded-3xl text-lg font-black uppercase tracking-widest shadow-2xl shadow-primary-500/40 transition-all hover:-translate-y-1 active:scale-95 text-center cursor-pointer"
+                  >
                     Descubrir Menú
-                  </a>
+                  </button>
                   <button
                     onClick={() => {
                       setOrderStep(1);
                       setIsOrderModalOpen(true);
                     }}
-                    className="w-full sm:w-auto group flex items-center justify-center gap-3 bg-white text-gray-900 px-10 py-6 rounded-3xl text-lg font-black uppercase tracking-widest shadow-2xl shadow-white/30 transition-all hover:-translate-y-1 hover:bg-primary-500 hover:text-white active:scale-95"
+                    className="w-full sm:w-auto group flex items-center justify-center gap-3 bg-white text-gray-900 px-10 py-6 rounded-3xl text-lg font-black uppercase tracking-widest shadow-2xl shadow-white/30 transition-all hover:-translate-y-1 hover:bg-primary-500 hover:text-white active:scale-95 cursor-pointer"
                   >
                     <ShoppingBag className="w-6 h-6" />
                     <span>Ordenar en Línea</span>
                   </button>
-                  <button onClick={() => document.getElementById('pasion-por-lo-que-hacemos')?.scrollIntoView({ behavior: 'smooth' })} className="w-full sm:w-auto group flex items-center justify-center space-x-4 bg-white/5 backdrop-blur-md border border-white/20 text-primary-500 px-8 py-6 rounded-3xl text-base font-bold hover:bg-white/10 transition-all" aria-label="Ir a Nuestra Historia">
+                  <button
+                    type="button"
+                    onClick={() => scrollToSection('pasion-por-lo-que-hacemos')}
+                    className="w-full sm:w-auto group flex items-center justify-center space-x-4 bg-white/5 backdrop-blur-md border border-white/20 text-primary-500 px-8 py-6 rounded-3xl text-base font-bold hover:bg-white/10 transition-all cursor-pointer"
+                    aria-label="Ir a Nuestra Historia"
+                  >
                     <span>Nuestra Historia</span>
                     <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                   </button>
@@ -395,7 +429,10 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
               </div>
             </div>
 
-            <div className="absolute bottom-12 left-1/2 -translate-x-1/2 animate-bounce flex flex-col items-center">
+            <div
+              onClick={() => scrollToSection('pasion-por-lo-que-hacemos')}
+              className="absolute bottom-12 left-1/2 -translate-x-1/2 animate-bounce flex flex-col items-center cursor-pointer"
+            >
               <span className="text-white/50 text-[10px] font-bold uppercase tracking-[0.4em] mb-4">Deslizar</span>
               <ChevronDown className="w-6 h-6 text-white/50" />
             </div>
@@ -600,7 +637,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                   </p>
                   <div className="flex space-x-3">
                     {[{ Icon: Instagram, label: 'Instagram' }, { Icon: Facebook, label: 'Facebook' }, { Icon: Phone, label: 'Teléfono' }].map(({ Icon, label }, i) => (
-                      <a key={i} href="#" title={label} className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-400 hover:text-white hover:bg-primary-500 transition-all hover:-translate-y-1">
+                      <a key={i} href="#" onClick={(e) => e.preventDefault()} title={label} className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-400 hover:text-white hover:bg-primary-500 transition-all hover:-translate-y-1">
                         <Icon className="w-5 h-5" />
                       </a>
                     ))}
@@ -610,8 +647,21 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                 <div>
                   <h5 className="font-black mb-8 text-xs uppercase tracking-[0.3em] text-gray-900 dark:text-white">Menú Rápido</h5>
                   <ul className="space-y-4 text-sm font-bold text-gray-500 dark:text-gray-400">
-                    {[{label: 'INICIO', href: '#inicio'}, {label: 'NUESTRA HISTORIA', href: '#pasion-por-lo-que-hacemos'}, {label: 'NUESTRO MENU', href: '#menu'}, {label: 'CONTACTANOS', href: '#cta'}].map(item => (
-                      <li key={item.label}><a href={item.href} className="hover:text-primary-500 transition-colors">{item.label}</a></li>
+                    {[
+                      { label: 'INICIO', id: 'inicio' },
+                      { label: 'NUESTRA HISTORIA', id: 'pasion-por-lo-que-hacemos' },
+                      { label: 'NUESTRO MENU', id: 'menu' },
+                      { label: 'CONTACTANOS', id: 'cta' }
+                    ].map(item => (
+                      <li key={item.label}>
+                        <button
+                          type="button"
+                          onClick={() => scrollToSection(item.id)}
+                          className="hover:text-primary-500 transition-colors cursor-pointer text-left"
+                        >
+                          {item.label}
+                        </button>
+                      </li>
                     ))}
                   </ul>
                 </div>
@@ -669,9 +719,9 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
               <div className="border-t border-gray-100 dark:border-gray-900 pt-12 flex flex-col md:flex-row justify-between items-center text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                 <p>&copy; {new Date().getFullYear()} El Buen Servir. Todos los derechos reservados.</p>
                 <div className="flex space-x-8 mt-6 md:mt-0">
-                  <a href="#" className="hover:text-primary-500">Privacidad</a>
-                  <a href="#" className="hover:text-primary-500">Términos</a>
-                  <a href="#" className="hover:text-primary-500">Cookies</a>
+                  <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary-500">Privacidad</a>
+                  <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary-500">Términos</a>
+                  <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary-500">Cookies</a>
                 </div>
               </div>
             </div>
