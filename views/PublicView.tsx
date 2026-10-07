@@ -80,9 +80,20 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authIntent, setAuthIntent] = useState<'order' | 'live' | 'profile'>('profile');
   const [isLiveOrderOpen, setIsLiveOrderOpen] = useState(false);
+
+  useEffect(() => {
+    if (showProfileTooltip) {
+      soundManager.play('notification');
+      const timer = setTimeout(() => {
+        setShowProfileTooltip(false);
+      }, 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [showProfileTooltip]);
 
   // Delivery Choice States
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'table' | 'delivery' | null>(null);
@@ -124,13 +135,15 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     } else if (authIntent === 'live') {
       setIsLiveOrderOpen(true);
     } else {
-      setIsProfileModalOpen(true);
+      // Do not open profile modal directly; display informative tooltip on navbar avatar
+      setShowProfileTooltip(true);
     }
   };
 
   const handleRegisterCustomer = (newCustomer: Customer) => {
     onAddCustomer(newCustomer);
     handleSetLoggedCustomer(newCustomer);
+    setShowProfileTooltip(true);
   };
 
   // Mobile Back Button Navigation Logic
@@ -365,37 +378,86 @@ export default function PublicView({ categories, menuItems, customers, orders = 
 
             {/* Customer Profile / Login Button */}
             {loggedCustomer ? (
-              <button
-                type="button"
-                onClick={() => {
-                  soundManager.play('click');
-                  setIsProfileModalOpen(true);
-                }}
-                title={`Mi Perfil (${loggedCustomer.name})`}
-                className={`flex items-center gap-2.5 p-1.5 sm:px-3 sm:py-1.5 rounded-full border transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer ${
-                  isScrolled || isPreview
-                    ? 'bg-white dark:bg-gray-900 border-primary-500/40 text-gray-900 dark:text-white hover:border-primary-500 shadow-primary-500/5'
-                    : 'bg-white/15 backdrop-blur-md border-white/30 text-white hover:bg-white/25'
-                }`}
-              >
-                <CustomerAvatar
-                  avatarUrl={loggedCustomer.avatarUrl}
-                  name={loggedCustomer.name}
-                  className="w-8 h-8"
-                  showOnlineBadge={true}
-                  badgeClassName="w-2.5 h-2.5"
-                  alternateWithInitial={true}
-                  alternateIntervalMs={3200}
-                />
-                <div className="hidden sm:flex flex-col text-left">
-                  <span className="text-xs font-black truncate max-w-[100px] leading-tight">
-                    {loggedCustomer.name.split(' ')[0]}
-                  </span>
-                  <span className="text-[9px] font-bold text-primary-500 dark:text-primary-400 uppercase tracking-wider leading-none">
-                    Mi Cuenta
-                  </span>
-                </div>
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundManager.play('click');
+                    setShowProfileTooltip(false);
+                    setIsProfileModalOpen(true);
+                  }}
+                  title={`Mi Perfil (${loggedCustomer.name})`}
+                  className={`flex items-center gap-2.5 p-1.5 sm:px-3 sm:py-1.5 rounded-full border transition-all hover:scale-105 active:scale-95 shadow-sm cursor-pointer ${
+                    isScrolled || isPreview
+                      ? 'bg-white dark:bg-gray-900 border-primary-500/40 text-gray-900 dark:text-white hover:border-primary-500 shadow-primary-500/5'
+                      : 'bg-white/15 backdrop-blur-md border-white/30 text-white hover:bg-white/25'
+                  }`}
+                >
+                  <CustomerAvatar
+                    avatarUrl={loggedCustomer.avatarUrl}
+                    name={loggedCustomer.name}
+                    className="w-8 h-8"
+                    showOnlineBadge={true}
+                    badgeClassName="w-2.5 h-2.5"
+                    alternateWithInitial={true}
+                    alternateIntervalMs={3200}
+                  />
+                  <div className="hidden sm:flex flex-col text-left">
+                    <span className="text-xs font-black truncate max-w-[100px] leading-tight">
+                      {loggedCustomer.name.split(' ')[0]}
+                    </span>
+                    <span className="text-[9px] font-bold text-primary-500 dark:text-primary-400 uppercase tracking-wider leading-none">
+                      Mi Cuenta
+                    </span>
+                  </div>
+                </button>
+
+                {/* Interactive Tooltip Guiding the User */}
+                {showProfileTooltip && (
+                  <div
+                    className="absolute top-full mt-3 right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 z-50 w-72 sm:w-80 p-4 bg-white dark:bg-gray-900 border-2 border-primary-500 rounded-3xl shadow-2xl animate-in fade-in zoom-in-95 duration-300 ring-4 ring-primary-500/15 cursor-pointer"
+                    onClick={() => {
+                      soundManager.play('click');
+                      setShowProfileTooltip(false);
+                      setIsProfileModalOpen(true);
+                    }}
+                  >
+                    {/* Tooltip Arrow pointing up to the avatar */}
+                    <div className="absolute -top-2 right-4 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 w-4 h-4 bg-white dark:bg-gray-900 border-t-2 border-l-2 border-primary-500 transform rotate-45" />
+
+                    <div className="relative flex items-start gap-3">
+                      <div className="w-9 h-9 rounded-2xl bg-primary-500/10 text-primary-600 dark:text-primary-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <Sparkles className="w-5 h-5 animate-spin" />
+                      </div>
+                      <div className="flex-1 text-left">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-tight">
+                            ¡Sesión Iniciada! 👋
+                          </p>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setShowProfileTooltip(false);
+                            }}
+                            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-lg -mr-1 -mt-1 cursor-pointer"
+                            title="Cerrar aviso"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p className="text-[11px] font-medium text-gray-600 dark:text-gray-300 mt-1 leading-snug">
+                          Puedes modificar tu foto, datos o revisar tu <strong className="font-black text-primary-500">historial de pedidos</strong> tocando aquí.
+                        </p>
+                        <div className="mt-2.5 flex items-center gap-1.5 text-[10px] font-black uppercase text-primary-500 tracking-wider">
+                          <span>Ver mi perfil</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <button
                 type="button"
