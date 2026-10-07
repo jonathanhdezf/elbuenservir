@@ -591,11 +591,15 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
             <div className="w-full bg-gray-900 rounded-[50px] p-12 md:p-24 relative overflow-hidden flex flex-col items-center text-center">
               <div className="absolute top-0 right-0 w-96 h-96 bg-primary-500/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/2"></div>
               <div className="relative z-10 max-w-2xl">
-                <h2 className="text-5xl md:text-7xl font-black text-white mb-8 tracking-tighter leading-none">
-                  ¿Listo para una <span className="text-primary-500 font-serif italic font-normal">experiencia</span> inolvidable?
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-black uppercase tracking-widest mb-6">
+                  <MessageCircle className="w-4 h-4" />
+                  <span>Menú Digital • Pedidos a WhatsApp</span>
+                </div>
+                <h2 className="text-4xl sm:text-5xl md:text-7xl font-black text-white mb-6 md:mb-8 tracking-tighter leading-tight">
+                  ¿Listo para una <span className="text-primary-500 font-serif italic font-normal">experiencia digital</span> con nuestro menú?
                 </h2>
-                <p className="text-xl text-white/60 mb-12 leading-relaxed">
-                  Reserva hoy mismo tu mesa y déjanos consentirte con los mejores sabores de la región.
+                <p className="text-lg md:text-xl text-white/70 mb-10 md:mb-12 leading-relaxed">
+                  Explora nuestros platillos, arma tu pedido en segundos desde el menú digital y envíalo directamente a nuestro WhatsApp sin filas ni demoras.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
                   <button
@@ -603,10 +607,10 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                       setOrderStep(1);
                       setIsOrderModalOpen(true);
                     }}
-                    className="w-full sm:w-auto bg-white text-gray-900 px-12 py-6 rounded-3xl text-lg font-black uppercase tracking-widest hover:bg-primary-500 hover:text-white transition-all hover:scale-105 active:scale-95 shadow-2xl flex items-center justify-center gap-3"
+                    className="w-full sm:w-auto bg-white text-gray-900 hover:bg-emerald-500 hover:text-white px-10 py-5 sm:px-12 sm:py-6 rounded-3xl text-base sm:text-lg font-black uppercase tracking-widest transition-all hover:scale-105 active:scale-95 shadow-2xl flex items-center justify-center gap-3 cursor-pointer group"
                   >
-                    <ShoppingCart className="w-6 h-6" />
-                    Ordenar Ahora
+                    <MessageCircle className="w-6 h-6 text-emerald-500 group-hover:text-white transition-colors" />
+                    <span>Ordenar por WhatsApp</span>
                   </button>
                   <a href="tel:+522311808272" className="flex items-center space-x-3 text-white hover:text-primary-400 transition-colors">
                     <div className="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center">
