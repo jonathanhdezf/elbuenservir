@@ -227,7 +227,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
   };
 
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans selection:bg-primary-200">
+    <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-white font-sans selection:bg-primary-200 transition-colors duration-300">
       {/* Navigation */}
       <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${isScrolled || isPreview ? 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl shadow-lg py-4 border-b border-gray-100 dark:border-gray-800' : 'bg-transparent py-8'}`}>
         <div className="w-full mx-auto px-6 md:px-12 flex justify-between items-center">
@@ -494,7 +494,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
       </section>
 
       {/* Menu Section */}
-      <section id="menu" className={`py-24 px-6 relative ${isPreview ? 'bg-white' : 'bg-[#FDFDFD] dark:bg-gray-900/50'}`}>
+      <section id="menu" className={`py-24 px-6 relative transition-colors duration-300 ${isPreview ? 'bg-white dark:bg-gray-950' : 'bg-[#FDFDFD] dark:bg-gray-950'}`}>
         <div className="w-full relative z-10 px-6 md:px-12">
           <div className="text-center mb-20">
             <span className="text-primary-500 font-black uppercase tracking-[0.3em] text-xs mb-4 block">Carta Gastronómica</span>
@@ -587,7 +587,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
       {/* CTA Section */}
       {
         !isPreview && (
-          <section id="cta" className="py-20 md:py-28 px-4 sm:px-6 md:px-12 relative">
+          <section id="cta" className="py-20 md:py-28 px-4 sm:px-6 md:px-12 relative bg-white dark:bg-gray-950 transition-colors duration-300">
             <div className="w-full max-w-6xl mx-auto bg-gray-900 dark:bg-gradient-to-br dark:from-gray-900/95 dark:via-gray-950 dark:to-gray-900/90 rounded-[40px] md:rounded-[56px] p-8 sm:p-12 md:p-20 relative overflow-hidden flex flex-col items-center text-center border border-gray-800 dark:border-white/10 dark:shadow-[0_0_80px_rgba(16,185,129,0.15)] shadow-2xl backdrop-blur-2xl">
               
               {/* Dynamic Ambient Glows for Dark Mode */}
