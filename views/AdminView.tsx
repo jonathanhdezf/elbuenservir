@@ -11,7 +11,7 @@ import {
   Banknote, Receipt, ArrowRight, Printer, CheckCircle,
   Monitor, Maximize2, Bell, Truck, UserMinus, Navigation, ShieldCheck, Layers,
   History, Wallet, ArrowUpRight, Store, Utensils, Zap, Save, UserCheck, Scan, Shield, Sun, Moon,
-  ArrowUp, ArrowDown, Move, MessageCircle
+  ArrowUp, ArrowDown, Move, MessageCircle, Copy
 } from 'lucide-react';
 import { MenuItem, Category, TabId, Order, OrderItem, OrderStatus, Customer, AdminSection, DeliveryDriver, VehicleType, PaymentMethod, PaymentStatus, TransferStatus, Staff, StaffRole, SiteLog, PayrollEntry, Loan } from '../types';
 import { soundManager, AudioAction } from '../utils/soundManager';
@@ -168,6 +168,11 @@ export default function AdminView({
   const [tpvWaiterId, setTpvWaiterId] = useState<string | null>(null);
   const [visibleItemsCount, setVisibleItemsCount] = useState(6);
 
+  // Orders Management & Search / Filter States
+  const [ordersSearch, setOrdersSearch] = useState('');
+  const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
+  const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
+
   // Payroll & Loans State
   const [payrollEntries, setPayrollEntries] = useState<PayrollEntry[]>([]);
   const [loans, setLoans] = useState<Loan[]>([]);
@@ -310,6 +315,67 @@ export default function AdminView({
     categories.find(c => c.id === activeTab)?.name || 'Categoría',
     [categories, activeTab]
   );
+
+  const handleCopyOrderId = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    try {
+      if (navigator?.clipboard?.writeText) {
+        navigator.clipboard.writeText(id);
+      } else {
+        const el = document.createElement('textarea');
+        el.value = id;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      }
+      setCopiedOrderId(id);
+      playUISound('click');
+      addNotification(`ID #${id} copiado al portapapeles`, 'info');
+      setTimeout(() => {
+        setCopiedOrderId(prev => prev === id ? null : prev);
+      }, 2000);
+    } catch {
+      // fallback
+    }
+  };
+
+  const formatOrderDateTime = (dateStr?: string) => {
+    if (!dateStr) return { date: '', time: '' };
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return { date: '', time: dateStr };
+      const date = d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
+      const time = d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+      return { date, time };
+    } catch {
+      return { date: '', time: '' };
+    }
+  };
+
+  const filteredOrders = useMemo(() => {
+    return orders.filter(o => {
+      // Status & source filter
+      if (orderStatusFilter !== 'all') {
+        if (orderStatusFilter === 'tpv' && o.source !== 'tpv') return false;
+        if (orderStatusFilter === 'online' && o.source !== 'online') return false;
+        if (orderStatusFilter === 'pending' && o.status !== 'pending' && o.status !== 'kitchen') return false;
+        if (orderStatusFilter === 'delivery' && o.status !== 'delivery') return false;
+        if (orderStatusFilter === 'delivered' && o.status !== 'delivered') return false;
+        if (orderStatusFilter === 'cancelled' && o.status !== 'cancelled') return false;
+      }
+      // Search query (matches ID, customer name, customer phone, or address)
+      if (ordersSearch.trim()) {
+        const query = ordersSearch.toLowerCase().trim();
+        const matchesId = o.id.toLowerCase().includes(query);
+        const matchesCustomer = o.customerName?.toLowerCase().includes(query);
+        const matchesPhone = o.customerPhone?.toLowerCase().includes(query);
+        const matchesAddress = o.address?.toLowerCase().includes(query);
+        return matchesId || matchesCustomer || matchesPhone || matchesAddress;
+      }
+      return true;
+    });
+  }, [orders, orderStatusFilter, ordersSearch]);
 
   const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
     const oldOrder = orders.find(o => o.id === orderId);
@@ -785,7 +851,22 @@ export default function AdminView({
                       ONLINE
                     </div>
                   )}
-                  <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{viewingOrder.id}</span>
+                  <div className="flex items-center space-x-1.5 bg-white/10 px-2.5 py-1 rounded-xl border border-white/10">
+                    <span className="text-[9px] font-black text-white/50 uppercase tracking-widest">ID:</span>
+                    <span className="font-mono text-xs font-black text-white tracking-wider break-all select-all">{viewingOrder.id}</span>
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopyOrderId(viewingOrder.id, e)}
+                      className="p-1 hover:bg-white/20 rounded-lg text-white/70 hover:text-white transition-colors"
+                      title="Copiar ID"
+                    >
+                      {copiedOrderId === viewingOrder.id ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
                 </div>
                 <button title="Cerrar" onClick={() => { setViewingOrderId(null); setIsConfirmingPayment(false); }} className="p-2 text-white/40 hover:text-white hover:bg-white/10 rounded-xl transition-all">
                   <X className="w-5 h-5" />
@@ -1603,91 +1684,392 @@ export default function AdminView({
 
   const renderOrdersTable = () => {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-[40px] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="p-8 border-b border-gray-50 dark:border-gray-700 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="relative flex-1 max-w-lg">
-            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input type="text" placeholder="ID de pedido o cliente..." className="w-full pl-14 pr-6 py-4 bg-gray-50 dark:bg-gray-900 border-none rounded-3xl text-sm focus:ring-4 focus:ring-primary-500/10 font-medium uppercase outline-none" />
+      <div className="bg-white dark:bg-gray-800 rounded-[28px] sm:rounded-[36px] md:rounded-[40px] shadow-sm border border-gray-100 dark:border-gray-700/80 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Search, Filter Tabs and Header */}
+        <div className="p-4 sm:p-6 md:p-8 border-b border-gray-100 dark:border-gray-700/80 flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-4 sm:left-5 top-1/2 -translate-y-1/2 w-4 sm:w-5 h-4 sm:h-5 text-gray-400" />
+              <input
+                type="text"
+                value={ordersSearch}
+                onChange={(e) => setOrdersSearch(e.target.value)}
+                placeholder="Buscar por ID de pedido, cliente o teléfono..."
+                className="w-full pl-11 sm:pl-14 pr-10 py-3 sm:py-3.5 bg-gray-50 dark:bg-gray-900 border-none rounded-2xl sm:rounded-3xl text-xs sm:text-sm focus:ring-4 focus:ring-primary-500/10 font-medium outline-none text-gray-900 dark:text-white placeholder:text-gray-400"
+              />
+              {ordersSearch && (
+                <button
+                  type="button"
+                  onClick={() => setOrdersSearch('')}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg"
+                  title="Limpiar búsqueda"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+              <span className="text-[11px] font-black uppercase tracking-wider text-gray-400 bg-gray-50 dark:bg-gray-900/60 px-3 py-2 rounded-xl">
+                {filteredOrders.length} {filteredOrders.length === 1 ? 'pedido' : 'pedidos'}
+              </span>
+            </div>
           </div>
-          <button className="px-6 py-4 bg-gray-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center"><Filter className="w-4 h-4 mr-3" /> Filtros</button>
+
+          {/* Filter Pills */}
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 custom-scrollbar">
+            {[
+              { id: 'all', label: 'Todos' },
+              { id: 'pending', label: 'En Cocina' },
+              { id: 'delivery', label: 'En Reparto' },
+              { id: 'delivered', label: 'Entregados' },
+              { id: 'online', label: 'Web Online' },
+              { id: 'tpv', label: 'Venta TPV' }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => { setOrderStatusFilter(tab.id); playUISound('click'); }}
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider whitespace-nowrap transition-all ${
+                  orderStatusFilter === tab.id
+                    ? 'bg-primary-500 text-white shadow-md shadow-primary-500/25'
+                    : 'bg-gray-50 dark:bg-gray-900/60 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
-        <div className="overflow-x-auto">
+
+        {/* ============================================================== */}
+        {/* MOBILE VIEW: Card-based restructuring for screens < md (phones) */}
+        {/* ============================================================== */}
+        <div className="block md:hidden p-3.5 sm:p-4 space-y-3.5">
+          {filteredOrders.map(o => {
+            const statusCfg = STATUS_CONFIG[o.status] || STATUS_CONFIG['pending'];
+            const paymentCfg = PAYMENT_STATUS_CONFIG[o.paymentStatus] || PAYMENT_STATUS_CONFIG['pending'];
+            const methodCfg = PAYMENT_METHOD_CONFIG[o.paymentMethod] || PAYMENT_METHOD_CONFIG['efectivo'];
+            const { time } = formatOrderDateTime(o.createdAt);
+            const driver = drivers.find(d => d.id === o.assignedDriverId);
+
+            return (
+              <div
+                key={o.id}
+                onClick={() => setViewingOrderId(o.id)}
+                className={`bg-white dark:bg-gray-800/95 rounded-2xl sm:rounded-3xl p-4 border transition-all active:scale-[0.99] cursor-pointer shadow-sm relative overflow-hidden flex flex-col gap-3 ${
+                  o.source === 'online'
+                    ? 'border-primary-200/80 dark:border-primary-900/50 hover:border-primary-400'
+                    : 'border-gray-200/80 dark:border-gray-700/80 hover:border-gray-300 dark:hover:border-gray-600'
+                }`}
+              >
+                {/* Top Row: Full Order ID Pill & Timestamp */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  {/* Highlighted Order ID with 1-Tap Copy */}
+                  <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900/90 px-3 py-1.5 rounded-xl border border-gray-200/90 dark:border-gray-700 shadow-inner max-w-full">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 shrink-0">ID:</span>
+                    <span className="font-mono font-black text-xs sm:text-sm text-primary-600 dark:text-primary-400 tracking-wider break-all select-all">
+                      {o.id}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => handleCopyOrderId(o.id, e)}
+                      className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-primary-500 transition-colors shrink-0 ml-1 active:scale-90"
+                      title="Copiar ID del pedido"
+                      aria-label="Copiar ID"
+                    >
+                      {copiedOrderId === o.id ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-500 animate-in zoom-in" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Channel & Time Badges */}
+                  <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider ${
+                      o.source === 'tpv'
+                        ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border border-amber-200/70 dark:border-amber-800/60'
+                        : 'bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-400 border border-primary-200/70 dark:border-primary-800/60'
+                    }`}>
+                      {o.source === 'tpv' ? <Monitor className="w-3 h-3" /> : <ShoppingBag className="w-3 h-3" />}
+                      <span>{o.source === 'tpv' ? 'TPV' : 'Online'}</span>
+                    </span>
+
+                    {time && (
+                      <span className="text-[10px] font-bold text-gray-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-gray-400" />
+                        <span>{time}</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Customer and Total Row */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-black text-gray-900 dark:text-white text-sm sm:text-base tracking-tight uppercase truncate">
+                      {o.customerName || 'Cliente TPV'}
+                    </h4>
+                    {o.customerPhone && o.customerPhone !== 'N/A' && (
+                      <a
+                        href={`tel:${o.customerPhone}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-gray-400 hover:text-primary-500 mt-0.5 transition-colors"
+                      >
+                        <Phone className="w-3 h-3 text-gray-400" />
+                        <span>{o.customerPhone}</span>
+                      </a>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">Total</span>
+                    <span className="text-lg sm:text-xl font-black text-gray-900 dark:text-white">${o.total.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                {/* Delivery Address (if any) */}
+                {o.address && (
+                  <div className="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/60 px-3 py-1.5 rounded-xl border border-gray-100 dark:border-gray-800">
+                    <MapPin className="w-3.5 h-3.5 text-primary-500 shrink-0" />
+                    <span className="truncate">{o.address}</span>
+                  </div>
+                )}
+
+                {/* Status, Payment and Driver Pills */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-gray-100 dark:border-gray-700/60">
+                  {/* Order Status */}
+                  <div className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full ${statusCfg.color}`}>
+                    <statusCfg.icon className="w-3 h-3" />
+                    <span className="text-[9px] font-black uppercase tracking-wider">{statusCfg.label}</span>
+                  </div>
+
+                  {/* Payment Status */}
+                  <div className={`inline-flex items-center px-2 py-0.5 rounded-lg border text-[9px] font-black uppercase tracking-wider ${paymentCfg.color}`}>
+                    {paymentCfg.label}
+                  </div>
+
+                  {/* Payment Method */}
+                  <div className="inline-flex items-center space-x-1 text-[9px] font-bold text-gray-500 dark:text-gray-400 uppercase bg-gray-100 dark:bg-gray-900 px-2 py-0.5 rounded-lg">
+                    <methodCfg.icon className="w-3 h-3" />
+                    <span>{methodCfg.label}</span>
+                  </div>
+
+                  {/* Driver */}
+                  {driver ? (
+                    <div className="inline-flex items-center space-x-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 px-2 py-0.5 rounded-lg">
+                      <Bike className="w-3 h-3" />
+                      <span className="truncate max-w-[110px]">{driver.name}</span>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* Card Footer: Items summary & Action Buttons */}
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-gray-700/60">
+                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    {o.items?.length || 0} {o.items?.length === 1 ? 'platillo' : 'platillos'}
+                  </div>
+
+                  <div className="flex items-center space-x-1.5">
+                    {/* WhatsApp */}
+                    {(o.status === 'kitchen' || o.status === 'delivery' || o.status === 'delivered') && o.customerPhone && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const isSent = o.notifiedStatuses?.[o.status];
+                          if (!isSent) {
+                            setOrders(prev => prev.map(order => 
+                              order.id === o.id 
+                                ? { ...order, notifiedStatuses: { ...(order.notifiedStatuses || {}), [o.status]: true } } 
+                                : order
+                            ));
+                          }
+                          const phone = o.customerPhone.replace(/\D/g, '');
+                          const ticketUrl = `https://elbuenservir.vercel.app/?ticket=${o.id}`;
+                          const message = o.status === 'kitchen' 
+                            ? `Hola ${o.customerName}, tu pedido ${o.id} de El Buen Servir está siendo preparado en cocina. Te avisaremos cuando esté listo.`
+                            : o.status === 'delivery'
+                              ? `Hola ${o.customerName}, tu pedido ${o.id} de El Buen Servir está en camino en reparto. ¡Prepárate para recibirlo!`
+                              : `¡Hola ${o.customerName}! ✨\n\nConfirmamos la entrega de tu pedido *${o.id}*. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\n¡Muchas gracias por tu preferencia en *El Buen Servir*! 🍽️`;
+                            
+                          window.open(`https://wa.me/52${phone}?text=${encodeURIComponent(message)}`, '_blank');
+                        }}
+                        className={`p-2 rounded-xl transition-all inline-flex items-center justify-center ${o.notifiedStatuses?.[o.status] ? 'text-gray-400 bg-gray-50 dark:bg-gray-800' : 'text-green-500 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50'}`}
+                        title={o.notifiedStatuses?.[o.status] ? "Mensaje de WhatsApp ya enviado" : "Enviar notificación por WhatsApp"}
+                      >
+                        <MessageCircle className="w-4 h-4" />
+                      </button>
+                    )}
+
+                    {/* View Details */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setViewingOrderId(o.id);
+                      }}
+                      className="px-3 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-primary-500 hover:text-white dark:hover:bg-primary-500 text-gray-700 dark:text-gray-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1"
+                    >
+                      <span>Ver</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+
+                    {/* Delete */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOrderToDelete(o.id);
+                      }}
+                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-all inline-flex items-center justify-center"
+                      title="Eliminar pedido permanentemente"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ============================================================== */}
+        {/* DESKTOP VIEW: Clean responsive table for screens >= md         */}
+        {/* ============================================================== */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-gray-50 dark:border-gray-700">
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Pedido</th>
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Cliente</th>
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Estado</th>
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Pago</th>
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Repartidor</th>
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Total</th>
-                <th className="px-8 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Acciones</th>
+              <tr className="border-b border-gray-100 dark:border-gray-700/80 bg-gray-50/50 dark:bg-gray-900/50">
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Pedido / ID</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Cliente</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Estado</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Pago</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Repartidor</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Total</th>
+                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Acciones</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
-              {orders.map(o => {
-                const statusCfg = STATUS_CONFIG[o.status];
-                const paymentCfg = PAYMENT_STATUS_CONFIG[o.paymentStatus];
-                const methodCfg = PAYMENT_METHOD_CONFIG[o.paymentMethod];
+            <tbody className="divide-y divide-gray-50 dark:divide-gray-700/60">
+              {filteredOrders.map(o => {
+                const statusCfg = STATUS_CONFIG[o.status] || STATUS_CONFIG['pending'];
+                const paymentCfg = PAYMENT_STATUS_CONFIG[o.paymentStatus] || PAYMENT_STATUS_CONFIG['pending'];
+                const methodCfg = PAYMENT_METHOD_CONFIG[o.paymentMethod] || PAYMENT_METHOD_CONFIG['efectivo'];
+                const { time } = formatOrderDateTime(o.createdAt);
+                const driver = drivers.find(d => d.id === o.assignedDriverId);
+
                 return (
-                  <tr key={o.id} onClick={() => setViewingOrderId(o.id)} className={`hover:bg-gray-50/80 dark:hover:bg-gray-900/50 transition-colors group cursor-pointer ${o.source === 'online' ? 'bg-primary-50/30 dark:bg-primary-900/10' : ''}`}>
-                    <td className="px-8 py-6 font-black text-sm text-primary-500">
-                      <div className="flex items-center space-x-2">
-                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${o.source === 'tpv' ? 'bg-amber-100 text-amber-600' : 'bg-primary-500 text-white shadow-lg shadow-primary-500/30'}`}>
+                  <tr
+                    key={o.id}
+                    onClick={() => setViewingOrderId(o.id)}
+                    className={`hover:bg-gray-50/80 dark:hover:bg-gray-900/50 transition-colors group cursor-pointer ${
+                      o.source === 'online' ? 'bg-primary-50/30 dark:bg-primary-900/10' : ''
+                    }`}
+                  >
+                    {/* Pedido / ID column */}
+                    <td className="px-6 py-4 font-black text-sm">
+                      <div className="flex items-center space-x-3">
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                          o.source === 'tpv'
+                            ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+                            : 'bg-primary-500 text-white shadow-lg shadow-primary-500/30'
+                        }`}>
                           {o.source === 'tpv' ? <Monitor className="w-5 h-5" /> : <ShoppingBag className="w-5 h-5" />}
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-black text-gray-900 dark:text-white uppercase leading-none">{o.id}</span>
-                          <span className={`text-[9px] font-bold uppercase mt-1 ${o.source === 'online' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400'}`}>
-                            {o.source === 'tpv' ? 'Venta Directa TPV' : 'Pedido Online Web'}
-                          </span>
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-center space-x-1.5">
+                            <span className="font-mono font-black text-sm text-gray-900 dark:text-white tracking-wide break-all">
+                              {o.id}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => handleCopyOrderId(o.id, e)}
+                              className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-primary-500 transition-colors shrink-0"
+                              title="Copiar ID"
+                            >
+                              {copiedOrderId === o.id ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-500" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                          </div>
+                          <div className="flex items-center space-x-2 mt-0.5">
+                            <span className={`text-[9px] font-bold uppercase ${
+                              o.source === 'online' ? 'text-primary-600 dark:text-primary-400' : 'text-gray-400'
+                            }`}>
+                              {o.source === 'tpv' ? 'Venta Directa TPV' : 'Pedido Online Web'}
+                            </span>
+                            {time && (
+                              <span className="text-[9px] font-bold text-gray-400">• {time}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-8 py-6">
+
+                    {/* Cliente column */}
+                    <td className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="font-black text-gray-900 dark:text-white tracking-tight uppercase leading-none">{o.customerName}</span>
-                        <span className="text-[10px] font-bold text-gray-400 mt-1">{o.customerPhone}</span>
+                        <span className="font-black text-gray-900 dark:text-white tracking-tight uppercase leading-none">
+                          {o.customerName || 'Cliente TPV'}
+                        </span>
+                        {o.customerPhone && (
+                          <span className="text-[10px] font-bold text-gray-400 mt-1">{o.customerPhone}</span>
+                        )}
+                        {o.address && (
+                          <span className="flex items-center gap-1 text-[10px] font-medium text-gray-400 mt-1 truncate max-w-xs">
+                            <MapPin className="w-3 h-3 text-primary-500 shrink-0" />
+                            <span className="truncate">{o.address}</span>
+                          </span>
+                        )}
                       </div>
                     </td>
-                    <td className="px-8 py-6">
+
+                    {/* Estado column */}
+                    <td className="px-6 py-4">
                       <div className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-full ${statusCfg.color}`}>
                         <statusCfg.icon className="w-3 h-3" />
                         <span className="text-[9px] font-black uppercase tracking-widest">{statusCfg.label}</span>
                       </div>
                     </td>
-                    <td className="px-8 py-6">
+
+                    {/* Pago column */}
+                    <td className="px-6 py-4">
                       <div className="flex flex-col space-y-1">
-                        <div className={`inline-flex items-center justify-center border px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${paymentCfg.color}`}>
+                        <div className={`inline-flex items-center justify-center border px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest w-fit ${paymentCfg.color}`}>
                           {paymentCfg.label}
                         </div>
                         <div className="flex items-center space-x-1.5 text-[9px] font-bold text-gray-400 uppercase">
                           <methodCfg.icon className="w-3 h-3" />
                           <span>{methodCfg.label}</span>
                         </div>
-                        <div className="mt-6 pt-6 border-t border-gray-50 dark:border-gray-700/50 flex justify-between items-center text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                          <span className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5" /> {o.address}</span>
-                          {o.source === 'tpv' && (
-                            <span className="bg-amber-50 text-amber-600 px-2 py-0.5 rounded-lg border border-amber-100 font-black">EN DIRECTO</span>
-                          )}
-                        </div>
                       </div>
                     </td>
-                    <td className="px-8 py-6">
-                      {o.assignedDriverId ? (
+
+                    {/* Repartidor column */}
+                    <td className="px-6 py-4">
+                      {driver ? (
                         <div className="flex items-center space-x-2">
-                          <Bike className="w-3.5 h-3.5 text-blue-500" />
-                          <span className="text-xs font-bold dark:text-white uppercase truncate max-w-[120px]">{drivers.find(d => d.id === o.assignedDriverId)?.name}</span>
+                          <Bike className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                          <span className="text-xs font-bold dark:text-white uppercase truncate max-w-[120px]">{driver.name}</span>
                         </div>
                       ) : (
-                        <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Sin asignar</span>
+                        <span className="text-[9px] font-black text-gray-300 dark:text-gray-600 uppercase tracking-widest">Sin asignar</span>
                       )}
                     </td>
-                    <td className="px-8 py-6 text-right font-black text-gray-900 dark:text-white">${o.total.toFixed(2)}</td>
-                    <td className="px-8 py-6 text-center">
+
+                    {/* Total column */}
+                    <td className="px-6 py-4 text-right font-black text-gray-900 dark:text-white text-base">
+                      ${o.total.toFixed(2)}
+                    </td>
+
+                    {/* Acciones column */}
+                    <td className="px-6 py-4 text-center">
                       <div className="flex items-center justify-center space-x-2">
                         {(o.status === 'kitchen' || o.status === 'delivery' || o.status === 'delivered') && o.customerPhone && (
                           <button
+                            type="button"
                             onClick={(e) => {
                               e.stopPropagation();
                               const isSent = o.notifiedStatuses?.[o.status];
@@ -1716,6 +2098,7 @@ export default function AdminView({
                           </button>
                         )}
                         <button
+                          type="button"
                           onClick={(e) => {
                             e.stopPropagation();
                             setOrderToDelete(o.id);
@@ -1733,6 +2116,28 @@ export default function AdminView({
             </tbody>
           </table>
         </div>
+
+        {/* Empty state when no orders match */}
+        {filteredOrders.length === 0 && (
+          <div className="py-16 sm:py-20 text-center flex flex-col items-center justify-center px-4">
+            <ShoppingBag className="w-12 sm:w-16 h-12 sm:h-16 text-gray-200 dark:text-gray-700 mb-4" />
+            <h4 className="text-base sm:text-lg font-black text-gray-900 dark:text-white uppercase tracking-tight">
+              No se encontraron pedidos
+            </h4>
+            <p className="text-xs sm:text-sm text-gray-400 mt-1 max-w-sm">
+              {ordersSearch ? `No hay pedidos que coincidan con "${ordersSearch}"` : 'No hay pedidos en esta categoría.'}
+            </p>
+            {ordersSearch && (
+              <button
+                type="button"
+                onClick={() => setOrdersSearch('')}
+                className="mt-4 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-primary-500 hover:text-white transition-all"
+              >
+                Limpiar búsqueda
+              </button>
+            )}
+          </div>
+        )}
       </div>
     );
   };
@@ -3342,7 +3747,7 @@ export default function AdminView({
           }
         />
 
-        <div className="flex-1 overflow-y-auto p-6 md:p-10 custom-scrollbar bg-[#F8FAFC] dark:bg-gray-950/20 relative">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-6 md:p-10 custom-scrollbar bg-[#F8FAFC] dark:bg-gray-950/20 relative">
           <div className="mx-auto h-full">
             {activeSection === 'dashboard' && renderDashboard()}
             {activeSection === 'tpv' && renderTPVSection()}
