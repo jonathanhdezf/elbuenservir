@@ -857,36 +857,26 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
 
                 <div>
                   <h5 className="font-black mb-8 text-xs uppercase tracking-[0.3em] text-gray-900 dark:text-white">Horarios</h5>
-                  <div className="space-y-4 text-sm">
-                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 border-b border-gray-50 dark:border-gray-900 pb-2">
-                      <span>Lunes</span>
-                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
-                    </div>
-                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 border-b border-gray-50 dark:border-gray-900 pb-2">
-                      <span>Martes</span>
-                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
-                    </div>
-                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 border-b border-gray-50 dark:border-gray-900 pb-2">
-                      <span>Miércoles</span>
-                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
-                    </div>
-                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 border-b border-gray-50 dark:border-gray-900 pb-2">
-                      <span>Jueves</span>
-                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
-                    </div>
-                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 border-b border-gray-50 dark:border-gray-900 pb-2">
-                      <span>Viernes</span>
-                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
-                    </div>
-                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 border-b border-gray-50 dark:border-gray-900 pb-2">
-                      <span>Sábado</span>
-                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
-                    </div>
-                    <div className="flex justify-between items-center text-gray-500 dark:text-gray-400 pb-2">
-                      <span>Domingo</span>
-                      <span className="font-black text-gray-900 dark:text-white">9:00 a.m. - 5:30 p.m.</span>
+                  <div className="space-y-4">
+                    <div className="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                          <Clock className="w-4 h-4 text-primary-500" />
+                          <span>Lunes a Domingo</span>
+                        </span>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                          Todos los días
+                        </span>
+                      </div>
+                      <p className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+                        9:00 a.m. – 5:30 p.m.
+                      </p>
                     </div>
 
+                    <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 px-1">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse shrink-0"></span>
+                      <span>Servicio continuo en comedor y pedidos por WhatsApp.</span>
+                    </div>
                   </div>
                 </div>
               </div>
