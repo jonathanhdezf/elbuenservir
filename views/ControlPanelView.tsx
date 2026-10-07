@@ -16,10 +16,13 @@ import {
     Sparkles,
     Check,
     UtensilsCrossed,
-    ArrowRight
+    ArrowRight,
+    Download
 } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
 import { useMobileBack } from '../hooks/useMobileBack';
+import { usePwaInstall } from '../hooks/usePwaInstall';
+import { InstallPwaModal } from '../components/InstallPwaModal';
 import { AdminSection } from '../types';
 
 interface ControlPanelViewProps {
@@ -47,6 +50,8 @@ export default function ControlPanelView({
 }: ControlPanelViewProps) {
     const [localPanelMode, setLocalPanelMode] = useState<'basic' | 'advanced'>('basic');
     const panelMode = propPanelMode ?? localPanelMode;
+
+    const { isInstalled, isIos, showInstructions, setShowInstructions, installApp } = usePwaInstall();
 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [showWelcome, setShowWelcome] = useState(false);
@@ -276,6 +281,20 @@ export default function ControlPanelView({
                 </div>
 
                 <div className="flex items-center gap-3 sm:gap-6">
+                    {!isInstalled && (
+                        <button
+                            type="button"
+                            title="Instalar aplicación en tu dispositivo"
+                            onClick={() => {
+                                soundManager.play('click');
+                                installApp();
+                            }}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary-500/20 hover:bg-primary-500 text-primary-300 hover:text-white border border-primary-500/40 transition-all text-[10px] font-black uppercase tracking-wider cursor-pointer shadow-sm active:scale-95"
+                        >
+                            <Download className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Instalar App</span>
+                        </button>
+                    )}
                     <div className="relative">
                         <button
                             title="Notificaciones"
@@ -498,6 +517,12 @@ export default function ControlPanelView({
             </div>
 
             {isSettingsOpen && renderSettingsModal()}
+
+            <InstallPwaModal
+                isOpen={showInstructions}
+                onClose={() => setShowInstructions(false)}
+                isIos={isIos}
+            />
         </div>
     );
 }

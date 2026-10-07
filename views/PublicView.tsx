@@ -1,10 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
-import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap, Mic } from 'lucide-react';
+import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap, Mic, Download, Smartphone } from 'lucide-react';
 import { Category, MenuItem, Customer, Order } from '../types';
 import { soundManager } from '../utils/soundManager';
 import LiveOrderModal from '../components/LiveOrderModal';
 import { useMobileBack } from '../hooks/useMobileBack';
+import { usePwaInstall } from '../hooks/usePwaInstall';
+import { InstallPwaModal } from '../components/InstallPwaModal';
 
 interface PublicViewProps {
   categories: Category[];
@@ -19,6 +21,8 @@ interface PublicViewProps {
 }
 
 export default function PublicView({ categories, menuItems, customers, onAddCustomer, onAddOrder, onEnterControlPanel, isPreview, isDarkMode, setIsDarkMode }: PublicViewProps) {
+  const { isInstalled, isIos, showInstructions, setShowInstructions, installApp } = usePwaInstall();
+  const [showFloatingBanner, setShowFloatingBanner] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id || '');
   const [isScrolled, setIsScrolled] = useState(false);
   const [visibleItemsCount, setVisibleItemsCount] = useState(6);
@@ -279,6 +283,25 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
               </div>
             )}
 
+            {!isInstalled && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundManager.play('click');
+                  installApp();
+                }}
+                title="Instalar aplicación en tu dispositivo"
+                className={`hidden md:flex items-center gap-2 px-5 py-2.5 rounded-xl border border-primary-500/40 transition-all hover:scale-105 active:scale-95 shadow-sm font-black text-xs uppercase tracking-wider cursor-pointer ${
+                  isScrolled || isPreview
+                    ? 'bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 hover:bg-primary-500 hover:text-white dark:hover:bg-primary-500 dark:hover:text-white'
+                    : 'bg-white/10 text-white hover:bg-primary-500 backdrop-blur-md'
+                }`}
+              >
+                <Download className="w-4 h-4 text-primary-500" />
+                <span>Instalar App</span>
+              </button>
+            )}
+
             <button
               onClick={() => {
                 setOrderStep(1);
@@ -324,6 +347,32 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                   </button>
                 ))}
                 <hr className="border-gray-50 dark:border-gray-800" />
+                
+                {!isInstalled && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundManager.play('click');
+                      setIsMobileMenuOpen(false);
+                      installApp();
+                    }}
+                    className="w-full flex items-center justify-between p-4 bg-gradient-to-r from-primary-500/15 via-amber-500/10 to-primary-500/5 dark:from-primary-500/20 dark:via-amber-500/15 dark:to-primary-500/10 border border-primary-500/30 rounded-[24px] text-left hover:scale-[1.01] active:scale-98 transition-all cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary-500 text-white flex items-center justify-center shadow-md shadow-primary-500/30">
+                        <Download className="w-5 h-5 animate-bounce" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-tight">Instalar Aplicación</p>
+                        <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400">Acceso directo desde tu pantalla de inicio</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-wider px-3.5 py-1.5 bg-primary-500 text-white rounded-xl shadow-sm">
+                      Instalar
+                    </span>
+                  </button>
+                )}
+
                 <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900 rounded-[24px]">
                   <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 ${isDarkMode ? 'bg-primary-500/20 text-primary-400' : 'bg-amber-100 text-amber-600'}`}>
@@ -1579,6 +1628,66 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
           </div>
         </div>
       )}
+
+      {/* Floating PWA Install Invite Banner (disappears if already installed or dismissed) */}
+      {!isInstalled && showFloatingBanner && !isPreview && (
+        <aside
+          aria-label="Invitación para instalar la app"
+          className="fixed bottom-5 right-5 left-5 sm:left-auto sm:w-96 z-40 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-2 border-primary-500/30 shadow-2xl rounded-3xl p-4.5 animate-in slide-in-from-bottom-5 duration-300"
+        >
+          <div className="flex items-start gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-primary-500 text-white flex items-center justify-center shadow-lg shadow-primary-500/30 shrink-0">
+              <Smartphone className="w-6 h-6" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-1">
+                <h5 className="font-black text-xs uppercase tracking-tight text-gray-900 dark:text-white truncate">
+                  Instala El Buen Servir
+                </h5>
+                <button
+                  type="button"
+                  onClick={() => setShowFloatingBanner(false)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 p-1 cursor-pointer"
+                  title="Cerrar aviso"
+                  aria-label="Cerrar aviso de instalación"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 font-bold leading-tight mt-0.5 mb-3">
+                Accede a nuestro menú digital con un solo toque desde tu celular o computadora.
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundManager.play('click');
+                    installApp();
+                  }}
+                  className="flex-1 py-2 px-3 bg-primary-500 text-white rounded-xl font-black text-xs uppercase tracking-wider hover:bg-primary-600 transition-all flex items-center justify-center gap-1.5 shadow-md shadow-primary-500/20 active:scale-95 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Instalar App</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowFloatingBanner(false)}
+                  className="py-2 px-3 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded-xl font-bold text-xs uppercase hover:bg-gray-200 dark:hover:bg-gray-700 transition-all cursor-pointer"
+                >
+                  Más tarde
+                </button>
+              </div>
+            </div>
+          </div>
+        </aside>
+      )}
+
+      {/* PWA Instructions Modal */}
+      <InstallPwaModal
+        isOpen={showInstructions}
+        onClose={() => setShowInstructions(false)}
+        isIos={isIos}
+      />
     </div>
   );
 }

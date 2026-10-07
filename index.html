@@ -7,7 +7,13 @@
   <title>El Buen Servir | Gastronomía con Alma</title>
   <meta name="description"
     content="Experimenta el sabor de la tradición con un toque contemporáneo. Reserva tu mesa en El Buen Servir." />
-  <link rel="icon" type="image/png" href="/logo.png" />
+  <link rel="icon" type="image/png" href="./logo.png" />
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#f59e0b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="El Buen Servir" />
+  <link rel="apple-touch-icon" href="./assets/logo_nuevo.png" />
 
   <!-- Tailwind and Typography -->
   <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
@@ -123,6 +129,15 @@
 <body
   class="bg-[#FDFDFD] dark:bg-[#0f172a] text-gray-900 dark:text-gray-100 antialiased transition-colors duration-300">
   <div id="root"></div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(function (err) {
+          console.warn('SW registration failed:', err);
+        });
+      });
+    }
+  </script>
   <script type="module" src="/index.tsx"></script>
 </body>
 
