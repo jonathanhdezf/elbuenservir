@@ -7,6 +7,7 @@ import LiveOrderModal from '../components/LiveOrderModal';
 import { useMobileBack } from '../hooks/useMobileBack';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import { InstallPwaModal } from '../components/InstallPwaModal';
+import LegalModal, { LegalDocType } from '../components/LegalModal';
 
 interface PublicViewProps {
   categories: Category[];
@@ -25,6 +26,12 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
   const [showFloatingBanner, setShowFloatingBanner] = useState(false);
   const [hasTriggeredInstallBanner, setHasTriggeredInstallBanner] = useState(false);
   const [isBannerClosing, setIsBannerClosing] = useState(false);
+
+  // Legal Modal State (Privacidad, Términos, Cookies)
+  const [legalModalState, setLegalModalState] = useState<{ isOpen: boolean; doc: LegalDocType }>({
+    isOpen: false,
+    doc: 'privacy'
+  });
 
   const handleDismissBanner = () => {
     soundManager.play('click');
@@ -881,9 +888,36 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
               <div className="border-t border-gray-100 dark:border-gray-900 pt-12 flex flex-col md:flex-row justify-between items-center text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
                 <p>&copy; {new Date().getFullYear()} El Buen Servir. Todos los derechos reservados.</p>
                 <div className="flex space-x-8 mt-6 md:mt-0">
-                  <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary-500">Privacidad</a>
-                  <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary-500">Términos</a>
-                  <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary-500">Cookies</a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundManager.play('click');
+                      setLegalModalState({ isOpen: true, doc: 'privacy' });
+                    }}
+                    className="hover:text-primary-500 transition-colors uppercase cursor-pointer"
+                  >
+                    Privacidad
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundManager.play('click');
+                      setLegalModalState({ isOpen: true, doc: 'terms' });
+                    }}
+                    className="hover:text-primary-500 transition-colors uppercase cursor-pointer"
+                  >
+                    Términos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      soundManager.play('click');
+                      setLegalModalState({ isOpen: true, doc: 'cookies' });
+                    }}
+                    className="hover:text-primary-500 transition-colors uppercase cursor-pointer"
+                  >
+                    Cookies
+                  </button>
                 </div>
               </div>
             </div>
@@ -1733,6 +1767,13 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
         isOpen={showInstructions}
         onClose={() => setShowInstructions(false)}
         isIos={isIos}
+      />
+
+      {/* Legal Documents Modal */}
+      <LegalModal
+        isOpen={legalModalState.isOpen}
+        onClose={() => setLegalModalState(prev => ({ ...prev, isOpen: false }))}
+        initialDoc={legalModalState.doc}
       />
     </div>
   );
