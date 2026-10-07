@@ -725,54 +725,197 @@ export default function AdminView({
         </div>
 
         {/* Movement History Table */}
-        <div className="bg-white dark:bg-gray-800 rounded-[48px] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-          <div className="p-10 border-b border-gray-50 dark:border-gray-700 flex justify-between items-center">
+        <div className="bg-white dark:bg-gray-800 rounded-[28px] sm:rounded-[36px] md:rounded-[48px] shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+          <div className="p-5 sm:p-8 md:p-10 border-b border-gray-50 dark:border-gray-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h4 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter flex items-center">
-                <History className="w-7 h-7 mr-3 text-primary-500" /> Historial de Movimientos
-              </h4>
+              <div className="flex items-center gap-3">
+                <h4 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tighter flex items-center">
+                  <History className="w-6 sm:w-7 h-6 sm:h-7 mr-2.5 text-primary-500" /> Historial de Movimientos
+                </h4>
+                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 bg-gray-50 dark:bg-gray-900/60 px-2.5 py-1 rounded-lg">
+                  {movementHistory.length} {movementHistory.length === 1 ? 'movimiento' : 'movimientos'}
+                </span>
+              </div>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Registro cronológico de pagos realizados</p>
             </div>
-            <button title="Imprimir historial" className="p-4 bg-gray-50 dark:bg-gray-900 text-gray-400 rounded-2xl hover:text-primary-500 transition-colors">
+            <button title="Imprimir historial" className="p-3.5 sm:p-4 bg-gray-50 dark:bg-gray-900 text-gray-400 rounded-2xl hover:text-primary-500 transition-colors shrink-0">
               <Printer className="w-5 h-5" />
             </button>
           </div>
-          <div className="overflow-x-auto">
+
+          {/* ============================================================== */}
+          {/* MOBILE VIEW: Card-based restructuring for screens < md (phones) */}
+          {/* ============================================================== */}
+          <div className="block md:hidden p-3.5 sm:p-4 space-y-3">
+            {movementHistory.map((mov, idx) => {
+              const { date, time } = formatOrderDateTime(mov.paidAt);
+              const method = PAYMENT_METHOD_CONFIG[mov.paymentMethod] || PAYMENT_METHOD_CONFIG['efectivo'];
+              const duration = mov.dispatchedAt && mov.paidAt ? Math.floor((new Date(mov.paidAt).getTime() - new Date(mov.dispatchedAt).getTime()) / 60000) : null;
+              const driverName = drivers.find(d => d.id === mov.assignedDriverId)?.name || 'Venta Local';
+
+              return (
+                <div
+                  key={idx}
+                  onClick={() => setViewingOrderId(mov.id)}
+                  className="bg-white dark:bg-gray-800/95 rounded-2xl p-4 border border-gray-100 dark:border-gray-700/80 shadow-sm transition-all active:scale-[0.99] cursor-pointer flex flex-col gap-3 relative overflow-hidden hover:border-primary-300 dark:hover:border-primary-800"
+                >
+                  {/* Top Row: ID with Copy button and Date/Time */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    {/* Monospace ID Badge */}
+                    <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-900/90 px-3 py-1.5 rounded-xl border border-gray-200/90 dark:border-gray-700 shadow-inner max-w-full">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-500 shrink-0">ID:</span>
+                      <span className="font-mono font-black text-xs sm:text-sm text-primary-600 dark:text-primary-400 tracking-wider break-all select-all">
+                        {mov.id}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => handleCopyOrderId(mov.id, e)}
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-primary-500 transition-colors shrink-0 ml-1 active:scale-90"
+                        title="Copiar ID"
+                        aria-label="Copiar ID"
+                      >
+                        {copiedOrderId === mov.id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-500 animate-in zoom-in" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Timestamp */}
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 ml-auto shrink-0">
+                      <Clock className="w-3 h-3 text-gray-400" />
+                      <span>{time || date}</span>
+                      {time && date && <span className="text-gray-300 dark:text-gray-600">• {date}</span>}
+                    </div>
+                  </div>
+
+                  {/* Middle Row: Method, Driver & Amount */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center space-x-2">
+                        <method.icon className={`w-4 h-4 ${method.color} shrink-0`} />
+                        <span className="text-xs font-black uppercase text-gray-700 dark:text-gray-200 tracking-wider truncate">
+                          {method.label}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-1.5 text-xs font-bold text-gray-500 dark:text-gray-400">
+                        <Bike className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                        <span className="truncate">{driverName}</span>
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">Monto</span>
+                      <span className="text-lg sm:text-xl font-black text-gray-900 dark:text-white">${mov.total.toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Bottom Row: Status and Verification Info */}
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-100 dark:border-gray-700/60">
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex items-center space-x-1 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded-lg border border-emerald-100 dark:border-emerald-800 w-fit">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                        <span className="text-[8px] font-black uppercase text-emerald-600 dark:text-emerald-400 tracking-widest">Confirmado</span>
+                      </div>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase mt-0.5 truncate">
+                        {mov.operationNumber ? `OP: ${mov.operationNumber}` : ''}
+                        {mov.ticketNumber ? ` | TK: ${mov.ticketNumber}` : ''}
+                        {mov.transferStatus ? ` | ${TRANSFER_STATUS_LABELS[mov.transferStatus]}` : ''}
+                        {!mov.operationNumber && !mov.ticketNumber && !mov.transferStatus && 'Venta Directa'}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center space-x-2 shrink-0">
+                      {duration && (
+                        <div className="flex items-center space-x-1 text-[10px] font-bold text-gray-400">
+                          <Clock className={`w-3 h-3 ${duration > 30 ? 'text-red-500' : 'text-gray-400'}`} />
+                          <span className={duration > 30 ? 'text-red-600' : ''}>{duration} min</span>
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewingOrderId(mov.id);
+                        }}
+                        className="px-2.5 py-1.5 bg-gray-100 dark:bg-gray-700 hover:bg-primary-500 hover:text-white dark:hover:bg-primary-500 text-gray-700 dark:text-gray-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1"
+                      >
+                        <span>Ver</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {movementHistory.length === 0 && (
+              <div className="py-12 text-center flex flex-col items-center justify-center p-4">
+                <History className="w-12 h-12 text-gray-200 dark:text-gray-700 mb-3" />
+                <p className="text-gray-400 font-black uppercase tracking-widest text-xs">No hay movimientos registrados hoy</p>
+              </div>
+            )}
+          </div>
+
+          {/* ============================================================== */}
+          {/* DESKTOP VIEW: Clean responsive table for screens >= md         */}
+          {/* ============================================================== */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="bg-gray-50/50 dark:bg-gray-900/50">
-                  <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Fecha y Hora</th>
-                  <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Referencia</th>
-                  <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Método</th>
-                  <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Repartidor</th>
-                  <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Estado Pago</th>
-                  <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">T. Entrega</th>
-                  <th className="px-10 py-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Monto</th>
+                <tr className="bg-gray-50/50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700/80">
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Fecha y Hora</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Referencia / ID</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Método</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Repartidor</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Estado Pago</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">T. Entrega</th>
+                  <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Monto</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50 dark:divide-gray-700">
+              <tbody className="divide-y divide-gray-50 dark:divide-gray-700/60">
                 {movementHistory.map((mov, idx) => {
                   const date = new Date(mov.paidAt!);
-                  const method = PAYMENT_METHOD_CONFIG[mov.paymentMethod];
+                  const method = PAYMENT_METHOD_CONFIG[mov.paymentMethod] || PAYMENT_METHOD_CONFIG['efectivo'];
                   const duration = mov.dispatchedAt && mov.paidAt ? Math.floor((new Date(mov.paidAt).getTime() - new Date(mov.dispatchedAt).getTime()) / 60000) : null;
                   return (
-                    <tr key={idx} className="hover:bg-gray-50/50 dark:hover:bg-gray-900/30 transition-colors">
-                      <td className="px-10 py-6">
+                    <tr
+                      key={idx}
+                      onClick={() => setViewingOrderId(mov.id)}
+                      className="hover:bg-gray-50/80 dark:hover:bg-gray-900/40 transition-colors group cursor-pointer"
+                    >
+                      <td className="px-6 py-4">
                         <div className="flex flex-col">
                           <span className="text-sm font-black text-gray-900 dark:text-white">{date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}</span>
                           <span className="text-[10px] font-bold text-gray-400">{date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                       </td>
-                      <td className="px-10 py-6">
-                        <span className="text-xs font-black text-primary-500 uppercase tracking-widest">{mov.id}</span>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center space-x-1.5">
+                          <span className="font-mono font-black text-sm text-primary-600 dark:text-primary-400 tracking-wide break-all">
+                            {mov.id}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => handleCopyOrderId(mov.id, e)}
+                            className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-400 hover:text-primary-500 transition-colors shrink-0"
+                            title="Copiar ID"
+                          >
+                            {copiedOrderId === mov.id ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
                       </td>
-                      <td className="px-10 py-6">
+                      <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
                           <method.icon className={`w-4 h-4 ${method.color}`} />
                           <span className="text-[10px] font-black uppercase text-gray-600 dark:text-gray-300 tracking-widest">{method.label}</span>
                         </div>
                       </td>
-                      <td className="px-10 py-6">
+                      <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
                           <Bike className="w-3.5 h-3.5 text-gray-400" />
                           <span className="text-[10px] font-black uppercase text-gray-600 dark:text-gray-300 tracking-widest">
@@ -780,7 +923,7 @@ export default function AdminView({
                           </span>
                         </div>
                       </td>
-                      <td className="px-10 py-6">
+                      <td className="px-6 py-4">
                         <div className="flex flex-col">
                           <div className="flex items-center space-x-1 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-1 rounded-lg border border-emerald-100 dark:border-emerald-800 w-fit">
                             <CheckCircle2 className="w-3 h-3 text-emerald-500" />
@@ -794,7 +937,7 @@ export default function AdminView({
                           </p>
                         </div>
                       </td>
-                      <td className="px-10 py-6">
+                      <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
                           <Clock className={`w-3.5 h-3.5 ${duration && duration > 30 ? 'text-red-500' : 'text-gray-400'}`} />
                           <span className={`text-[10px] font-black uppercase tracking-widest ${duration && duration > 30 ? 'text-red-600' : 'text-gray-600 dark:text-gray-300'}`}>
@@ -802,7 +945,7 @@ export default function AdminView({
                           </span>
                         </div>
                       </td>
-                      <td className="px-10 py-6 text-right">
+                      <td className="px-6 py-4 text-right">
                         <span className="text-lg font-black text-gray-900 dark:text-white">${mov.total.toFixed(2)}</span>
                       </td>
                     </tr>
@@ -810,7 +953,7 @@ export default function AdminView({
                 })}
                 {movementHistory.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-10 py-20 text-center">
+                    <td colSpan={7} className="px-6 py-16 text-center">
                       <History className="w-12 h-12 text-gray-200 dark:text-gray-700 mx-auto mb-4" />
                       <p className="text-gray-400 font-black uppercase tracking-widest">No hay movimientos registrados hoy</p>
                     </td>
