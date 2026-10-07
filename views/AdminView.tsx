@@ -26,6 +26,7 @@ import ReportsSection from '../components/ReportsSection';
 import LogsSection from '../components/LogsSection';
 import { PayrollSection } from '../components/PayrollSection';
 import { useMobileBack } from '../hooks/useMobileBack';
+import { notificationService } from '../services/notificationService';
 
 interface AdminViewProps {
   categories: Category[];
@@ -3555,6 +3556,7 @@ export default function AdminView({
         }
 
         setOrders(prev => [newOrder, ...prev]);
+        notificationService.notifyNewOrder(newOrder);
 
         if (tpvDeliveryType === 'store') {
           // Auto-trigger payment for store orders

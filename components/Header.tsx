@@ -4,6 +4,7 @@ import {
   Menu, Eye, Bell, Clock, Calendar,
   X, CheckCircle2, AlertCircle, Info, Trash2, LayoutDashboard
 } from 'lucide-react';
+import { notificationService } from '../services/notificationService';
 
 interface Notification {
   id: number;
@@ -37,6 +38,18 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission>(() => {
+    return notificationService.getPermission();
+  });
+
+  useEffect(() => {
+    setPushPermission(notificationService.getPermission());
+  }, [showNotifications]);
+
+  const handleEnablePush = async () => {
+    await notificationService.requestPermission();
+    setPushPermission(notificationService.getPermission());
+  };
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -149,6 +162,37 @@ const Header: React.FC<HeaderProps> = ({
                     >
                       <Trash2 className="w-3 h-3" />
                       Limpiar
+                    </button>
+                  )}
+                </div>
+
+                {/* Push Notification Controls */}
+                <div className="p-3.5 bg-gray-50/80 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${pushPermission === 'granted' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`}></span>
+                    <span className="text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                      {pushPermission === 'granted' ? 'Alertas Push activas' : 'Alertas Push inactivas'}
+                    </span>
+                  </div>
+                  {pushPermission === 'granted' ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        notificationService.sendSystemNotification('🔔 Prueba de Notificación', {
+                          body: 'Las notificaciones push para pedidos nuevos están activadas correctamente.'
+                        });
+                      }}
+                      className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 hover:bg-primary-100 dark:hover:bg-primary-900/60 rounded-lg transition-all"
+                    >
+                      Probar
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleEnablePush}
+                      className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-all shadow-sm active:scale-95"
+                    >
+                      Activar
                     </button>
                   )}
                 </div>

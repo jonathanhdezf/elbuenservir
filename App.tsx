@@ -12,6 +12,7 @@ import RepartidorView from './views/RepartidorView';
 import { ControlPanelAuthModal } from './components/ControlPanelAuthModal';
 import { DigitalTicketModal } from './components/DigitalTicketModal';
 import { databaseService, mapOrderFromDb, mapMenuItemFromDb, mapCategoryFromDb } from './services/databaseService';
+import { notificationService } from './services/notificationService';
 
 const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-3', name: 'Menú del Día' },
@@ -445,6 +446,24 @@ export default function App() {
     }
   }, [isDarkMode]);
 
+  // Request notification permission on first user interaction if not prompted yet
+  useEffect(() => {
+    const handleFirstInteraction = () => {
+      if (notificationService.isSupported() && notificationService.getPermission() === 'default') {
+        notificationService.requestPermission();
+      }
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+
+    window.addEventListener('click', handleFirstInteraction);
+    window.addEventListener('keydown', handleFirstInteraction);
+    return () => {
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('keydown', handleFirstInteraction);
+    };
+  }, []);
+
   // Load and sync from Supabase PostgreSQL Database with Realtime
   useEffect(() => {
     let isMounted = true;
@@ -469,6 +488,8 @@ export default function App() {
       onOrderChange: (payload) => {
         if (payload.eventType === 'INSERT') {
           const newOrder = mapOrderFromDb(payload.new);
+          // Send push notification and audio alert for newly received order
+          notificationService.notifyNewOrder(newOrder);
           setOrders(prev => {
             if (prev.some(o => o.id === newOrder.id)) return prev;
             return [newOrder, ...prev];
@@ -666,7 +687,10 @@ export default function App() {
               menuItems={menuItems}
               customers={customers}
               onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
-              onAddOrder={(order) => handleSetOrders(prev => [order, ...prev])}
+              onAddOrder={(order) => {
+                handleSetOrders(prev => [order, ...prev]);
+                notificationService.notifyNewOrder(order);
+              }}
               onEnterControlPanel={handleEnterControlPanel}
               isDarkMode={isDarkMode}
               setIsDarkMode={setIsDarkMode}
@@ -798,6 +822,7 @@ export default function App() {
               source: 'tpv'
             } as Order;
             handleSetOrders(prev => [fullOrder, ...prev]);
+            notificationService.notifyNewOrder(fullOrder);
             setTpvEditOrder(null);
           }}
           onUpdateOrder={(order) => {
@@ -839,7 +864,10 @@ export default function App() {
           menuItems={menuItems}
           customers={customers}
           onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
-          onAddOrder={(order) => handleSetOrders(prev => [order, ...prev])}
+          onAddOrder={(order) => {
+            handleSetOrders(prev => [order, ...prev]);
+            notificationService.notifyNewOrder(order);
+          }}
           onEnterControlPanel={handleEnterControlPanel}
           isDarkMode={isDarkMode}
           setIsDarkMode={setIsDarkMode}
