@@ -46,6 +46,7 @@ interface AdminViewProps {
   setIsDarkMode: (val: boolean) => void;
   onExit: () => void;
   initialSection?: AdminSection;
+  onViewDigitalTicket?: (order: Order) => void;
 }
 
 interface Notification {
@@ -82,7 +83,8 @@ export default function AdminView({
   isDarkMode,
   setIsDarkMode,
   onExit,
-  initialSection = 'dashboard'
+  initialSection = 'dashboard',
+  onViewDigitalTicket
 }: AdminViewProps) {
   const STATUS_CONFIG: Record<OrderStatus, { label: string, color: string, icon: any }> = {
     pending: { label: 'Pendiente', color: 'bg-gray-100 text-gray-700', icon: Clock },
@@ -448,7 +450,8 @@ export default function AdminView({
         </div>
         <div className="max-h-[50vh] overflow-y-auto p-1 space-y-4 custom-scrollbar">
           {pending.map(order => {
-            const message = `¡Hola ${order.customerName}! ✨\n\nTu pedido *${order.id}* por un total de *$${order.total.toFixed(2)}* ha sido entregado con éxito. ✅\n\nMuchas gracias por tu preferencia. Te invitamos a conocer más de nosotros en nuestra página web: http://elbuenservir.vercel.app\n\n¡Que lo disfrutes! 🍽️`;
+            const ticketUrl = `https://elbuenservir.vercel.app/?ticket=${order.id}`;
+            const message = `¡Hola ${order.customerName}! ✨\n\nTu pedido *${order.id}* por un total de *$${order.total.toFixed(2)}* ha sido entregado con éxito. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\nMuchas gracias por tu preferencia en *El Buen Servir*. ¡Que lo disfrutes! 🍽️`;
             
             return (
               <div key={order.id} className="bg-white dark:bg-gray-800 p-6 rounded-[32px] shadow-2xl border-2 border-emerald-500/10 flex flex-col gap-4 group hover:scale-[1.02] transition-all relative overflow-hidden">
@@ -907,17 +910,27 @@ export default function AdminView({
                 </div>
 
                 {/* Quick Actions */}
-                <div className="flex gap-3">
+                <div className="flex gap-2">
                   <button
                     onClick={() => generateTicket(viewingOrder)}
-                    className="flex-1 py-4 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all active:scale-95"
+                    className="flex-1 py-4 bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all active:scale-95"
+                    title="Imprimir ticket físico"
                   >
-                    <Printer className="w-4 h-4" /> Ticket
+                    <Printer className="w-4 h-4" /> Imprimir
                   </button>
+                  {onViewDigitalTicket && (
+                    <button
+                      onClick={() => onViewDigitalTicket(viewingOrder)}
+                      className="flex-1 py-4 bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 text-teal-600 dark:text-teal-400 hover:bg-teal-100 dark:hover:bg-teal-900/40 transition-all active:scale-95"
+                      title="Abrir vista digital del ticket"
+                    >
+                      <Receipt className="w-4 h-4" /> Ticket Digital
+                    </button>
+                  )}
                   <button
                     onClick={() => { updateOrderStatus(viewingOrder.id, 'delivered'); playUISound('confirm', 'local_dispatch'); }}
                     disabled={viewingOrder.status === 'delivered'}
-                    className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 active:scale-95 disabled:opacity-40 transition-all flex items-center justify-center gap-2"
+                    className="flex-1 py-4 bg-emerald-500 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 active:scale-95 disabled:opacity-40 transition-all flex items-center justify-center gap-1.5"
                   >
                     <CheckCircle className="w-4 h-4" /> Entregado
                   </button>
@@ -1687,11 +1700,12 @@ export default function AdminView({
                               }
                               
                               const phone = o.customerPhone.replace(/\D/g, '');
+                              const ticketUrl = `https://elbuenservir.vercel.app/?ticket=${o.id}`;
                               const message = o.status === 'kitchen' 
                                 ? `Hola ${o.customerName}, tu pedido ${o.id} de El Buen Servir está siendo preparado en cocina. Te avisaremos cuando esté listo.`
                                 : o.status === 'delivery'
                                   ? `Hola ${o.customerName}, tu pedido ${o.id} de El Buen Servir está en camino en reparto. ¡Prepárate para recibirlo!`
-                                  : `Hola ${o.customerName}, confirmamos la entrega de tu pedido ${o.id}. ¡Gracias por tu preferencia! Visítanos en nuestra página web: https://elbuenservir.vercel.app. Te enviamos tu comprobante en PDF adjunto a este mensaje.`;
+                                  : `¡Hola ${o.customerName}! ✨\n\nConfirmamos la entrega de tu pedido *${o.id}*. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\n¡Muchas gracias por tu preferencia en *El Buen Servir*! 🍽️`;
                                 
                               window.open(`https://wa.me/52${phone}?text=${encodeURIComponent(message)}`, '_blank');
                             }}

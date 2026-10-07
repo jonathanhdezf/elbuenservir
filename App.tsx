@@ -10,6 +10,7 @@ import LocalDispatchView from './views/LocalDispatchView.tsx';
 import ControlPanelView from './views/ControlPanelView';
 import RepartidorView from './views/RepartidorView';
 import { ControlPanelAuthModal } from './components/ControlPanelAuthModal';
+import { DigitalTicketModal } from './components/DigitalTicketModal';
 import { databaseService, mapOrderFromDb, mapMenuItemFromDb, mapCategoryFromDb } from './services/databaseService';
 
 const INITIAL_CATEGORIES: Category[] = [
@@ -381,6 +382,61 @@ export default function App() {
     setView('control_panel');
   };
 
+  const [digitalTicketOrderId, setDigitalTicketOrderId] = useState<string | null>(null);
+  const [isDigitalTicketOpen, setIsDigitalTicketOpen] = useState(false);
+
+  useEffect(() => {
+    const handleUrlTicket = () => {
+      try {
+        const search = window.location.search;
+        const params = new URLSearchParams(search);
+        const ticketId = params.get('ticket') || params.get('pedido') || params.get('orden');
+        if (ticketId) {
+          setDigitalTicketOrderId(ticketId);
+          setIsDigitalTicketOpen(true);
+          return;
+        }
+
+        const hash = window.location.hash;
+        if (hash && (hash.startsWith('#ticket-') || hash.startsWith('#ticket='))) {
+          const id = hash.replace(/^#ticket[-=]/, '');
+          if (id) {
+            setDigitalTicketOrderId(id);
+            setIsDigitalTicketOpen(true);
+          }
+        }
+      } catch (e) {
+        console.warn('Error reading URL ticket param:', e);
+      }
+    };
+
+    handleUrlTicket();
+    window.addEventListener('popstate', handleUrlTicket);
+    return () => window.removeEventListener('popstate', handleUrlTicket);
+  }, []);
+
+  const handleCloseDigitalTicket = () => {
+    setIsDigitalTicketOpen(false);
+    setDigitalTicketOrderId(null);
+    try {
+      if (window.location.search.includes('ticket') || window.location.hash.includes('ticket')) {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('ticket');
+        url.searchParams.delete('pedido');
+        url.searchParams.delete('orden');
+        url.hash = '';
+        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleOpenDigitalTicket = (order: Order) => {
+    setDigitalTicketOrderId(order.id);
+    setIsDigitalTicketOpen(true);
+  };
+
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
@@ -600,196 +656,212 @@ export default function App() {
     }));
   }, []);
 
-  if (view === 'control_panel') {
-    if (!isPanelAuthenticated) {
+  const renderCurrentView = () => {
+    if (view === 'control_panel') {
+      if (!isPanelAuthenticated) {
+        return (
+          <>
+            <PublicView
+              categories={categories}
+              menuItems={menuItems}
+              customers={customers}
+              onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
+              onAddOrder={(order) => handleSetOrders(prev => [order, ...prev])}
+              onEnterControlPanel={handleEnterControlPanel}
+              isDarkMode={isDarkMode}
+              setIsDarkMode={setIsDarkMode}
+            />
+            <ControlPanelAuthModal
+              isOpen={true}
+              onClose={() => setView('public')}
+              onSuccess={handleAuthSuccess}
+            />
+          </>
+        );
+      }
+
       return (
-        <>
-          <PublicView
-            categories={categories}
-            menuItems={menuItems}
-            customers={customers}
-            onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
-            onAddOrder={(order) => handleSetOrders(prev => [order, ...prev])}
-            onEnterControlPanel={handleEnterControlPanel}
-            isDarkMode={isDarkMode}
-            setIsDarkMode={setIsDarkMode}
-          />
-          <ControlPanelAuthModal
-            isOpen={true}
-            onClose={() => setView('public')}
-            onSuccess={handleAuthSuccess}
-          />
-        </>
+        <ControlPanelView
+          onNavigate={(newView, section) => {
+            if (section) {
+              setAdminInitialSection(section);
+            } else {
+              setAdminInitialSection('dashboard');
+            }
+            setView(newView as any);
+          }}
+          onExit={() => {
+            setIsPanelAuthenticated(false);
+            try {
+              sessionStorage.removeItem('el_buen_servir_cp_auth');
+            } catch {
+              // ignore
+            }
+            setView('public');
+          }}
+          isDarkMode={isDarkMode}
+          systemBgColor={systemBgColor}
+          setSystemBgColor={setSystemBgColor}
+          systemBgEffect={systemBgEffect}
+          setSystemBgEffect={setSystemBgEffect}
+          panelMode={panelMode}
+          setPanelMode={setPanelMode}
+        />
+      );
+    }
+
+    if (view === 'driver_portal') {
+      return (
+        <RepartidorView
+          drivers={drivers}
+          setDrivers={handleSetDrivers}
+          orders={orders}
+          setOrders={handleSetOrders}
+          updateCustomerStats={updateCustomerStats}
+          updateDriverStats={updateDriverStats}
+          isDarkMode={isDarkMode}
+          setIsDarkMode={setIsDarkMode}
+          onExit={() => setView('control_panel')}
+        />
+      );
+    }
+
+    if (view === 'kitchen') {
+      return (
+        <MonitorCocina
+          orders={orders}
+          setOrders={handleSetOrders}
+          isDarkMode={isDarkMode}
+          setIsDarkMode={setIsDarkMode}
+          onExit={() => setView('control_panel')}
+        />
+      );
+    }
+    if (view === 'logistics') {
+      return (
+        <LogisticaDespachos
+          orders={orders}
+          setOrders={handleSetOrders}
+          drivers={drivers}
+          setDrivers={handleSetDrivers}
+          isDarkMode={isDarkMode}
+          setIsDarkMode={setIsDarkMode}
+          onExit={() => setView('control_panel')}
+        />
+      );
+    }
+
+    if (view === 'admin') {
+      return (
+        <AdminView
+          initialSection={adminInitialSection}
+          categories={categories}
+          setCategories={handleSetCategories}
+          menuItems={menuItems}
+          setMenuItems={handleSetMenuItems}
+          orders={orders}
+          setOrders={handleSetOrders}
+          drivers={drivers}
+          setDrivers={handleSetDrivers}
+          logs={logs}
+          setLogs={handleSetLogs}
+          customers={customers}
+          setCustomers={handleSetCustomers}
+          updateCustomerStats={updateCustomerStats}
+          updateDriverStats={updateDriverStats}
+          isDarkMode={isDarkMode}
+          setIsDarkMode={setIsDarkMode}
+          onExit={() => setView('control_panel')}
+          onViewDigitalTicket={handleOpenDigitalTicket}
+        />
+      );
+    }
+
+    if (view === 'tpv') {
+      return (
+        <TPVView
+          categories={categories}
+          menuItems={menuItems}
+          staff={staff}
+          customers={customers}
+          orders={orders}
+          onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
+          updateCustomerStats={updateCustomerStats}
+          onAddOrder={(order) => {
+            const fullOrder: Order = {
+              ...order,
+              id: order.id || `ORD-${Date.now().toString().slice(-4)}`,
+              createdAt: order.createdAt || new Date().toISOString(),
+              status: order.status || 'kitchen',
+              paymentStatus: order.paymentStatus || 'pending',
+              paymentMethod: order.paymentMethod || 'efectivo',
+              source: 'tpv'
+            } as Order;
+            handleSetOrders(prev => [fullOrder, ...prev]);
+            setTpvEditOrder(null);
+          }}
+          onUpdateOrder={(order) => {
+            handleSetOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...order } : o));
+            setTpvEditOrder(null);
+            setView('local_dispatch');
+          }}
+          initialOrder={tpvEditOrder}
+          isDarkMode={isDarkMode}
+          setIsDarkMode={setIsDarkMode}
+          onExit={() => {
+            setTpvEditOrder(null);
+            setView('control_panel');
+          }}
+        />
+      );
+    }
+
+    if (view === 'local_dispatch') {
+      return (
+        <LocalDispatchView
+          orders={orders}
+          staff={staff}
+          updateCustomerStats={updateCustomerStats}
+          onUpdateOrder={(updated) => handleSetOrders(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o))}
+          onEditOrder={(order) => {
+            setTpvEditOrder(order);
+            setView('tpv');
+          }}
+          setView={setView}
+        />
       );
     }
 
     return (
-      <ControlPanelView
-        onNavigate={(newView, section) => {
-          if (section) {
-            setAdminInitialSection(section);
-          } else {
-            setAdminInitialSection('dashboard');
-          }
-          setView(newView as any);
-        }}
-        onExit={() => {
-          setIsPanelAuthenticated(false);
-          try {
-            sessionStorage.removeItem('el_buen_servir_cp_auth');
-          } catch {
-            // ignore
-          }
-          setView('public');
-        }}
-        isDarkMode={isDarkMode}
-        systemBgColor={systemBgColor}
-        setSystemBgColor={setSystemBgColor}
-        systemBgEffect={systemBgEffect}
-        setSystemBgEffect={setSystemBgEffect}
-        panelMode={panelMode}
-        setPanelMode={setPanelMode}
-      />
+      <>
+        <PublicView
+          categories={categories}
+          menuItems={menuItems}
+          customers={customers}
+          onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
+          onAddOrder={(order) => handleSetOrders(prev => [order, ...prev])}
+          onEnterControlPanel={handleEnterControlPanel}
+          isDarkMode={isDarkMode}
+          setIsDarkMode={setIsDarkMode}
+        />
+        <ControlPanelAuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onSuccess={handleAuthSuccess}
+        />
+      </>
     );
-  }
-
-  if (view === 'driver_portal') {
-    return (
-      <RepartidorView
-        drivers={drivers}
-        setDrivers={handleSetDrivers}
-        orders={orders}
-        setOrders={handleSetOrders}
-        updateCustomerStats={updateCustomerStats}
-        updateDriverStats={updateDriverStats}
-        isDarkMode={isDarkMode}
-        setIsDarkMode={setIsDarkMode}
-        onExit={() => setView('control_panel')}
-      />
-    );
-  }
-
-  if (view === 'kitchen') {
-    return (
-      <MonitorCocina
-        orders={orders}
-        setOrders={handleSetOrders}
-        isDarkMode={isDarkMode}
-        setIsDarkMode={setIsDarkMode}
-        onExit={() => setView('control_panel')}
-      />
-    );
-  }
-  if (view === 'logistics') {
-    return (
-      <LogisticaDespachos
-        orders={orders}
-        setOrders={handleSetOrders}
-        drivers={drivers}
-        setDrivers={handleSetDrivers}
-        isDarkMode={isDarkMode}
-        setIsDarkMode={setIsDarkMode}
-        onExit={() => setView('control_panel')}
-      />
-    );
-  }
-
-  if (view === 'admin') {
-    return (
-      <AdminView
-        initialSection={adminInitialSection}
-        categories={categories}
-        setCategories={handleSetCategories}
-        menuItems={menuItems}
-        setMenuItems={handleSetMenuItems}
-        orders={orders}
-        setOrders={handleSetOrders}
-        drivers={drivers}
-        setDrivers={handleSetDrivers}
-        logs={logs}
-        setLogs={handleSetLogs}
-        customers={customers}
-        setCustomers={handleSetCustomers}
-        updateCustomerStats={updateCustomerStats}
-        updateDriverStats={updateDriverStats}
-        isDarkMode={isDarkMode}
-        setIsDarkMode={setIsDarkMode}
-        onExit={() => setView('control_panel')}
-      />
-    );
-  }
-
-  if (view === 'tpv') {
-    return (
-      <TPVView
-        categories={categories}
-        menuItems={menuItems}
-        staff={staff}
-        customers={customers}
-        orders={orders}
-        onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
-        updateCustomerStats={updateCustomerStats}
-        onAddOrder={(order) => {
-          const fullOrder: Order = {
-            ...order,
-            id: order.id || `ORD-${Date.now().toString().slice(-4)}`,
-            createdAt: order.createdAt || new Date().toISOString(),
-            status: order.status || 'kitchen',
-            paymentStatus: order.paymentStatus || 'pending',
-            paymentMethod: order.paymentMethod || 'efectivo',
-            source: 'tpv'
-          } as Order;
-          handleSetOrders(prev => [fullOrder, ...prev]);
-          setTpvEditOrder(null);
-        }}
-        onUpdateOrder={(order) => {
-          handleSetOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...order } : o));
-          setTpvEditOrder(null);
-          setView('local_dispatch');
-        }}
-        initialOrder={tpvEditOrder}
-        isDarkMode={isDarkMode}
-        setIsDarkMode={setIsDarkMode}
-        onExit={() => {
-          setTpvEditOrder(null);
-          setView('control_panel');
-        }}
-      />
-    )
-  }
-
-  if (view === 'local_dispatch') {
-    return (
-      <LocalDispatchView
-        orders={orders}
-        staff={staff}
-        updateCustomerStats={updateCustomerStats}
-        onUpdateOrder={(updated) => handleSetOrders(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o))}
-        onEditOrder={(order) => {
-          setTpvEditOrder(order);
-          setView('tpv');
-        }}
-        setView={setView}
-      />
-    );
-  }
+  };
 
   return (
     <>
-      <PublicView
-        categories={categories}
-        menuItems={menuItems}
-        customers={customers}
-        onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
-        onAddOrder={(order) => handleSetOrders(prev => [order, ...prev])}
-        onEnterControlPanel={handleEnterControlPanel}
+      {renderCurrentView()}
+      <DigitalTicketModal
+        isOpen={isDigitalTicketOpen}
+        orderId={digitalTicketOrderId}
+        order={orders.find(o => o.id === digitalTicketOrderId) || null}
+        onClose={handleCloseDigitalTicket}
         isDarkMode={isDarkMode}
-        setIsDarkMode={setIsDarkMode}
-      />
-      <ControlPanelAuthModal
-        isOpen={isAuthModalOpen}
-        onClose={() => setIsAuthModalOpen(false)}
-        onSuccess={handleAuthSuccess}
       />
     </>
   );

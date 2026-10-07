@@ -354,11 +354,12 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
                                                     }
 
                                                     const phone = order.customerPhone.replace(/\D/g, '');
+                                                    const ticketUrl = `https://elbuenservir.vercel.app/?ticket=${order.id}`;
                                                     const message = order.status === 'kitchen'
                                                         ? `Hola ${order.customerName}, tu pedido ${order.id} de El Buen Servir está siendo preparado en cocina. Te avisaremos cuando esté listo.`
                                                         : order.status === 'delivery'
                                                             ? `Hola ${order.customerName}, tu pedido ${order.id} de El Buen Servir está en camino en reparto. ¡Prepárate para recibirlo!`
-                                                            : `Hola ${order.customerName}, confirmamos la entrega de tu pedido ${order.id}. ¡Gracias por tu preferencia! Visítanos en nuestra página web: https://elbuenservir.vercel.app. Te enviamos tu comprobante en PDF adjunto a este mensaje.`;
+                                                            : `¡Hola ${order.customerName}! ✨\n\nConfirmamos la entrega de tu pedido *${order.id}*. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\n¡Muchas gracias por tu preferencia en *El Buen Servir*! 🍽️`;
 
                                                     window.open(`https://wa.me/52${phone}?text=${encodeURIComponent(message)}`, '_blank');
                                                 }}

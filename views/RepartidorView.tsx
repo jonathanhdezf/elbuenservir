@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Bike, CheckCircle, Clock, DollarSign, MapPin, Moon, Package,
   PackageCheck, Star, Sun, User, X, CreditCard, ArrowRight,
-  Info, AlertCircle, Shield, ChevronLeft
+  Info, AlertCircle, Shield, ChevronLeft, MessageCircle
 } from 'lucide-react';
 import { DeliveryDriver, Order, PaymentMethod } from '../types';
 import { soundManager } from '../utils/soundManager';
@@ -39,6 +39,7 @@ export default function RepartidorView({
   const [ticketNum, setTicketNum] = useState('');
   const [opNum, setOpNum] = useState('');
   const [payError, setPayError] = useState<string | null>(null);
+  const [justDeliveredOrder, setJustDeliveredOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     const t = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -133,6 +134,7 @@ export default function RepartidorView({
     updateDriverStats(driver.id, driver.rating, true);
     setDrivers(prev => prev.map(d => d.id === driver.id ? { ...d, status: 'active' } : d));
     setCashReceived(''); setTicketNum(''); setOpNum(''); setPayError(null);
+    setJustDeliveredOrder(updated);
     soundManager.play('confirm', 'driver_dashboard');
   };
 
@@ -434,6 +436,48 @@ export default function RepartidorView({
           </div>
         )}
       </div>
+
+      {/* Modal post-entrega para notificar WhatsApp al cliente con ticket digital */}
+      {justDeliveredOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-[32px] p-6 max-w-sm w-full text-center space-y-4 shadow-2xl animate-in zoom-in-95">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center mx-auto">
+              <CheckCircle className="w-8 h-8" />
+            </div>
+            <div>
+              <h3 className="text-xl font-black text-gray-900 dark:text-white uppercase">
+                ¡Entrega Exitosa!
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Pedido <span className="font-bold text-gray-800 dark:text-gray-200">{justDeliveredOrder.id}</span> de <span className="font-bold text-gray-800 dark:text-gray-200">{justDeliveredOrder.customerName}</span> registrado y cobrado.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                onClick={() => {
+                  const phone = justDeliveredOrder.customerPhone.replace(/\D/g, '');
+                  const ticketUrl = `https://elbuenservir.vercel.app/?ticket=${justDeliveredOrder.id}`;
+                  const msg = `¡Hola ${justDeliveredOrder.customerName}! ✨\n\nTu repartidor de *El Buen Servir* ha entregado tu pedido *${justDeliveredOrder.id}* con éxito. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\n¡Muchas gracias por tu preferencia! 🍽️`;
+                  window.open(`https://wa.me/52${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+                  setOrders(prev => prev.map(o => o.id === justDeliveredOrder.id ? { ...o, whatsappNotified: true } : o));
+                  setJustDeliveredOrder(null);
+                }}
+                className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all"
+              >
+                <MessageCircle className="w-4 h-4" /> Enviar Ticket por WhatsApp
+              </button>
+
+              <button
+                onClick={() => setJustDeliveredOrder(null)}
+                className="w-full py-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 font-bold text-xs uppercase tracking-widest transition-colors"
+              >
+                Continuar sin notificar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
