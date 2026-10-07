@@ -179,7 +179,14 @@ const Header: React.FC<HeaderProps> = ({
                       type="button"
                       onClick={() => {
                         notificationService.sendSystemNotification('🔔 Prueba de Notificación', {
-                          body: 'Las notificaciones push para pedidos nuevos están activadas correctamente.'
+                          body: 'Las alertas push están activas. Toca para abrir el módulo de pedidos.',
+                          tag: 'test-admin-push',
+                          data: {
+                            action: 'open_orders',
+                            view: 'admin',
+                            section: 'orders',
+                            url: '/?view=admin&section=orders'
+                          }
                         });
                       }}
                       className="px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-950/40 hover:bg-primary-100 dark:hover:bg-primary-900/60 rounded-lg transition-all"

@@ -128,6 +128,20 @@ export default function AdminView({
       setActiveSection(initialSection);
     }
   }, [initialSection]);
+
+  // Listen for navigation events (e.g. from push notification clicks or background SW)
+  useEffect(() => {
+    const handleSectionNavigate = (e: any) => {
+      if (e.detail?.section) {
+        setActiveSection(e.detail.section);
+        if (e.detail.section === 'orders' && e.detail.orderId) {
+          setOrdersSearch(e.detail.orderId);
+        }
+      }
+    };
+    window.addEventListener('navigate_to_admin_section', handleSectionNavigate);
+    return () => window.removeEventListener('navigate_to_admin_section', handleSectionNavigate);
+  }, []);
   const isFullScreen = true;
 
   // Modal states

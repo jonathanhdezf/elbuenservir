@@ -354,10 +354,14 @@ export default function App() {
   const [systemBgEffect, setSystemBgEffect] = useState<'none' | 'gradient' | 'animated-blobs' | 'stars'>('gradient');
   const [adminInitialSection, setAdminInitialSection] = useState<AdminSection>('dashboard');
   const [panelMode, setPanelMode] = useState<'basic' | 'advanced'>('basic');
+  const [pendingRedirectSection, setPendingRedirectSection] = useState<AdminSection | null>(null);
 
   const [isPanelAuthenticated, setIsPanelAuthenticated] = useState<boolean>(() => {
     try {
-      return sessionStorage.getItem('el_buen_servir_cp_auth') === 'true';
+      return (
+        sessionStorage.getItem('el_buen_servir_cp_auth') === 'true' ||
+        localStorage.getItem('el_buen_servir_cp_auth') === 'true'
+      );
     } catch {
       return false;
     }
@@ -372,15 +376,66 @@ export default function App() {
     }
   };
 
+  const handleOpenAdminOrders = (orderId?: string | null) => {
+    const hasAdminSession = isPanelAuthenticated || notificationService.isAdmin();
+
+    if (hasAdminSession) {
+      setIsPanelAuthenticated(true);
+      notificationService.setAdminAuthenticated(true);
+      setAdminInitialSection('orders');
+      setView('admin');
+
+      // Dispatch to AdminView (in case it is already mounted)
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('navigate_to_admin_section', {
+          detail: { section: 'orders', orderId: orderId || null }
+        }));
+      }, 50);
+
+      // Clean up URL parameters cleanly without page refresh
+      try {
+        const url = new URL(window.location.href);
+        if (url.searchParams.has('section') || url.searchParams.has('action') || url.searchParams.has('orderId')) {
+          url.searchParams.delete('section');
+          url.searchParams.delete('action');
+          url.searchParams.delete('orderId');
+          url.searchParams.delete('view');
+          window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+        }
+      } catch {
+        // ignore
+      }
+    } else {
+      // User is not authenticated. Save pending destination and ask for admin password
+      setPendingRedirectSection('orders');
+      setIsAuthModalOpen(true);
+    }
+  };
+
   const handleAuthSuccess = () => {
     setIsPanelAuthenticated(true);
-    try {
-      sessionStorage.setItem('el_buen_servir_cp_auth', 'true');
-    } catch {
-      // ignore
+    notificationService.setAdminAuthenticated(true);
+
+    // Auto-prompt admin to enable push notifications if default and supported
+    if (notificationService.isSupported() && notificationService.getPermission() === 'default') {
+      notificationService.requestPermission();
     }
+
     setIsAuthModalOpen(false);
-    setView('control_panel');
+
+    if (pendingRedirectSection) {
+      const targetSec = pendingRedirectSection;
+      setPendingRedirectSection(null);
+      setAdminInitialSection(targetSec);
+      setView('admin');
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('navigate_to_admin_section', {
+          detail: { section: targetSec, orderId: null }
+        }));
+      }, 50);
+    } else {
+      setView('control_panel');
+    }
   };
 
   const [digitalTicketOrderId, setDigitalTicketOrderId] = useState<string | null>(null);
@@ -446,23 +501,59 @@ export default function App() {
     }
   }, [isDarkMode]);
 
-  // Request notification permission on first user interaction if not prompted yet
+  // Handle notification clicks, URL deep links, and service worker messages to open orders
   useEffect(() => {
-    const handleFirstInteraction = () => {
-      if (notificationService.isSupported() && notificationService.getPermission() === 'default') {
-        notificationService.requestPermission();
+    const handleUrlNavigation = () => {
+      try {
+        const search = window.location.search;
+        const params = new URLSearchParams(search);
+        const viewParam = params.get('view');
+        const sectionParam = params.get('section');
+        const actionParam = params.get('action');
+
+        if ((viewParam === 'admin' && sectionParam === 'orders') || actionParam === 'open_orders' || sectionParam === 'orders') {
+          handleOpenAdminOrders(params.get('orderId'));
+        }
+      } catch (e) {
+        console.warn('Error reading URL navigation params:', e);
       }
-      window.removeEventListener('click', handleFirstInteraction);
-      window.removeEventListener('keydown', handleFirstInteraction);
     };
 
-    window.addEventListener('click', handleFirstInteraction);
-    window.addEventListener('keydown', handleFirstInteraction);
-    return () => {
-      window.removeEventListener('click', handleFirstInteraction);
-      window.removeEventListener('keydown', handleFirstInteraction);
+    handleUrlNavigation();
+    window.addEventListener('popstate', handleUrlNavigation);
+
+    const handleSwMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'NAVIGATE_TO_ADMIN_ORDERS') {
+        handleOpenAdminOrders(event.data.orderId);
+      }
     };
-  }, []);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSwMessage);
+    }
+
+    let channel: BroadcastChannel | null = null;
+    try {
+      channel = new BroadcastChannel('el_buen_servir_sw_channel');
+      channel.onmessage = (event) => {
+        if (event.data?.type === 'NAVIGATE_TO_ADMIN_ORDERS') {
+          handleOpenAdminOrders(event.data.orderId);
+        }
+      };
+    } catch {
+      // BroadcastChannel unsupported in current environment
+    }
+
+    return () => {
+      window.removeEventListener('popstate', handleUrlNavigation);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSwMessage);
+      }
+      if (channel) {
+        channel.close();
+      }
+    };
+  }, [isPanelAuthenticated]);
 
   // Load and sync from Supabase PostgreSQL Database with Realtime
   useEffect(() => {
@@ -488,8 +579,10 @@ export default function App() {
       onOrderChange: (payload) => {
         if (payload.eventType === 'INSERT') {
           const newOrder = mapOrderFromDb(payload.new);
-          // Send push notification and audio alert for newly received order
-          notificationService.notifyNewOrder(newOrder);
+          // Send push notification and audio alert for newly received order ONLY if admin is authenticated
+          if (notificationService.isAdmin()) {
+            notificationService.notifyNewOrder(newOrder);
+          }
           setOrders(prev => {
             if (prev.some(o => o.id === newOrder.id)) return prev;
             return [newOrder, ...prev];
@@ -689,7 +782,9 @@ export default function App() {
               onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
               onAddOrder={(order) => {
                 handleSetOrders(prev => [order, ...prev]);
-                notificationService.notifyNewOrder(order);
+                if (notificationService.isAdmin()) {
+                  notificationService.notifyNewOrder(order);
+                }
               }}
               onEnterControlPanel={handleEnterControlPanel}
               isDarkMode={isDarkMode}
@@ -716,11 +811,7 @@ export default function App() {
           }}
           onExit={() => {
             setIsPanelAuthenticated(false);
-            try {
-              sessionStorage.removeItem('el_buen_servir_cp_auth');
-            } catch {
-              // ignore
-            }
+            notificationService.setAdminAuthenticated(false);
             setView('public');
           }}
           isDarkMode={isDarkMode}
@@ -866,7 +957,9 @@ export default function App() {
           onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
           onAddOrder={(order) => {
             handleSetOrders(prev => [order, ...prev]);
-            notificationService.notifyNewOrder(order);
+            if (notificationService.isAdmin()) {
+              notificationService.notifyNewOrder(order);
+            }
           }}
           onEnterControlPanel={handleEnterControlPanel}
           isDarkMode={isDarkMode}

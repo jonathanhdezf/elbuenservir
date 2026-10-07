@@ -14,6 +14,39 @@ class NotificationService {
   }
 
   /**
+   * Check if current user/device is authenticated as administrator
+   */
+  public isAdmin(): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+      return (
+        sessionStorage.getItem('el_buen_servir_cp_auth') === 'true' ||
+        localStorage.getItem('el_buen_servir_cp_auth') === 'true'
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Set administrator authentication state in storage
+   */
+  public setAdminAuthenticated(authenticated: boolean): void {
+    if (typeof window === 'undefined') return;
+    try {
+      if (authenticated) {
+        sessionStorage.setItem('el_buen_servir_cp_auth', 'true');
+        localStorage.setItem('el_buen_servir_cp_auth', 'true');
+      } else {
+        sessionStorage.removeItem('el_buen_servir_cp_auth');
+        localStorage.removeItem('el_buen_servir_cp_auth');
+      }
+    } catch (e) {
+      console.warn('Storage error in notificationService:', e);
+    }
+  }
+
+  /**
    * Check if Notifications are supported in the current browser/device
    */
   public isSupported(): boolean {
@@ -29,20 +62,26 @@ class NotificationService {
   }
 
   /**
-   * Request permission from the user
+   * Request permission from the user (administrators only)
    */
   public async requestPermission(): Promise<boolean> {
     if (!this.isSupported()) return false;
     try {
       const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        await this.sendSystemNotification('✅ Notificaciones Activadas', {
-          body: 'Recibirás avisos instantáneos cuando se genere un nuevo pedido en El Buen Servir.',
-          tag: 'notifications-enabled'
+      if (permission === 'granted' && this.isAdmin()) {
+        await this.sendSystemNotification('✅ Notificaciones de Pedidos Activas', {
+          body: 'Como administrador, recibirás alertas automáticas cuando entre un nuevo pedido.',
+          tag: 'admin-notifications-enabled',
+          data: {
+            action: 'open_orders',
+            view: 'admin',
+            section: 'orders',
+            url: '/?view=admin&section=orders'
+          }
         });
         return true;
       }
-      return false;
+      return permission === 'granted';
     } catch (err) {
       console.warn('Error solicitando permisos de notificación:', err);
       return false;
@@ -82,9 +121,15 @@ class NotificationService {
 
   /**
    * Notify about a newly generated order with push notification and sound
+   * EXCLUSIVELY for authenticated administrators
    */
   public async notifyNewOrder(order: Order): Promise<void> {
     if (!order || !order.id) return;
+
+    // Push notifications and sound for new orders are strictly for administrators
+    if (!this.isAdmin()) {
+      return;
+    }
 
     // Prevent duplicate alert for the same order within a short window
     if (this.lastNotifiedOrderId === order.id) return;
@@ -95,8 +140,8 @@ class NotificationService {
 
     if (!this.isSupported()) return;
 
-    // Auto-request permission on user interaction if default
-    if (Notification.permission === 'default' && !this.hasPrompted) {
+    // Auto-request permission on user interaction if default, only for admins
+    if (Notification.permission === 'default' && !this.hasPrompted && this.isAdmin()) {
       this.hasPrompted = true;
       const granted = await this.requestPermission();
       if (!granted) return;
@@ -121,8 +166,11 @@ class NotificationService {
       requireInteraction: true,
       vibrate: [300, 100, 300, 100, 300],
       data: {
+        action: 'open_orders',
+        view: 'admin',
+        section: 'orders',
         orderId: order.id,
-        url: `/?ticket=${order.id}`,
+        url: `/?view=admin&section=orders&orderId=${order.id}`,
         timestamp: Date.now()
       }
     };

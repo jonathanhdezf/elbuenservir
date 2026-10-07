@@ -1,5 +1,5 @@
-// Service Worker for El Buen Servir PWA - v3
-const CACHE_NAME = 'el-buen-servir-v3';
+// Service Worker for El Buen Servir PWA - v4
+const CACHE_NAME = 'el-buen-servir-v4';
 
 self.addEventListener('install', (event) => {
   // Activate immediately without waiting for other tabs
@@ -43,24 +43,63 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Handle push notification clicks (focus app or open ticket)
+// Handle push notification clicks (focus app or open window, and navigate to orders module)
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = event.notification.data?.url || '/';
+  
+  const notifData = event.notification.data || {};
+  const orderId = notifData.orderId || null;
+  const targetUrl = notifData.url || (orderId ? `/?view=admin&section=orders&orderId=${orderId}` : '/?view=admin&section=orders');
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Focus existing tab if available
+      // 1. Try to find an existing window and focus it
       for (const client of windowClients) {
         if ('focus' in client) {
-          client.focus();
-          if (client.url && client.navigate) {
-            client.navigate(targetUrl);
-          }
-          return;
+          return client.focus().then((focusedClient) => {
+            const activeClient = focusedClient || client;
+
+            // Direct message to the active client
+            activeClient.postMessage({
+              type: 'NAVIGATE_TO_ADMIN_ORDERS',
+              action: 'open_orders',
+              view: 'admin',
+              section: 'orders',
+              orderId: orderId
+            });
+
+            // Also broadcast through channel for maximum reliability across tabs/workers
+            try {
+              const channel = new BroadcastChannel('el_buen_servir_sw_channel');
+              channel.postMessage({
+                type: 'NAVIGATE_TO_ADMIN_ORDERS',
+                action: 'open_orders',
+                view: 'admin',
+                section: 'orders',
+                orderId: orderId
+              });
+              channel.close();
+            } catch (e) {
+              // BroadcastChannel not available in this worker environment
+            }
+
+            // If the client supports navigate, ensure url updates if not on orders
+            if (activeClient.navigate && activeClient.url && !activeClient.url.includes('section=orders')) {
+              try {
+                const url = new URL(activeClient.url);
+                url.searchParams.set('view', 'admin');
+                url.searchParams.set('section', 'orders');
+                if (orderId) url.searchParams.set('orderId', orderId);
+                return activeClient.navigate(url.href);
+              } catch (e) {
+                // ignore
+              }
+            }
+          });
         }
       }
-      // If no tab open, open a new window
+
+      // 2. If no window is currently open (e.g. tapped from lock screen with browser closed)
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }
@@ -75,20 +114,29 @@ self.addEventListener('push', (event) => {
     data = event.data ? event.data.json() : {};
   } catch (e) {
     data = {
-      title: 'Nuevo Pedido',
+      title: '🔔 ¡Nuevo Pedido en El Buen Servir!',
       body: event.data ? event.data.text() : 'Se ha recibido un nuevo pedido en el sistema.'
     };
   }
 
-  const title = data.title || '🔔 ¡Nuevo Pedido en El Buen Servir!';
+  const orderId = data.orderId || null;
+  const targetUrl = data.url || (orderId ? `/?view=admin&section=orders&orderId=${orderId}` : '/?view=admin&section=orders');
+  const title = data.title || (orderId ? `🔔 ¡Nuevo Pedido #${orderId}!` : '🔔 ¡Nuevo Pedido en El Buen Servir!');
+
   const options = {
-    body: data.body || 'Revisa los detalles en el monitor de comandas.',
+    body: data.body || 'Toca para abrir el módulo de pedidos en el panel de administración.',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-192x192.png',
-    tag: data.tag || `order-${Date.now()}`,
+    tag: data.tag || (orderId ? `order-${orderId}` : `order-${Date.now()}`),
     vibrate: [300, 100, 300, 100, 300],
     requireInteraction: true,
-    data: data
+    data: {
+      action: 'open_orders',
+      view: 'admin',
+      section: 'orders',
+      orderId: orderId,
+      url: targetUrl
+    }
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
