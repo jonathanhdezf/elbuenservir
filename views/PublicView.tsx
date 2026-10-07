@@ -29,6 +29,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
   const [orderStep, setOrderStep] = useState(1);
   const [selectedBaseDish, setSelectedBaseDish] = useState<MenuItem | null>(null);
   const [selectedVariation, setSelectedVariation] = useState<any>(null);
+  const [selectedVariationsByDish, setSelectedVariationsByDish] = useState<Record<string, any>>({});
   const [selectedSides, setSelectedSides] = useState<string[]>([]);
   const [selectedExtras, setSelectedExtras] = useState<MenuItem[]>([]);
   const [customerComments, setCustomerComments] = useState('');
@@ -146,9 +147,9 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
       `👤 *Cliente:* ${customer.name}\n` +
       `📱 *Teléfono:* ${customer.phone}\n` +
       deliveryInfo.replace(/%0A/g, '\n') +
-      `🥘 *Platillo:* ${selectedBaseDish?.name}\n` +
+      `🥘 *Platillo:* ${selectedBaseDish?.name}${selectedVariation ? ` (${selectedVariation.label} - $${selectedVariation.price})` : ''}\n` +
       (selectedSides.length > 0 ? `🥗 *Guarniciones:* ${selectedSides.join(', ')} (Sin costo)\n` : '') +
-      (selectedExtras.length > 0 ? `🥤 *Adicionales:* ${selectedExtras.map(e => e.name).join(', ')}\n` : '') +
+      (selectedExtras.length > 0 ? `🥤 *Adicionales:* ${selectedExtras.map(e => `${e.name}${e.variations?.[0] ? ` (${e.variations[0].label})` : ''}`).join(', ')}\n` : '') +
       (customerComments ? `📝 *Notas:* ${customerComments}\n` : '') +
       `\n💰 *TOTAL:* $${total}\n\n` +
       `🚀 _Enviado desde el sitio web_`;
@@ -507,14 +508,14 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
           </div>
 
           {/* Categories Selector */}
-          <div className="flex justify-center flex-wrap gap-3 mb-20">
+          <div className="flex justify-center flex-wrap gap-2.5 sm:gap-3 mb-16 md:mb-20">
             {categories.map(cat => (
               <button
                 key={cat.id}
                 onClick={() => setActiveCategory(cat.id)}
-                className={`px-10 py-4 rounded-3xl font-black text-sm uppercase tracking-widest transition-all duration-300 border-2 ${activeCategory === cat.id
-                  ? 'bg-gray-900 text-white border-gray-900 shadow-2xl shadow-black/20 scale-105'
-                  : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-transparent hover:border-primary-200 dark:hover:border-primary-900 hover:text-primary-600'
+                className={`px-7 sm:px-9 py-3 sm:py-3.5 rounded-2xl font-black text-xs sm:text-sm uppercase tracking-wider transition-all duration-300 border-2 cursor-pointer ${activeCategory === cat.id
+                  ? 'bg-gray-900 text-white border-gray-900 dark:bg-primary-500 dark:text-white dark:border-primary-500 shadow-xl shadow-black/10 dark:shadow-primary-500/25 scale-105'
+                  : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-800 hover:border-primary-400 dark:hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400'
                   }`}
               >
                 {cat.name}
@@ -523,51 +524,92 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
           </div>
 
           {/* Menu Items Grid */}
-          <div className="grid md:grid-cols-2 gap-12 lg:gap-16">
+          <div className="grid md:grid-cols-2 gap-8 lg:gap-12">
             {filteredItems.length > 0 ? (
               <>
-                {filteredItems.slice(0, visibleItemsCount).map(item => (
-                  <div key={item.id} className="group relative">
-                    <div className="flex justify-between items-baseline mb-3">
-                      <h4 className="text-2xl font-black group-hover:text-primary-600 transition-colors uppercase tracking-tighter dark:text-white">
-                        {item.name}
-                      </h4>
-                      <div className="flex-1 mx-4 border-b-2 border-dotted border-gray-200 dark:border-gray-800"></div>
-                      <span className="text-2xl font-black text-primary-500">
-                        ${Math.min(...item.variations.map(v => v.price)).toFixed(2)}
-                      </span>
-                    </div>
-                    <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-6 italic">
-                      {item.description}
-                    </p>
-                    <div className="flex flex-wrap gap-3 mb-6">
-                      {item.variations.map(v => (
-                        <div key={v.id} className="flex items-center bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-4 py-1.5 rounded-full shadow-sm group-hover:border-primary-200 transition-all">
-                          <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest mr-2">{v.label}</span>
-                          <span className="text-xs font-bold dark:text-white">${v.price.toFixed(2)}</span>
+                {filteredItems.slice(0, visibleItemsCount).map(item => {
+                  const activeVariation = selectedVariationsByDish[item.id] || item.variations[0];
+                  const currentPrice = activeVariation?.price ?? item.variations[0]?.price ?? 0;
+
+                  return (
+                    <div key={item.id} className="group relative p-6 sm:p-7 rounded-[32px] bg-white dark:bg-gray-900/70 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl dark:hover:border-gray-700 transition-all duration-300 flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-baseline mb-2">
+                          <h4 className="text-xl sm:text-2xl font-black group-hover:text-primary-500 transition-colors uppercase tracking-tight text-gray-900 dark:text-white">
+                            {item.name}
+                          </h4>
+                          <div className="flex-1 mx-3 border-b-2 border-dotted border-gray-200 dark:border-gray-700"></div>
+                          <span className="text-2xl font-black text-primary-500 dark:text-primary-400">
+                            ${currentPrice.toFixed(2)}
+                          </span>
                         </div>
-                      ))}
+
+                        <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed mb-5 italic">
+                          {item.description}
+                        </p>
+
+                        {/* Interactive Variation Selector */}
+                        <div className="space-y-2 mb-6">
+                          <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400">
+                            <span>Variantes:</span>
+                            {activeVariation && (
+                              <span className="text-primary-600 dark:text-primary-400 font-bold">
+                                Seleccionada: {activeVariation.label}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-2">
+                            {item.variations.map(v => {
+                              const isSelected = activeVariation?.id === v.id;
+                              return (
+                                <button
+                                  key={v.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedVariationsByDish(prev => ({ ...prev, [item.id]: v }));
+                                    soundManager.play('click');
+                                  }}
+                                  title={`Seleccionar variante ${v.label} ($${v.price})`}
+                                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer border ${isSelected
+                                    ? 'bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/25 ring-2 ring-primary-500/30 dark:ring-primary-400/40 scale-105'
+                                    : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-primary-400 dark:hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-300'
+                                    }`}
+                                >
+                                  <span className={`text-[10px] font-black uppercase tracking-wider ${isSelected ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`}>
+                                    {v.label}
+                                  </span>
+                                  <span className={`font-black ${isSelected ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                    ${v.price.toFixed(2)}
+                                  </span>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setSelectedBaseDish(item);
+                          setSelectedVariation(activeVariation);
+                          setOrderStep(2);
+                          setIsOrderModalOpen(true);
+                        }}
+                        className="w-full py-3.5 sm:py-4 bg-gray-50 dark:bg-gray-800 hover:bg-primary-500 hover:text-white dark:hover:bg-primary-500 text-gray-700 dark:text-gray-200 rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 hover:border-primary-500 dark:hover:border-primary-500 cursor-pointer shadow-sm active:scale-98 group/btn"
+                      >
+                        <Plus className="w-4 h-4 text-primary-500 dark:text-primary-400 group-hover/btn:text-white transition-colors" />
+                        <span>Ordenar {activeVariation ? `(${activeVariation.label})` : 'Ahora'}</span>
+                      </button>
                     </div>
-                    <button
-                      onClick={() => {
-                        setSelectedBaseDish(item);
-                        setSelectedVariation(item.variations[0]);
-                        setOrderStep(2);
-                        setIsOrderModalOpen(true);
-                      }}
-                      className="w-full py-4 bg-gray-50 dark:bg-gray-800 hover:bg-primary-500 hover:text-white text-gray-500 dark:text-gray-400 rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-transparent hover:border-primary-500"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Ordenar Ahora
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
 
                 {filteredItems.length > visibleItemsCount && (
                   <div className="col-span-full flex justify-center mt-12">
                     <button
                       onClick={() => setVisibleItemsCount(prev => prev + 6)}
-                      className="px-8 py-4 bg-white dark:bg-gray-800 border-2 border-gray-100 dark:border-gray-700 rounded-full font-black text-xs uppercase tracking-widest text-gray-900 dark:text-white hover:border-primary-500 hover:text-primary-500 transition-all shadow-xl hover:shadow-primary-500/10 active:scale-95"
+                      className="px-8 py-4 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 rounded-full font-black text-xs uppercase tracking-widest text-gray-900 dark:text-white hover:border-primary-500 dark:hover:border-primary-400 hover:text-primary-500 dark:hover:text-primary-400 transition-all shadow-xl hover:shadow-primary-500/10 active:scale-95 cursor-pointer"
                     >
                       Mostrar más platillos ({filteredItems.length - visibleItemsCount} restantes)
                     </button>
@@ -575,9 +617,9 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                 )}
               </>
             ) : (
-              <div className="col-span-full text-center py-32 bg-gray-50 dark:bg-gray-800/50 rounded-[40px] border-2 border-dashed border-gray-100 dark:border-gray-800">
-                <Utensils className="w-16 h-16 text-gray-200 dark:text-gray-700 mx-auto mb-6" />
-                <p className="text-gray-400 dark:text-gray-500 font-black uppercase tracking-widest">Aún no hay especialidades en esta categoría</p>
+              <div className="col-span-full text-center py-24 sm:py-32 bg-gray-50 dark:bg-gray-900/60 rounded-[40px] border-2 border-dashed border-gray-200 dark:border-gray-800">
+                <Utensils className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-6" />
+                <p className="text-gray-500 dark:text-gray-400 font-black uppercase tracking-widest">Aún no hay especialidades en esta categoría</p>
               </div>
             )}
           </div>
@@ -829,28 +871,40 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                             .map(item => (
                               <div
                                 key={item.id}
-                                className="p-5 bg-gray-50 dark:bg-gray-800 rounded-3xl border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-all"
+                                className="p-5 bg-gray-50 dark:bg-gray-800/80 rounded-3xl border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-all"
                               >
                                 <div className="mb-4">
                                   <p className="font-black text-gray-900 dark:text-white uppercase tracking-tight text-lg">{item.name}</p>
-                                  <p className="text-xs text-gray-400 italic mt-1">{item.description}</p>
+                                  <p className="text-xs text-gray-500 dark:text-gray-300 italic mt-1">{item.description}</p>
                                 </div>
 
-                                <div className="flex flex-wrap gap-2">
-                                  {item.variations.map(v => (
-                                    <button
-                                      key={v.id}
-                                      onClick={() => {
-                                        setSelectedBaseDish(item);
-                                        setSelectedVariation(v);
-                                        setOrderStep(2);
-                                      }}
-                                      className="flex-grow sm:flex-grow-0 flex items-center justify-between gap-3 px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-600 hover:border-primary-500 dark:hover:border-primary-500 hover:text-primary-500 transition-all group/var"
-                                    >
-                                      <span className="text-xs font-black uppercase tracking-wide text-gray-600 dark:text-gray-300 group-hover/var:text-primary-500">{v.label}</span>
-                                      <span className="text-sm font-black text-gray-900 dark:text-white group-hover/var:text-primary-500">${v.price}</span>
-                                    </button>
-                                  ))}
+                                <div className="space-y-1.5">
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400 block">
+                                    Selecciona tu variante:
+                                  </span>
+                                  <div className="flex flex-wrap gap-2">
+                                    {item.variations.map(v => {
+                                      const isChosen = selectedBaseDish?.id === item.id && selectedVariation?.id === v.id;
+                                      return (
+                                        <button
+                                          key={v.id}
+                                          onClick={() => {
+                                            setSelectedBaseDish(item);
+                                            setSelectedVariation(v);
+                                            setOrderStep(2);
+                                          }}
+                                          className={`flex-grow sm:flex-grow-0 flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border transition-all cursor-pointer group/var ${isChosen
+                                            ? 'bg-primary-500 text-white border-primary-500 shadow-md ring-2 ring-primary-500/30'
+                                            : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-primary-500 dark:hover:border-primary-500 text-gray-700 dark:text-gray-200'
+                                            }`}
+                                        >
+                                          <span className={`text-xs font-black uppercase tracking-wide ${isChosen ? 'text-white' : 'text-gray-700 dark:text-gray-200 group-hover/var:text-primary-500'}`}>{v.label}</span>
+                                          <span className={`text-sm font-black ${isChosen ? 'text-white' : 'text-gray-900 dark:text-white group-hover/var:text-primary-500'}`}>${v.price}</span>
+                                          {isChosen && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -866,14 +920,52 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                 {/* Step 2: Accompaniment Selection */}
                 {orderStep === 2 && selectedBaseDish && (
                   <div className="space-y-8">
-                    <div className="bg-primary-50 dark:bg-primary-950/30 p-6 rounded-3xl border border-primary-100 dark:border-primary-900/50">
-                      <p className="text-xs font-black text-primary-600 dark:text-primary-400 uppercase tracking-widest mb-2">Platillo seleccionado</p>
+                    <div className="bg-primary-50 dark:bg-primary-950/40 p-6 rounded-3xl border border-primary-100 dark:border-primary-900/60">
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                        <p className="text-xs font-black text-primary-600 dark:text-primary-400 uppercase tracking-widest">Platillo seleccionado</p>
+                        {selectedVariation && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-500 text-white text-xs font-black uppercase shadow-sm">
+                            <Check className="w-3.5 h-3.5 stroke-[3]" />
+                            Variante: {selectedVariation.label} • ${selectedVariation.price}
+                          </span>
+                        )}
+                      </div>
                       <h4 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">{selectedBaseDish.name}</h4>
-                      <p className="text-sm font-bold text-emerald-500 mt-2">✨ Las guarniciones no tienen costo extra.</p>
+
+                      {/* Switch variation in Step 2 if multiple available */}
+                      {selectedBaseDish.variations.length > 1 && (
+                        <div className="mt-4 pt-4 border-t border-primary-100/60 dark:border-primary-900/40">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-300 mb-2 block">
+                            Cambiar variante seleccionada:
+                          </span>
+                          <div className="flex flex-wrap gap-2">
+                            {selectedBaseDish.variations.map((v: any) => {
+                              const isSelected = selectedVariation?.id === v.id;
+                              return (
+                                <button
+                                  key={v.id}
+                                  type="button"
+                                  onClick={() => setSelectedVariation(v)}
+                                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-primary-500 text-white border-primary-500 shadow-md ring-2 ring-primary-500/30'
+                                      : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-primary-400'
+                                  }`}
+                                >
+                                  <span>{v.label}</span>
+                                  <span className="opacity-90">${v.price}</span>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-3">✨ Las guarniciones no tienen costo extra.</p>
                     </div>
 
                     <div className="space-y-4">
-                      <p className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">¿Con qué se va a acompañar?</p>
+                      <p className="text-xs font-black text-gray-500 dark:text-gray-300 uppercase tracking-widest ml-1">¿Con qué se va a acompañar?</p>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {menuItems.filter(item => item.categoryId === 'cat-5' && item.isActive).map(item => item.name).map(side => (
                           <button
@@ -885,25 +977,25 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                                 setSelectedSides(prev => [...prev, side]);
                               }
                             }}
-                            className={`flex items-center justify-between p-5 rounded-3xl border-2 transition-all font-bold text-sm ${selectedSides.includes(side)
+                            className={`flex items-center justify-between p-5 rounded-3xl border-2 transition-all font-bold text-sm cursor-pointer ${selectedSides.includes(side)
                               ? 'bg-primary-500 text-white border-primary-500 shadow-lg shadow-primary-500/20'
-                              : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-transparent hover:border-primary-200'
+                              : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-100 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-500'
                               }`}
                           >
                             <span>{side}</span>
-                            {selectedSides.includes(side) ? <Check className="w-5 h-5" /> : <Plus className="w-4 h-4 opacity-30" />}
+                            {selectedSides.includes(side) ? <Check className="w-5 h-5" /> : <Plus className="w-4 h-4 opacity-50 dark:opacity-70 text-gray-400 dark:text-gray-300" />}
                           </button>
                         ))}
                       </div>
                     </div>
 
                     <div className="space-y-3">
-                      <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Instrucciones Especiales</label>
+                      <label className="text-xs font-black text-gray-500 dark:text-gray-300 uppercase tracking-widest ml-1">Instrucciones Especiales</label>
                       <textarea
                         value={customerComments}
                         onChange={e => setCustomerComments(e.target.value)}
                         placeholder="Ej. Sin cebolla, término medio, etc..."
-                        className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-3xl p-6 outline-none transition-all font-bold text-sm min-h-[120px]"
+                        className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 focus:border-primary-500 rounded-3xl p-6 outline-none transition-all font-bold text-sm min-h-[120px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
                       />
                     </div>
                   </div>
@@ -982,21 +1074,29 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                         <MessageCircle className="w-12 h-12 text-emerald-500" />
                       </div>
                       <h4 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Resumen de tu Pedido</h4>
-                      <p className="text-gray-400 font-bold uppercase tracking-widest text-[10px] mt-2 italic">Confirmación Final</p>
+                      <p className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-[10px] mt-2 italic">Confirmación Final</p>
                     </div>
 
                     <div className="bg-gray-50 dark:bg-gray-800 rounded-[32px] overflow-hidden border border-gray-100 dark:border-gray-700">
                       <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                        <span className="font-black text-gray-900 dark:text-white uppercase text-base">{selectedBaseDish.name}</span>
-                        <span className="font-black text-primary-500">${selectedVariation?.price.toFixed(2)}</span>
+                        <div>
+                          <span className="font-black text-gray-900 dark:text-white uppercase text-base block">{selectedBaseDish.name}</span>
+                          {selectedVariation && (
+                            <span className="inline-flex items-center gap-1 mt-1 text-xs font-bold text-primary-600 dark:text-primary-400 uppercase">
+                              <Check className="w-3.5 h-3.5 stroke-[3]" />
+                              Variante: {selectedVariation.label}
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-black text-primary-500 dark:text-primary-400 text-xl">${selectedVariation?.price.toFixed(2)}</span>
                       </div>
 
                       {selectedSides.length > 0 && (
                         <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-white/50 dark:bg-gray-900/50">
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Guarniciones (Sin Costo):</p>
+                          <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Guarniciones (Sin Costo):</p>
                           <div className="flex flex-wrap gap-2">
                             {selectedSides.map(side => (
-                              <span key={side} className="px-3 py-1 bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 text-[10px] font-black rounded-lg uppercase">{side}</span>
+                              <span key={side} className="px-3 py-1 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-black rounded-lg uppercase">{side}</span>
                             ))}
                           </div>
                         </div>
@@ -1004,12 +1104,19 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
 
                       {selectedExtras.length > 0 && (
                         <div className="p-6 border-b border-gray-100 dark:border-gray-700">
-                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Adicionales:</p>
+                          <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Adicionales:</p>
                           <div className="space-y-2">
                             {selectedExtras.map(extra => (
-                              <div key={extra.id} className="flex justify-between text-sm font-bold dark:text-white">
-                                <span>{extra.name}</span>
-                                <span>${Math.min(...extra.variations.map(v => v.price)).toFixed(2)}</span>
+                              <div key={extra.id} className="flex justify-between items-center text-sm font-bold text-gray-900 dark:text-white">
+                                <div className="flex items-center gap-2">
+                                  <span>{extra.name}</span>
+                                  {extra.variations && extra.variations[0] && (
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">
+                                      ({extra.variations[0].label})
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="font-extrabold text-primary-500 dark:text-primary-400">${Math.min(...extra.variations.map(v => v.price)).toFixed(2)}</span>
                               </div>
                             ))}
                           </div>
@@ -1037,7 +1144,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                   {orderStep > 1 && (
                     <button
                       onClick={() => setOrderStep(prev => prev - 1)}
-                      className="px-8 py-5 bg-gray-100 dark:bg-gray-800 text-gray-500 rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-gray-200 transition-all"
+                      className="px-8 py-5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-gray-200 dark:hover:bg-gray-700 transition-all cursor-pointer"
                     >
                       Regresar
                     </button>
@@ -1050,8 +1157,8 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                         setOrderStep(prev => prev + 1);
                       }}
                       disabled={orderStep === 1 && !selectedBaseDish}
-                      className={`flex-1 flex items-center justify-center gap-3 py-5 rounded-3xl font-black uppercase text-xs tracking-widest transition-all shadow-xl ${orderStep === 1 && !selectedBaseDish
-                        ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                      className={`flex-1 flex items-center justify-center gap-3 py-5 rounded-3xl font-black uppercase text-xs tracking-widest transition-all shadow-xl cursor-pointer ${orderStep === 1 && !selectedBaseDish
+                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
                         : 'bg-gray-900 dark:bg-primary-500 text-white hover:scale-[1.02] active:scale-[0.98]'
                         }`}
                     >
@@ -1156,34 +1263,47 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
               </div>
 
               <div className="p-6 space-y-6">
-                <p className="text-gray-500 dark:text-gray-400 text-sm italic">{viewingExtraItem.description || "Deliciosa opción para acompañar tus alimentos."}</p>
+                <p className="text-gray-600 dark:text-gray-300 text-sm italic">{viewingExtraItem.description || "Deliciosa opción para acompañar tus alimentos."}</p>
 
                 {/* Variation Selection */}
                 <div className="space-y-3">
-                  <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Elige una opción</label>
+                  <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-300 ml-1">
+                    <span>Elige una opción:</span>
+                    {viewingExtraVariation && (
+                      <span className="text-primary-600 dark:text-primary-400 font-bold">
+                        Seleccionada: {viewingExtraVariation.label}
+                      </span>
+                    )}
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
-                    {viewingExtraItem.variations.map(variation => (
-                      <button
-                        key={variation.id}
-                        onClick={() => setViewingExtraVariation(variation)}
-                        className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center justify-center gap-1
-                            ${viewingExtraVariation?.id === variation.id
-                            ? 'bg-primary-500 text-white border-primary-500 shadow-lg'
-                            : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-100 dark:border-gray-700 hover:border-primary-200'}
-                          `}
-                      >
-                        <span className="font-black text-xs uppercase tracking-wide">{variation.label}</span>
-                        <span className={`text-sm font-bold ${viewingExtraVariation?.id === variation.id ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
-                          ${variation.price}
-                        </span>
-                      </button>
-                    ))}
+                    {viewingExtraItem.variations.map(variation => {
+                      const isSelected = viewingExtraVariation?.id === variation.id;
+                      return (
+                        <button
+                          key={variation.id}
+                          onClick={() => setViewingExtraVariation(variation)}
+                          className={`p-3.5 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer
+                              ${isSelected
+                              ? 'bg-primary-500 text-white border-primary-500 shadow-lg ring-2 ring-primary-500/30'
+                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-500'}
+                            `}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-black text-xs uppercase tracking-wide">{variation.label}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                          </div>
+                          <span className={`text-sm font-black ${isSelected ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                            ${variation.price.toFixed(2)}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl">
+                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
                   <span className="font-black text-gray-900 dark:text-white uppercase text-sm">Precio Final</span>
-                  <span className="font-black text-primary-500 text-xl">${viewingExtraVariation?.price.toFixed(2)}</span>
+                  <span className="font-black text-primary-500 dark:text-primary-400 text-xl">${viewingExtraVariation?.price.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -1203,10 +1323,10 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                     }
                   }}
                   disabled={!viewingExtraVariation}
-                  className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-lg flex items-center justify-center gap-2
+                  className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer
                        ${viewingExtraVariation
                       ? 'bg-emerald-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-emerald-500/20'
-                      : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'}
+                      : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed shadow-none'}
                      `}
                 >
                   <Check className="w-5 h-5" />
@@ -1398,7 +1518,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
 
               {deliveryMethod === 'table' && (
                 <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">¿Qué mesa ocupas?</label>
+                  <label className="text-[10px] font-black text-gray-500 dark:text-gray-300 uppercase tracking-widest ml-1">¿Qué mesa ocupas?</label>
                   <input
                     type="number"
                     value={tableNumber}
@@ -1411,13 +1531,13 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
 
               {deliveryMethod === 'delivery' && (
                 <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Dirección de entrega</label>
+                  <label className="text-[10px] font-black text-gray-500 dark:text-gray-300 uppercase tracking-widest ml-1">Dirección de entrega</label>
                   <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar p-1">
                     {loggedCustomer.addresses?.map((addr, i) => (
                       <button
                         key={i}
                         onClick={() => setSelectedAddress(addr)}
-                        className={`w-full p-4 rounded-xl border-2 text-left transition-all ${selectedAddress === addr ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600 shadow-sm' : 'border-gray-100 dark:border-gray-800 text-gray-500'}`}
+                        className={`w-full p-4 rounded-xl border-2 text-left transition-all ${selectedAddress === addr ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 shadow-sm' : 'border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-700'}`}
                       >
                         <p className="text-xs font-bold truncate tracking-tight">{addr}</p>
                       </button>
@@ -1428,7 +1548,7 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                         const newAddr = prompt("Nueva dirección:");
                         if (newAddr) setSelectedAddress(newAddr);
                       }}
-                      className="w-full p-4 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 text-center text-gray-400 hover:border-primary-300 hover:text-primary-500 transition-all font-bold text-[10px] uppercase tracking-widest"
+                      className="w-full p-4 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 text-center text-gray-500 dark:text-gray-400 hover:border-primary-300 dark:hover:border-primary-500 hover:text-primary-500 dark:hover:text-primary-400 transition-all font-bold text-[10px] uppercase tracking-widest cursor-pointer"
                     >
                       + Agregar Nueva Dirección
                     </button>
@@ -1448,8 +1568,8 @@ export default function PublicView({ categories, menuItems, customers, onAddCust
                 }}
                 className={`w-full py-5 rounded-[28px] font-black uppercase text-sm tracking-[0.2em] transition-all shadow-xl flex items-center justify-center gap-3
                   ${(!deliveryMethod || (deliveryMethod === 'table' && !tableNumber) || (deliveryMethod === 'delivery' && !selectedAddress))
-                    ? 'bg-gray-100 text-gray-300 cursor-not-allowed shadow-none'
-                    : 'bg-emerald-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-emerald-500/20'
+                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed shadow-none'
+                    : 'bg-emerald-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-emerald-500/20 cursor-pointer'
                   }`}
               >
                 <MessageCircle className="w-6 h-6" />
