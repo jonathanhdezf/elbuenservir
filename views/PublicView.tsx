@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap, Mic, Download, Smartphone, Sparkles, User } from 'lucide-react';
+import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, Minus, Trash2, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap, Mic, Download, Smartphone, Sparkles, User } from 'lucide-react';
 import { Category, MenuItem, Customer, Order } from '../types';
 import { soundManager } from '../utils/soundManager';
 import LiveOrderModal from '../components/LiveOrderModal';
@@ -25,6 +25,19 @@ interface PublicViewProps {
   isPreview?: boolean;
   isDarkMode?: boolean;
   setIsDarkMode?: (isDark: boolean) => void;
+}
+
+export interface PublicCartItem {
+  id: string;
+  dishId: string;
+  name: string;
+  variationLabel: string;
+  price: number;
+  quantity: number;
+  sides?: string[];
+  comments?: string;
+  categoryId?: string;
+  isExtra?: boolean;
 }
 
 export default function PublicView({ categories, menuItems, customers, orders = [], onAddCustomer, onUpdateCustomer, onAddOrder, onEnterControlPanel, onViewDigitalTicket, isPreview, isDarkMode, setIsDarkMode }: PublicViewProps) {
@@ -53,21 +66,81 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   const [visibleItemsCount, setVisibleItemsCount] = useState(6);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Order Flow States
+  // Order Flow States (Multi-dish Cart)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [orderStep, setOrderStep] = useState(1);
-  const [selectedBaseDish, setSelectedBaseDish] = useState<MenuItem | null>(null);
-  const [selectedVariation, setSelectedVariation] = useState<any>(null);
-  const [selectedVariationsByDish, setSelectedVariationsByDish] = useState<Record<string, any>>({});
-  const [selectedSides, setSelectedSides] = useState<string[]>([]);
-  const [selectedExtras, setSelectedExtras] = useState<MenuItem[]>([]);
+  const [cartItems, setCartItems] = useState<PublicCartItem[]>([]);
+  const [modalCategoryFilter, setModalCategoryFilter] = useState<string>('all');
+  const [pendingDishSides, setPendingDishSides] = useState<Record<string, string[]>>({});
+  const [pendingDishVariation, setPendingDishVariation] = useState<Record<string, any>>({});
+  const [pendingDishQty, setPendingDishQty] = useState<Record<string, number>>({});
   const [customerComments, setCustomerComments] = useState('');
-
-  const [extraModalType, setExtraModalType] = useState<string | null>(null);
-  const [viewingExtraItem, setViewingExtraItem] = useState<MenuItem | null>(null);
-  const [viewingExtraVariation, setViewingExtraVariation] = useState<any>(null);
-
   const [quickSearch, setQuickSearch] = useState('');
+  const [extraModalType, setExtraModalType] = useState<string | null>(null);
+
+  const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const cartItemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  const isSideCategory = (catId: string) => catId === 'cat-5' || catId === 'cat-acompanar' || catId.toLowerCase().includes('acompañ');
+  const isDrinkCategory = (catId: string) => catId === 'cat-2' || catId === 'cat-bebidas' || catId.toLowerCase().includes('bebida');
+  const isDessertCategory = (catId: string) => catId === 'cat-1' || catId === 'cat-postres' || catId.toLowerCase().includes('postre');
+  const isMainDishCategory = (catId: string) => !isSideCategory(catId) && !isDrinkCategory(catId) && !isDessertCategory(catId);
+
+  const availableSides = menuItems.filter(item => isSideCategory(item.categoryId) && item.isActive);
+  const mainDishCategories = categories.filter(c => isMainDishCategory(c.id));
+
+  const handleAddDishToCart = (item: MenuItem, variationOverride?: any, sidesOverride?: string[], qtyOverride?: number) => {
+    const chosenVar = variationOverride || pendingDishVariation[item.id] || item.variations[0];
+    const qty = qtyOverride || pendingDishQty[item.id] || 1;
+    const sides = sidesOverride !== undefined ? sidesOverride : (pendingDishSides[item.id] || []);
+
+    setCartItems(prev => {
+      const existingIdx = prev.findIndex(ci =>
+        ci.dishId === item.id &&
+        ci.variationLabel === chosenVar.label &&
+        JSON.stringify([...(ci.sides || [])].sort()) === JSON.stringify([...sides].sort())
+      );
+
+      if (existingIdx > -1) {
+        return prev.map((ci, idx) =>
+          idx === existingIdx ? { ...ci, quantity: ci.quantity + qty } : ci
+        );
+      }
+
+      const newItem: PublicCartItem = {
+        id: `${item.id}-${chosenVar.id || 'v0'}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        dishId: item.id,
+        name: item.name,
+        variationLabel: chosenVar.label,
+        price: chosenVar.price,
+        quantity: qty,
+        sides: [...sides],
+        categoryId: item.categoryId,
+        isExtra: isDrinkCategory(item.categoryId) || isDessertCategory(item.categoryId)
+      };
+
+      return [...prev, newItem];
+    });
+
+    setPendingDishQty(prev => ({ ...prev, [item.id]: 1 }));
+    soundManager.play('click');
+  };
+
+  const handleUpdateCartQuantity = (cartItemId: string, delta: number) => {
+    soundManager.play('click');
+    setCartItems(prev => prev.map(item => {
+      if (item.id === cartItemId) {
+        const newQty = item.quantity + delta;
+        return newQty > 0 ? { ...item, quantity: newQty } : null;
+      }
+      return item;
+    }).filter(Boolean) as PublicCartItem[]);
+  };
+
+  const handleRemoveFromCart = (cartItemId: string) => {
+    soundManager.play('click');
+    setCartItems(prev => prev.filter(item => item.id !== cartItemId));
+  };
 
   // Auth & Profile States
   const [loggedCustomer, setLoggedCustomer] = useState<Customer | null>(() => {
@@ -180,30 +253,33 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   const sendWhatsAppOrder = (customer: Customer) => {
     const number = "2311024672";
     const orderId = `BS-${Math.random().toString(36).substr(2, 6).toUpperCase()}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
-    const total = (
-      (selectedVariation?.price || 0) +
-      selectedExtras.reduce((acc, e) => acc + Math.min(...e.variations.map(v => v.price)), 0)
-    ).toFixed(2);
+    const total = cartTotal.toFixed(2);
 
     let deliveryInfo = '';
     if (deliveryMethod === 'pickup') {
-      deliveryInfo = `🏪 *Entrega:* Recoger en mostrador%0A`;
+      deliveryInfo = `🏪 *Entrega:* Recoger en mostrador\n`;
     } else if (deliveryMethod === 'table') {
-      deliveryInfo = `🪑 *Entrega:* En mesa #${tableNumber}%0A`;
+      deliveryInfo = `🪑 *Entrega:* En mesa #${tableNumber}\n`;
     } else if (deliveryMethod === 'delivery') {
-      deliveryInfo = `🏠 *Entrega:* Domicilio - ${selectedAddress}%0A`;
+      deliveryInfo = `🏠 *Entrega:* Domicilio - ${selectedAddress}\n`;
     }
+
+    const itemsSummary = cartItems.map(item => {
+      const sidesText = item.sides && item.sides.length > 0 ? `\n   ↳ Guarnición: ${item.sides.join(', ')}` : '';
+      const notesText = item.comments ? `\n   ↳ Nota: ${item.comments}` : '';
+      return `• ${item.quantity}x ${item.name} (${item.variationLabel}) - $${(item.price * item.quantity).toFixed(2)}${sidesText}${notesText}`;
+    }).join('\n');
 
     const orderText = `*NUEVO PEDIDO EN LÍNEA - EL BUEN SERVIR*\n\n` +
       `🆔 *Orden:* #${orderId}\n` +
       `👤 *Cliente:* ${customer.name}\n` +
       `📱 *Teléfono:* ${customer.phone}\n` +
-      deliveryInfo.replace(/%0A/g, '\n') +
-      `🥘 *Platillo:* ${selectedBaseDish?.name}${selectedVariation ? ` (${selectedVariation.label} - $${selectedVariation.price})` : ''}\n` +
-      (selectedSides.length > 0 ? `🥗 *Guarniciones:* ${selectedSides.join(', ')} (Sin costo)\n` : '') +
-      (selectedExtras.length > 0 ? `🥤 *Adicionales:* ${selectedExtras.map(e => `${e.name}${e.variations?.[0] ? ` (${e.variations[0].label})` : ''}`).join(', ')}\n` : '') +
-      (customerComments ? `📝 *Notas:* ${customerComments}\n` : '') +
-      `\n💰 *TOTAL:* $${total}\n\n` +
+      deliveryInfo +
+      `\n*PLATILLOS Y PRODUCTOS:*\n` +
+      itemsSummary +
+      `\n\n` +
+      (customerComments ? `📝 *Instrucciones generales:* ${customerComments}\n` : '') +
+      `💰 *TOTAL:* $${total}\n\n` +
       `🚀 _Enviado desde el sitio web_`;
 
     window.open(`https://wa.me/52${number}?text=${encodeURIComponent(orderText)}`, '_blank');
@@ -216,22 +292,13 @@ export default function PublicView({ categories, menuItems, customers, orders = 
         address: deliveryMethod === 'pickup' ? 'Recoger en mostrador' :
           deliveryMethod === 'table' ? `Mesa: ${tableNumber}` :
             selectedAddress,
-        items: [
-          {
-            id: selectedBaseDish?.id || '',
-            name: selectedBaseDish?.name || '',
-            variationLabel: selectedVariation?.label || '',
-            price: selectedVariation?.price || 0,
-            quantity: 1
-          },
-          ...selectedExtras.map(extra => ({
-            id: extra.id,
-            name: extra.name,
-            variationLabel: extra.variations[0].label,
-            price: extra.variations[0].price,
-            quantity: 1
-          }))
-        ],
+        items: cartItems.map(item => ({
+          id: item.dishId,
+          name: item.name,
+          variationLabel: item.variationLabel + (item.sides && item.sides.length > 0 ? ` [${item.sides.join(', ')}]` : ''),
+          price: item.price,
+          quantity: item.quantity
+        })),
         total: parseFloat(total),
         status: 'pending',
         paymentMethod: 'efectivo',
@@ -243,11 +310,9 @@ export default function PublicView({ categories, menuItems, customers, orders = 
       onAddOrder(newOrder);
     }
 
+    setCartItems([]);
     setIsOrderModalOpen(false);
     setOrderStep(1);
-    setSelectedBaseDish(null);
-    setSelectedSides([]);
-    setSelectedExtras([]);
     setCustomerComments('');
     setDeliveryMethod(null);
     setTableNumber('');
@@ -481,13 +546,13 @@ export default function PublicView({ categories, menuItems, customers, orders = 
 
             <button
               onClick={() => {
-                setOrderStep(1);
+                setOrderStep(cartItems.length > 0 ? 3 : 1);
                 setIsOrderModalOpen(true);
               }}
               className={`hidden sm:flex items-center gap-2 px-8 py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest transition-all shadow-xl ${isScrolled || isPreview ? 'bg-primary-500 text-white shadow-primary-500/30 hover:scale-105' : 'bg-white text-gray-900 hover:scale-105 active:scale-95 shadow-white/10'}`}
             >
               <ShoppingBag className="w-4 h-4" />
-              Ordenar en Línea
+              {cartItems.length > 0 ? `Mi Pedido (${cartItemsCount})` : 'Ordenar en Línea'}
             </button>
 
             {/* Mobile Menu Button (Hamburger) */}
@@ -641,13 +706,14 @@ export default function PublicView({ categories, menuItems, customers, orders = 
 
                 <button
                   onClick={() => {
-                    setOrderStep(1);
+                    setOrderStep(cartItems.length > 0 ? 3 : 1);
                     setIsOrderModalOpen(true);
                     setIsMobileMenuOpen(false);
                   }}
-                  className="w-full bg-primary-500 text-white py-5 rounded-[24px] font-black uppercase tracking-widest shadow-xl shadow-primary-500/30 active:scale-95 transition-all"
+                  className="w-full bg-primary-500 text-white py-5 rounded-[24px] font-black uppercase tracking-widest shadow-xl shadow-primary-500/30 active:scale-95 transition-all flex items-center justify-center gap-2"
                 >
-                  Ordenar ahora
+                  <ShoppingBag className="w-5 h-5" />
+                  <span>{cartItems.length > 0 ? `Ver Mi Pedido (${cartItemsCount})` : 'Ordenar ahora'}</span>
                 </button>
 
                 <button
@@ -701,13 +767,13 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   </button>
                   <button
                     onClick={() => {
-                      setOrderStep(1);
+                      setOrderStep(cartItems.length > 0 ? 3 : 1);
                       setIsOrderModalOpen(true);
                     }}
                     className="w-full sm:w-auto group flex items-center justify-center gap-3 bg-white text-gray-900 px-10 py-6 rounded-3xl text-lg font-black uppercase tracking-widest shadow-2xl shadow-white/30 transition-all hover:-translate-y-1 hover:bg-primary-500 hover:text-white active:scale-95 cursor-pointer"
                   >
                     <ShoppingBag className="w-6 h-6" />
-                    <span>Ordenar en Línea</span>
+                    <span>{cartItems.length > 0 ? `Mi Pedido (${cartItemsCount})` : 'Ordenar en Línea'}</span>
                   </button>
                   <button
                     type="button"
@@ -883,9 +949,9 @@ export default function PublicView({ categories, menuItems, customers, orders = 
 
                       <button
                         onClick={() => {
-                          setSelectedBaseDish(item);
-                          setSelectedVariation(activeVariation);
-                          setOrderStep(2);
+                          const chosenVar = activeVariation || item.variations[0];
+                          handleAddDishToCart(item, chosenVar);
+                          setOrderStep(1);
                           setIsOrderModalOpen(true);
                         }}
                         className="w-full py-3.5 sm:py-4 bg-gray-50 dark:bg-gray-800 hover:bg-primary-500 hover:text-white dark:hover:bg-primary-500 text-gray-700 dark:text-gray-200 rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 hover:border-primary-500 dark:hover:border-primary-500 cursor-pointer shadow-sm active:scale-98 group/btn"
@@ -1118,25 +1184,28 @@ export default function PublicView({ categories, menuItems, customers, orders = 
           </footer>
         )
       }
-      {/* Order Modal */}
+      {/* Order Modal (Multi-Dish Ordering) */}
       {
         isOrderModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 animate-in fade-in duration-300">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-300">
             <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setIsOrderModalOpen(false)}></div>
-            <div className="bg-white dark:bg-gray-900 w-full max-w-2xl rounded-[40px] shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
+            <div className="bg-white dark:bg-gray-900 w-full max-w-3xl rounded-[36px] sm:rounded-[44px] shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-300 border border-gray-100 dark:border-gray-800">
 
               {/* Modal Header */}
-              <div className="p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+              <div className="p-6 sm:p-8 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/70 dark:bg-gray-800/50 shrink-0">
                 <div>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="bg-primary-500 text-white text-[10px] font-black px-2 py-0.5 rounded-lg uppercase tracking-tighter">Paso {orderStep} de 4</span>
-                    <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Compra en Línea</h3>
+                    <span className="bg-primary-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-lg uppercase tracking-wider">
+                      Paso {orderStep} de 3
+                    </span>
+                    <h3 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">
+                      Compra en Línea
+                    </h3>
                   </div>
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                    {orderStep === 1 && "Selecciona tu platillo"}
-                    {orderStep === 2 && "¿Con qué se acompañará?"}
-                    {orderStep === 3 && "Sugerencias para acompañar"}
-                    {orderStep === 4 && "Resumen y Envío"}
+                    {orderStep === 1 && "1. Elige uno o más platillos"}
+                    {orderStep === 2 && "2. Bebidas y postres"}
+                    {orderStep === 3 && "3. Resumen y envío"}
                   </p>
                 </div>
                 <button
@@ -1149,298 +1218,447 @@ export default function PublicView({ categories, menuItems, customers, orders = 
               </div>
 
               {/* Modal Content */}
-              <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-5 sm:p-8 space-y-6 custom-scrollbar">
 
-                {/* Step 1: Menu Selection */}
+                {/* Step 1: Main Dishes (Multi-Selection) */}
                 {orderStep === 1 && (
                   <div className="space-y-6">
-                    {/* Busqueda Rapida */}
-                    <div className="relative">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Buscar platillo..."
-                        value={quickSearch}
-                        onChange={(e) => setQuickSearch(e.target.value)}
-                        className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl pl-12 pr-4 py-3 font-bold text-gray-700 dark:text-white outline-none transition-all"
-                      />
-                    </div>
-
-                    {categories.filter(cat => cat.id === 'cat-3').map(cat => (
-                      <div key={cat.id} className="space-y-4">
-                        <h5 className="text-xs font-black text-primary-500 uppercase tracking-[0.2em]">{cat.name}</h5>
-                        <div className="grid grid-cols-1 gap-3">
-                          {menuItems
-                            .filter(item =>
-                              item.categoryId !== 'cat-1' &&
-                              item.categoryId !== 'cat-2' &&
-                              item.isActive &&
-                              item.name.toLowerCase().includes(quickSearch.toLowerCase())
-                            )
-                            .map(item => (
-                              <div
-                                key={item.id}
-                                className="p-5 bg-gray-50 dark:bg-gray-800/80 rounded-3xl border border-gray-100 dark:border-gray-700 hover:shadow-lg transition-all"
-                              >
-                                <div className="mb-4">
-                                  <p className="font-black text-gray-900 dark:text-white uppercase tracking-tight text-lg">{item.name}</p>
-                                  <p className="text-xs text-gray-500 dark:text-gray-300 italic mt-1">{item.description}</p>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                  <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400 block">
-                                    Selecciona tu variante:
-                                  </span>
-                                  <div className="flex flex-wrap gap-2">
-                                    {item.variations.map(v => {
-                                      const isChosen = selectedBaseDish?.id === item.id && selectedVariation?.id === v.id;
-                                      return (
-                                        <button
-                                          key={v.id}
-                                          onClick={() => {
-                                            setSelectedBaseDish(item);
-                                            setSelectedVariation(v);
-                                            setOrderStep(2);
-                                          }}
-                                          className={`flex-grow sm:flex-grow-0 flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl border transition-all cursor-pointer group/var ${isChosen
-                                            ? 'bg-primary-500 text-white border-primary-500 shadow-md ring-2 ring-primary-500/30'
-                                            : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-primary-500 dark:hover:border-primary-500 text-gray-700 dark:text-gray-200'
-                                            }`}
-                                        >
-                                          <span className={`text-xs font-black uppercase tracking-wide ${isChosen ? 'text-white' : 'text-gray-700 dark:text-gray-200 group-hover/var:text-primary-500'}`}>{v.label}</span>
-                                          <span className={`text-sm font-black ${isChosen ? 'text-white' : 'text-gray-900 dark:text-white group-hover/var:text-primary-500'}`}>${v.price}</span>
-                                          {isChosen && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          {menuItems.filter(item => item.categoryId !== 'cat-1' && item.categoryId !== 'cat-2' && item.isActive && item.name.toLowerCase().includes(quickSearch.toLowerCase())).length === 0 && (
-                            <p className="text-center text-gray-400 italic py-4">No se encontraron platillos con ese nombre.</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Step 2: Accompaniment Selection */}
-                {orderStep === 2 && selectedBaseDish && (
-                  <div className="space-y-8">
-                    <div className="bg-primary-50 dark:bg-primary-950/40 p-6 rounded-3xl border border-primary-100 dark:border-primary-900/60">
-                      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                        <p className="text-xs font-black text-primary-600 dark:text-primary-400 uppercase tracking-widest">Platillo seleccionado</p>
-                        {selectedVariation && (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-500 text-white text-xs font-black uppercase shadow-sm">
-                            <Check className="w-3.5 h-3.5 stroke-[3]" />
-                            Variante: {selectedVariation.label} • ${selectedVariation.price}
-                          </span>
-                        )}
-                      </div>
-                      <h4 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">{selectedBaseDish.name}</h4>
-
-                      {/* Switch variation in Step 2 if multiple available */}
-                      {selectedBaseDish.variations.length > 1 && (
-                        <div className="mt-4 pt-4 border-t border-primary-100/60 dark:border-primary-900/40">
-                          <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 dark:text-gray-300 mb-2 block">
-                            Cambiar variante seleccionada:
-                          </span>
-                          <div className="flex flex-wrap gap-2">
-                            {selectedBaseDish.variations.map((v: any) => {
-                              const isSelected = selectedVariation?.id === v.id;
-                              return (
-                                <button
-                                  key={v.id}
-                                  type="button"
-                                  onClick={() => setSelectedVariation(v)}
-                                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all border cursor-pointer ${
-                                    isSelected
-                                      ? 'bg-primary-500 text-white border-primary-500 shadow-md ring-2 ring-primary-500/30'
-                                      : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-primary-400'
-                                  }`}
-                                >
-                                  <span>{v.label}</span>
-                                  <span className="opacity-90">${v.price}</span>
-                                  {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
-                                </button>
-                              );
-                            })}
+                    {/* Cart Summary Bar inside Step 1 (if items added) */}
+                    {cartItems.length > 0 && (
+                      <div className="p-4 sm:p-5 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded-3xl space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <ShoppingBag className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                            <span className="text-xs font-black uppercase tracking-wider text-primary-700 dark:text-primary-300">
+                              Tu Pedido ({cartItemsCount} {cartItemsCount === 1 ? 'producto' : 'productos'})
+                            </span>
                           </div>
+                          <span className="font-mono font-black text-primary-600 dark:text-primary-400 text-sm">
+                            ${cartTotal.toFixed(2)}
+                          </span>
                         </div>
-                      )}
-                      <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-3">✨ Las guarniciones no tienen costo extra.</p>
-                    </div>
 
-                    <div className="space-y-4">
-                      <p className="text-xs font-black text-gray-500 dark:text-gray-300 uppercase tracking-widest ml-1">¿Con qué se va a acompañar?</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {menuItems.filter(item => item.categoryId === 'cat-5' && item.isActive).map(item => item.name).map(side => (
+                        <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                          {cartItems.map((cartItem) => (
+                            <div key={cartItem.id} className="p-3 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-between gap-3 shadow-sm border border-gray-100 dark:border-gray-700 text-xs">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-black text-gray-900 dark:text-white uppercase truncate">{cartItem.name}</p>
+                                <p className="text-[10px] font-bold text-primary-500 uppercase">{cartItem.variationLabel} • ${(cartItem.price * cartItem.quantity).toFixed(2)}</p>
+                                {cartItem.sides && cartItem.sides.length > 0 && (
+                                  <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold truncate">Guarnición: {cartItem.sides.join(', ')}</p>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateCartQuantity(cartItem.id, -1)}
+                                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300 cursor-pointer"
+                                    title="Disminuir"
+                                  >
+                                    <Minus className="w-3 h-3" />
+                                  </button>
+                                  <span className="w-6 text-center font-black text-xs text-gray-900 dark:text-white">{cartItem.quantity}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateCartQuantity(cartItem.id, 1)}
+                                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300 cursor-pointer"
+                                    title="Aumentar"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveFromCart(cartItem.id)}
+                                  className="p-1.5 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Search and Category Filter */}
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Buscar platillo..."
+                          value={quickSearch}
+                          onChange={(e) => setQuickSearch(e.target.value)}
+                          className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl pl-11 pr-4 py-3 font-bold text-sm text-gray-700 dark:text-white outline-none transition-all placeholder:text-gray-400"
+                        />
+                      </div>
+
+                      {/* Category Pills */}
+                      <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1">
+                        <button
+                          type="button"
+                          onClick={() => setModalCategoryFilter('all')}
+                          className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
+                            modalCategoryFilter === 'all'
+                              ? 'bg-primary-500 text-white shadow-md shadow-primary-500/20'
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          Todos
+                        </button>
+                        {mainDishCategories.map(cat => (
                           <button
-                            key={side}
-                            onClick={() => {
-                              if (selectedSides.includes(side)) {
-                                setSelectedSides(prev => prev.filter(s => s !== side));
-                              } else {
-                                setSelectedSides(prev => [...prev, side]);
-                              }
-                            }}
-                            className={`flex items-center justify-between p-5 rounded-3xl border-2 transition-all font-bold text-sm cursor-pointer ${selectedSides.includes(side)
-                              ? 'bg-primary-500 text-white border-primary-500 shadow-lg shadow-primary-500/20'
-                              : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-100 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-500'
-                              }`}
+                            key={cat.id}
+                            type="button"
+                            onClick={() => setModalCategoryFilter(cat.id)}
+                            className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider whitespace-nowrap transition-all cursor-pointer ${
+                              modalCategoryFilter === cat.id
+                                ? 'bg-primary-500 text-white shadow-md shadow-primary-500/20'
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                            }`}
                           >
-                            <span>{side}</span>
-                            {selectedSides.includes(side) ? <Check className="w-5 h-5" /> : <Plus className="w-4 h-4 opacity-50 dark:opacity-70 text-gray-400 dark:text-gray-300" />}
+                            {cat.name}
                           </button>
                         ))}
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <label className="text-xs font-black text-gray-500 dark:text-gray-300 uppercase tracking-widest ml-1">Instrucciones Especiales</label>
-                      <textarea
-                        value={customerComments}
-                        onChange={e => setCustomerComments(e.target.value)}
-                        placeholder="Ej. Sin cebolla, término medio, etc..."
-                        className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 focus:border-primary-500 rounded-3xl p-6 outline-none transition-all font-bold text-sm min-h-[120px] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                      />
+                    {/* Dishes Grid */}
+                    <div className="grid grid-cols-1 gap-4">
+                      {menuItems
+                        .filter(item => {
+                          if (!item.isActive) return false;
+                          if (!isMainDishCategory(item.categoryId)) return false;
+                          if (modalCategoryFilter !== 'all' && item.categoryId !== modalCategoryFilter) return false;
+                          if (quickSearch.trim()) {
+                            const q = quickSearch.toLowerCase();
+                            return item.name.toLowerCase().includes(q) || (item.description && item.description.toLowerCase().includes(q));
+                          }
+                          return true;
+                        })
+                        .map(item => {
+                          const currentVar = pendingDishVariation[item.id] || item.variations[0];
+                          const currentQty = pendingDishQty[item.id] || 1;
+                          const currentSides = pendingDishSides[item.id] || [];
+
+                          return (
+                            <div
+                              key={item.id}
+                              className="p-5 bg-gray-50 dark:bg-gray-800/80 rounded-3xl border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all space-y-4"
+                            >
+                              <div>
+                                <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tight text-base sm:text-lg">
+                                  {item.name}
+                                </h4>
+                                {item.description && (
+                                  <p className="text-xs text-gray-500 dark:text-gray-300 italic mt-0.5">
+                                    {item.description}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Variations */}
+                              <div className="space-y-1.5">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400 block">
+                                  Variante:
+                                </span>
+                                <div className="flex flex-wrap gap-2">
+                                  {item.variations.map(v => {
+                                    const isSelected = currentVar?.id === v.id;
+                                    return (
+                                      <button
+                                        key={v.id}
+                                        type="button"
+                                        onClick={() => setPendingDishVariation(prev => ({ ...prev, [item.id]: v }))}
+                                        className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all cursor-pointer ${
+                                          isSelected
+                                            ? 'bg-primary-500 text-white border-primary-500 shadow-sm ring-2 ring-primary-500/30'
+                                            : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-primary-400'
+                                        }`}
+                                      >
+                                        <span>{v.label}</span>
+                                        <span className={isSelected ? 'text-white' : 'text-gray-900 dark:text-white'}>${v.price}</span>
+                                        {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Free Sides */}
+                              {availableSides.length > 0 && (
+                                <div className="space-y-1.5 pt-2 border-t border-gray-200/60 dark:border-gray-700/60">
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                    <span>Guarniciones incluidas (sin costo extra):</span>
+                                  </span>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {availableSides.map(side => {
+                                      const isChecked = currentSides.includes(side.name);
+                                      return (
+                                        <button
+                                          key={side.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setPendingDishSides(prev => {
+                                              const old = prev[item.id] || [];
+                                              return {
+                                                ...prev,
+                                                [item.id]: isChecked ? old.filter(s => s !== side.name) : [...old, side.name]
+                                              };
+                                            });
+                                          }}
+                                          className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border cursor-pointer flex items-center gap-1.5 ${
+                                            isChecked
+                                              ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                                              : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-emerald-400'
+                                          }`}
+                                        >
+                                          <span>{side.name}</span>
+                                          {isChecked ? <Check className="w-3 h-3 stroke-[3]" /> : <Plus className="w-3 h-3 opacity-50" />}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Quantity & Add button */}
+                              <div className="flex items-center justify-between gap-3 pt-2">
+                                <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl p-1.5 shadow-sm">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (currentQty > 1) setPendingDishQty(prev => ({ ...prev, [item.id]: currentQty - 1 }));
+                                    }}
+                                    className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                                    title="Menos"
+                                  >
+                                    <Minus className="w-3.5 h-3.5" />
+                                  </button>
+                                  <span className="w-8 text-center font-black text-sm text-gray-900 dark:text-white">
+                                    {currentQty}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPendingDishQty(prev => ({ ...prev, [item.id]: currentQty + 1 }));
+                                    }}
+                                    className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                                    title="Más"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddDishToCart(item)}
+                                  className="flex-1 py-3 px-5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-primary-500 dark:hover:bg-primary-500 dark:hover:text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                  <Plus className="w-4 h-4" />
+                                  <span>Agregar al Pedido</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                      {menuItems.filter(item => {
+                        if (!item.isActive || !isMainDishCategory(item.categoryId)) return false;
+                        if (modalCategoryFilter !== 'all' && item.categoryId !== modalCategoryFilter) return false;
+                        if (quickSearch.trim()) {
+                          const q = quickSearch.toLowerCase();
+                          return item.name.toLowerCase().includes(q);
+                        }
+                        return true;
+                      }).length === 0 && (
+                        <p className="text-center text-gray-400 italic py-8">No se encontraron platillos con ese filtro o búsqueda.</p>
+                      )}
                     </div>
                   </div>
                 )}
 
-                {/* Step 3: Drinks & Desserts */}
-                {orderStep === 3 && (
-                  <div className="space-y-6 text-center py-6">
-                    <div className="inline-flex p-4 bg-amber-50 dark:bg-amber-950/30 rounded-3xl mb-4">
-                      <Award className="w-12 h-12 text-amber-500" />
+                {/* Step 2: Drinks & Desserts */}
+                {orderStep === 2 && (
+                  <div className="space-y-6">
+                    <div className="text-center py-2">
+                      <h4 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">¿Deseas acompañar con bebidas o postres?</h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider mt-1">Elige tus complementos favoritos</p>
                     </div>
-                    <h4 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">¿Deseas algo más?</h4>
-                    <p className="text-gray-500 dark:text-gray-400 font-bold max-w-sm mx-auto mb-8">Te sugerimos acompañar tu plato con una de nuestras bebidas o postres artesanales.</p>
 
-                    <div className="space-y-4">
-                      {categories
-                        .filter(cat => !['cat-3', 'cat-5', 'cat-caldos', 'cat-cerdo', 'cat-pollo', 'cat-carnes', 'cat-mariscos', 'cat-desayunos'].includes(cat.id))
-                        .map(cat => (
-                          <div key={cat.id} className="space-y-2">
-                            <button
-                              onClick={() => setExtraModalType(cat.id === 'cat-2' ? 'drinks' : cat.id === 'cat-1' ? 'desserts' : null)} // Currently mapping manually, eventually should be dynamic based on category type
-                              className={`w-full flex items-center justify-between p-6 bg-white dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-800 rounded-3xl hover:border-primary-500 transition-all shadow-sm hover:shadow-xl group
-                                ${cat.id === 'cat-2' ? 'hover:border-amber-500' : ''}
-                                ${cat.id === 'cat-1' ? 'hover:border-pink-500' : ''}
-                              `}
-                            >
-                              <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform
-                                   ${cat.id === 'cat-2' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
-                                    cat.id === 'cat-1' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400' :
-                                      'bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400'}
-                                `}>
-                                  {cat.id === 'cat-2' ? <ShoppingBag className="w-6 h-6" /> :
-                                    cat.id === 'cat-1' ? <Heart className="w-6 h-6" /> :
-                                      <Utensils className="w-6 h-6" />}
-                                </div>
-                                <div className="text-left">
-                                  <h5 className="font-black text-gray-900 dark:text-white uppercase tracking-widest text-sm">{cat.name}</h5>
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Toca para elegir</p>
-                                </div>
-                              </div>
-                              <ChevronRight className={`w-5 h-5 text-gray-300 transition-colors
-                                  ${cat.id === 'cat-2' ? 'group-hover:text-amber-500' :
-                                  cat.id === 'cat-1' ? 'group-hover:text-pink-500' :
-                                    'group-hover:text-primary-500'}
-                              `} />
-                            </button>
-
-                            {selectedExtras.filter(e => e.categoryId === cat.id).length > 0 && (
-                              <div className="flex flex-wrap gap-2 px-2">
-                                {selectedExtras.filter(e => e.categoryId === cat.id).map(item => (
-                                  <span key={item.id} className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase flex items-center gap-2
-                                       ${cat.id === 'cat-2' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' :
-                                      cat.id === 'cat-1' ? 'bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-400' :
-                                        'bg-primary-100 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400'}
-                                    `}>
-                                    {item.name}
-                                    <button onClick={() => setSelectedExtras(prev => prev.filter(p => p.id !== item.id))} className="hover:opacity-70" aria-label={`Eliminar ${item.name}`}><X className="w-3 h-3" /></button>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {menuItems
+                        .filter(item => (isDrinkCategory(item.categoryId) || isDessertCategory(item.categoryId)) && item.isActive)
+                        .map(extra => {
+                          const isDrink = isDrinkCategory(extra.categoryId);
+                          const currentVar = pendingDishVariation[extra.id] || extra.variations[0];
+                          return (
+                            <div key={extra.id} className="p-4 bg-gray-50 dark:bg-gray-800/80 rounded-3xl border border-gray-100 dark:border-gray-700 flex flex-col justify-between gap-3">
+                              <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-md ${isDrink ? 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400' : 'bg-pink-100 dark:bg-pink-950/40 text-pink-700 dark:text-pink-400'}`}>
+                                    {isDrink ? 'Bebida' : 'Postre'}
                                   </span>
-                                ))}
+                                  <span className="font-black text-gray-900 dark:text-white text-sm uppercase truncate">{extra.name}</span>
+                                </div>
+                                {extra.variations.length > 1 && (
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    {extra.variations.map(v => (
+                                      <button
+                                        key={v.id}
+                                        type="button"
+                                        onClick={() => setPendingDishVariation(prev => ({ ...prev, [extra.id]: v }))}
+                                        className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all cursor-pointer ${
+                                          currentVar?.id === v.id
+                                            ? 'bg-primary-500 text-white border-primary-500'
+                                            : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                                        }`}
+                                      >
+                                        {v.label} ${v.price}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
-                            )}
+
+                              <div className="flex items-center justify-between pt-1 border-t border-gray-200/50 dark:border-gray-700/50">
+                                <span className="font-black text-sm text-primary-500 dark:text-primary-400">
+                                  ${currentVar?.price.toFixed(2)}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAddDishToCart(extra, currentVar, [], 1)}
+                                  className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                                >
+                                  <Plus className="w-3.5 h-3.5" />
+                                  <span>Agregar</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                    </div>
+
+                    {cartItems.filter(i => i.isExtra).length > 0 && (
+                      <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-3xl space-y-2">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+                          Complementos agregados ({cartItems.filter(i => i.isExtra).reduce((s, i) => s + i.quantity, 0)}):
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {cartItems.filter(i => i.isExtra).map(extra => (
+                            <span key={extra.id} className="px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-black shadow-sm border border-gray-200 dark:border-gray-700 flex items-center gap-2">
+                              <span>{extra.quantity}x {extra.name} ({extra.variationLabel})</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFromCart(extra.id)}
+                                className="text-gray-400 hover:text-red-500 cursor-pointer"
+                                title="Eliminar"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Step 3: Summary and Submission */}
+                {orderStep === 3 && (
+                  <div className="space-y-6">
+                    <div className="text-center py-2">
+                      <h4 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Resumen de tu Pedido</h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider mt-1">Revisa tus productos antes de enviar</p>
+                    </div>
+
+                    <div className="bg-gray-50 dark:bg-gray-800/80 rounded-[32px] overflow-hidden border border-gray-100 dark:border-gray-700">
+                      <div className="p-5 sm:p-6 space-y-3">
+                        {cartItems.map(item => (
+                          <div key={item.id} className="p-4 bg-white dark:bg-gray-900 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-primary-500 font-black text-sm">{item.quantity}x</span>
+                                <span className="font-black text-gray-900 dark:text-white text-sm uppercase truncate">{item.name}</span>
+                                <span className="text-xs font-bold text-gray-400 uppercase">({item.variationLabel})</span>
+                              </div>
+                              {item.sides && item.sides.length > 0 && (
+                                <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                                  Guarnición: {item.sides.join(', ')}
+                                </p>
+                              )}
+                            </div>
+
+                            <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                              <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateCartQuantity(item.id, -1)}
+                                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 cursor-pointer"
+                                  title="Disminuir"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </button>
+                                <span className="w-6 text-center font-black text-xs text-gray-900 dark:text-white">{item.quantity}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateCartQuantity(item.id, 1)}
+                                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 cursor-pointer"
+                                  title="Aumentar"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </div>
+
+                              <span className="font-mono font-black text-sm text-gray-900 dark:text-white min-w-[70px] text-right">
+                                ${(item.price * item.quantity).toFixed(2)}
+                              </span>
+
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFromCart(item.id)}
+                                className="p-1.5 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                                title="Eliminar"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
                         ))}
 
-
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 4: Summary */}
-                {orderStep === 4 && selectedBaseDish && (
-                  <div className="space-y-8">
-                    <div className="text-center py-6">
-                      <div className="inline-flex p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-3xl mb-4">
-                        <MessageCircle className="w-12 h-12 text-emerald-500" />
-                      </div>
-                      <h4 className="text-3xl font-black text-gray-900 dark:text-white uppercase tracking-tighter">Resumen de tu Pedido</h4>
-                      <p className="text-gray-500 dark:text-gray-400 font-bold uppercase tracking-widest text-[10px] mt-2 italic">Confirmación Final</p>
-                    </div>
-
-                    <div className="bg-gray-50 dark:bg-gray-800 rounded-[32px] overflow-hidden border border-gray-100 dark:border-gray-700">
-                      <div className="p-6 border-b border-gray-100 dark:border-gray-700 flex justify-between items-center">
-                        <div>
-                          <span className="font-black text-gray-900 dark:text-white uppercase text-base block">{selectedBaseDish.name}</span>
-                          {selectedVariation && (
-                            <span className="inline-flex items-center gap-1 mt-1 text-xs font-bold text-primary-600 dark:text-primary-400 uppercase">
-                              <Check className="w-3.5 h-3.5 stroke-[3]" />
-                              Variante: {selectedVariation.label}
-                            </span>
-                          )}
+                        <div className="pt-2 text-center">
+                          <button
+                            type="button"
+                            onClick={() => setOrderStep(1)}
+                            className="text-xs font-black uppercase tracking-wider text-primary-500 hover:underline cursor-pointer"
+                          >
+                            + Agregar más platillos a este pedido
+                          </button>
                         </div>
-                        <span className="font-black text-primary-500 dark:text-primary-400 text-xl">${selectedVariation?.price.toFixed(2)}</span>
                       </div>
 
-                      {selectedSides.length > 0 && (
-                        <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-white/50 dark:bg-gray-900/50">
-                          <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Guarniciones (Sin Costo):</p>
-                          <div className="flex flex-wrap gap-2">
-                            {selectedSides.map(side => (
-                              <span key={side} className="px-3 py-1 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[10px] font-black rounded-lg uppercase">{side}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {selectedExtras.length > 0 && (
-                        <div className="p-6 border-b border-gray-100 dark:border-gray-700">
-                          <p className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3">Adicionales:</p>
-                          <div className="space-y-2">
-                            {selectedExtras.map(extra => (
-                              <div key={extra.id} className="flex justify-between items-center text-sm font-bold text-gray-900 dark:text-white">
-                                <div className="flex items-center gap-2">
-                                  <span>{extra.name}</span>
-                                  {extra.variations && extra.variations[0] && (
-                                    <span className="text-xs text-gray-500 dark:text-gray-400 font-normal">
-                                      ({extra.variations[0].label})
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="font-extrabold text-primary-500 dark:text-primary-400">${Math.min(...extra.variations.map(v => v.price)).toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="p-8 bg-gray-900 text-white flex justify-between items-baseline">
+                      <div className="p-6 bg-gray-900 text-white flex justify-between items-baseline">
                         <span className="text-xs font-black uppercase tracking-[0.3em] opacity-60">Total Estimado</span>
-                        <span className="text-4xl font-black tracking-tighter">
-                          ${(
-                            (selectedVariation?.price || 0) +
-                            selectedExtras.reduce((acc, e) => acc + Math.min(...e.variations.map(v => v.price)), 0)
-                          ).toFixed(2)}
+                        <span className="text-3xl sm:text-4xl font-black tracking-tighter">
+                          ${cartTotal.toFixed(2)}
                         </span>
                       </div>
+                    </div>
+
+                    {/* General Notes */}
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-gray-500 dark:text-gray-300 uppercase tracking-widest ml-1">
+                        Instrucciones Especiales para el Pedido (Opcional)
+                      </label>
+                      <textarea
+                        value={customerComments}
+                        onChange={e => setCustomerComments(e.target.value)}
+                        placeholder="Ej. Salsa aparte, servilletas extra, cubiertos..."
+                        className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 focus:border-primary-500 rounded-2xl p-4 outline-none transition-all font-bold text-sm min-h-[90px] text-gray-900 dark:text-white placeholder:text-gray-400"
+                      />
                     </div>
                   </div>
                 )}
@@ -1448,33 +1666,43 @@ export default function PublicView({ categories, menuItems, customers, orders = 
               </div>
 
               {/* Modal Footer Controls */}
-              <div className="p-8 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
+              <div className="p-6 sm:p-8 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
                 <div className="flex gap-4">
                   {orderStep > 1 && (
                     <button
                       onClick={() => setOrderStep(prev => prev - 1)}
-                      className="px-8 py-5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-gray-200 dark:hover:bg-gray-700 transition-all cursor-pointer"
+                      className="px-6 sm:px-8 py-4 sm:py-5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-gray-200 dark:hover:bg-gray-700 transition-all cursor-pointer"
                     >
                       Regresar
                     </button>
                   )}
 
-                  {orderStep < 4 ? (
+                  {orderStep === 1 && (
                     <button
-                      onClick={() => {
-                        if (orderStep === 1 && !selectedBaseDish) return;
-                        setOrderStep(prev => prev + 1);
-                      }}
-                      disabled={orderStep === 1 && !selectedBaseDish}
-                      className={`flex-1 flex items-center justify-center gap-3 py-5 rounded-3xl font-black uppercase text-xs tracking-widest transition-all shadow-xl cursor-pointer ${orderStep === 1 && !selectedBaseDish
-                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
-                        : 'bg-gray-900 dark:bg-primary-500 text-white hover:scale-[1.02] active:scale-[0.98]'
-                        }`}
+                      onClick={() => setOrderStep(2)}
+                      disabled={cartItems.length === 0}
+                      className={`flex-1 flex items-center justify-center gap-3 py-4 sm:py-5 rounded-3xl font-black uppercase text-xs tracking-widest transition-all shadow-xl cursor-pointer ${
+                        cartItems.length === 0
+                          ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed'
+                          : 'bg-gray-900 dark:bg-primary-500 text-white hover:scale-[1.02] active:scale-[0.98]'
+                      }`}
                     >
-                      <span>{orderStep === 1 ? 'Continuar' : 'Siguiente Paso'}</span>
+                      <span>{cartItems.length === 0 ? 'Selecciona al menos 1 platillo' : 'Continuar (Bebidas y Postres)'}</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
-                  ) : (
+                  )}
+
+                  {orderStep === 2 && (
+                    <button
+                      onClick={() => setOrderStep(3)}
+                      className="flex-1 flex items-center justify-center gap-3 py-4 sm:py-5 bg-gray-900 dark:bg-primary-500 text-white rounded-3xl font-black uppercase text-xs tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xl cursor-pointer"
+                    >
+                      <span>Continuar al Resumen</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  {orderStep === 3 && (
                     <button
                       onClick={() => {
                         if (!loggedCustomer) {
@@ -1484,164 +1712,18 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                         }
                         setIsDeliverySelectionOpen(true);
                       }}
-                      className="flex-1 flex items-center justify-center gap-3 py-6 bg-emerald-500 text-white rounded-[28px] font-black uppercase text-sm tracking-[0.2em] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-emerald-500/20"
+                      disabled={cartItems.length === 0}
+                      className={`flex-1 flex items-center justify-center gap-3 py-5 sm:py-6 rounded-[28px] font-black uppercase text-sm tracking-[0.2em] transition-all shadow-2xl ${
+                        cartItems.length === 0
+                          ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed shadow-none'
+                          : 'bg-emerald-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-emerald-500/20 cursor-pointer'
+                      }`}
                     >
                       <MessageCircle className="w-6 h-6" />
-                      <span>Enviar Pedido por WhatsApp</span>
+                      <span>Confirmar y Enviar Pedido</span>
                     </button>
                   )}
                 </div>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
-      {/* Selection Modal (Drinks/Desserts) */}
-      {
-        extraModalType && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-300">
-            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setExtraModalType(null)}></div>
-            <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-[32px] shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[80vh] animate-in zoom-in-95 duration-300">
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
-                <div>
-                  <h4 className="font-black text-xl text-gray-900 dark:text-white uppercase tracking-tighter">
-                    {extraModalType === 'drinks' ? 'Seleccionar Bebidas' : 'Seleccionar Postres'}
-                  </h4>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Elige tus favoritos</p>
-                </div>
-                <button onClick={() => setExtraModalType(null)} className="p-2 bg-white dark:bg-gray-800 text-gray-400 rounded-xl hover:text-red-500 transition-colors" aria-label="Cerrar modal">
-                  <X className="w-5 h-5" />
-                </button>
-
-              </div>
-
-              <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-                <div className="grid grid-cols-1 gap-3">
-                  {menuItems
-                    .filter(item => {
-                      if (extraModalType === 'drinks' || extraModalType === 'cat-2') return ['cat-2', 'cat-bebidas'].includes(item.categoryId) && item.isActive;
-                      if (extraModalType === 'desserts' || extraModalType === 'cat-1') return ['cat-1', 'cat-postres'].includes(item.categoryId) && item.isActive;
-                      // Allow other categories if dynamic
-                      return item.categoryId === extraModalType && item.isActive;
-                    })
-                    .map(item => (
-                      <button
-                        key={item.id}
-                        onClick={() => {
-                          setViewingExtraItem(item);
-                          setViewingExtraVariation(item.variations[0]);
-                        }}
-
-                        className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-100 dark:border-gray-700 hover:border-gray-300`}
-                      >
-                        <div className="text-left">
-                          <p className="font-black text-xs uppercase tracking-tight">{item.name}</p>
-                          <p className="text-[10px] font-bold opacity-70 uppercase mt-0.5 text-primary-500">Toca para elegir</p>
-                        </div>
-                        <ChevronRight className="w-4 h-4 text-gray-400" />
-                      </button>
-                    ))
-                  }
-                </div>
-              </div>
-
-              <div className="p-6 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900">
-                <button
-                  onClick={() => setExtraModalType(null)}
-                  className="w-full py-4 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-[1.02] active:scale-[0.98] transition-all shadow-lg"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
-      {/* Item Details Modal (Level 2) */}
-      {
-        viewingExtraItem && (
-          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 animate-in fade-in duration-300">
-            <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setViewingExtraItem(null)}></div>
-            <div className="bg-white dark:bg-gray-900 w-full max-w-sm rounded-[32px] shadow-2xl relative z-10 overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
-              <div className="p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center">
-                <h4 className="font-black text-xl text-gray-900 dark:text-white uppercase tracking-tighter">{viewingExtraItem.name}</h4>
-                <button onClick={() => setViewingExtraItem(null)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors" aria-label="Cerrar detalle">
-                  <X className="w-5 h-5 text-gray-400" />
-                </button>
-              </div>
-
-              <div className="p-6 space-y-6">
-                <p className="text-gray-600 dark:text-gray-300 text-sm italic">{viewingExtraItem.description || "Deliciosa opción para acompañar tus alimentos."}</p>
-
-                {/* Variation Selection */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-300 ml-1">
-                    <span>Elige una opción:</span>
-                    {viewingExtraVariation && (
-                      <span className="text-primary-600 dark:text-primary-400 font-bold">
-                        Seleccionada: {viewingExtraVariation.label}
-                      </span>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {viewingExtraItem.variations.map(variation => {
-                      const isSelected = viewingExtraVariation?.id === variation.id;
-                      return (
-                        <button
-                          key={variation.id}
-                          onClick={() => setViewingExtraVariation(variation)}
-                          className={`p-3.5 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-1 cursor-pointer
-                              ${isSelected
-                              ? 'bg-primary-500 text-white border-primary-500 shadow-lg ring-2 ring-primary-500/30'
-                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-500'}
-                            `}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-black text-xs uppercase tracking-wide">{variation.label}</span>
-                            {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
-                          </div>
-                          <span className={`text-sm font-black ${isSelected ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
-                            ${variation.price.toFixed(2)}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700">
-                  <span className="font-black text-gray-900 dark:text-white uppercase text-sm">Precio Final</span>
-                  <span className="font-black text-primary-500 dark:text-primary-400 text-xl">${viewingExtraVariation?.price.toFixed(2)}</span>
-                </div>
-              </div>
-
-              <div className="p-6 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
-                <button
-                  onClick={() => {
-                    if (viewingExtraVariation) {
-                      // Store item with ONLY the selected variation to simplify price calculation later
-                      const itemWithSelectedVariation = {
-                        ...viewingExtraItem,
-                        variations: [viewingExtraVariation]
-                      };
-                      setSelectedExtras(prev => [...prev, itemWithSelectedVariation]);
-                      setViewingExtraItem(null);
-                      setViewingExtraVariation(null);
-                      setExtraModalType(null); // Return to main flow
-                    }
-                  }}
-                  disabled={!viewingExtraVariation}
-                  className={`w-full py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer
-                       ${viewingExtraVariation
-                      ? 'bg-emerald-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-emerald-500/20'
-                      : 'bg-gray-200 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed shadow-none'}
-                     `}
-                >
-                  <Check className="w-5 h-5" />
-                  Agregar y Continuar
-                </button>
               </div>
 
             </div>
@@ -1814,6 +1896,42 @@ export default function PublicView({ categories, menuItems, customers, orders = 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Floating Cart Button when items exist and modal is closed */}
+      {cartItems.length > 0 && !isOrderModalOpen && !isDeliverySelectionOpen && (
+        <aside
+          aria-label="Ver carrito de pedido"
+          className="fixed bottom-6 left-4 right-4 sm:left-auto sm:right-8 z-40 animate-in slide-in-from-bottom-5 duration-300"
+        >
+          <button
+            onClick={() => {
+              soundManager.play('click');
+              setOrderStep(3);
+              setIsOrderModalOpen(true);
+            }}
+            className="w-full sm:w-auto flex items-center justify-between sm:justify-start gap-4 px-6 py-4 bg-gray-900/95 dark:bg-white/95 text-white dark:text-gray-950 backdrop-blur-xl rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.4)] hover:scale-105 active:scale-95 transition-all border border-white/20 dark:border-gray-800 cursor-pointer"
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <div className="w-10 h-10 rounded-xl bg-primary-500 text-white flex items-center justify-center font-black">
+                  <ShoppingBag className="w-5 h-5" />
+                </div>
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-sm">
+                  {cartItemsCount}
+                </span>
+              </div>
+              <div className="text-left">
+                <p className="text-xs font-black uppercase tracking-wider">Mi Pedido ({cartItemsCount} {cartItemsCount === 1 ? 'platillo' : 'platillos'})</p>
+                <p className="text-[11px] font-bold text-gray-300 dark:text-gray-600">Revisar y Enviar Pedido</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pl-4 border-l border-white/20 dark:border-gray-200">
+              <span className="text-base font-black text-primary-400 dark:text-primary-600">${cartTotal.toFixed(2)}</span>
+              <ArrowRight className="w-4 h-4 text-primary-400 dark:text-primary-600" />
+            </div>
+          </button>
+        </aside>
       )}
 
       {/* Floating PWA Install Notification (Appears at 90% scroll with sound, disappears if already installed) */}
