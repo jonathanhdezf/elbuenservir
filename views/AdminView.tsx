@@ -27,6 +27,7 @@ import LogsSection from '../components/LogsSection';
 import { PayrollSection } from '../components/PayrollSection';
 import { useMobileBack } from '../hooks/useMobileBack';
 import { notificationService } from '../services/notificationService';
+import { CustomerAvatar } from '../components/CustomerAvatar';
 
 interface AdminViewProps {
   categories: Category[];
@@ -268,6 +269,7 @@ export default function AdminView({
   const [regAddress, setRegAddress] = useState('');
   const [regAddresses, setRegAddresses] = useState<string[]>([]);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [viewingOrdersCustomer, setViewingOrdersCustomer] = useState<Customer | null>(null);
 
   // Reordering State
   const [isReordering, setIsReordering] = useState(false);
@@ -301,8 +303,9 @@ export default function AdminView({
   }, [badges, playUISound]);
 
   // Mobile Back Button Navigation Logic
-  const hasOpenAdminModal = !!(viewingOrderId || editingDriver || assigningOrderId || isConfirmingPayment || orderToDelete || customerToDelete || verifyingDispatchOrderId || isSidebarOpen || showPreview);
+  const hasOpenAdminModal = !!(viewingOrderId || editingDriver || assigningOrderId || isConfirmingPayment || orderToDelete || customerToDelete || verifyingDispatchOrderId || isSidebarOpen || showPreview || viewingOrdersCustomer);
   const handleCloseAdminModal = () => {
+    if (viewingOrdersCustomer) setViewingOrdersCustomer(null);
     if (viewingOrderId) setViewingOrderId(null);
     if (editingDriver) setEditingDriver(null);
     if (assigningOrderId) setAssigningOrderId(null);
@@ -2864,6 +2867,33 @@ export default function AdminView({
     );
   };
 
+  const getCustomerOrders = useCallback((customer: Customer) => {
+    const cPhone = (customer.phone || '').replace(/\D/g, '').slice(-10);
+    const cName = (customer.name || '').trim().toLowerCase();
+
+    return orders.filter(order => {
+      const oPhone = (order.customerPhone || '').replace(/\D/g, '').slice(-10);
+      const oName = (order.customerName || '').trim().toLowerCase();
+
+      // Primary: Match by phone (last 10 digits when length >= 7)
+      if (cPhone.length >= 7 && oPhone.length >= 7 && cPhone === oPhone) {
+        return true;
+      }
+
+      // Secondary: Match by exact or partial name
+      if (cName.length >= 3 && oName.length >= 3) {
+        if (cName === oName) return true;
+        const cParts = cName.split(/\s+/).filter(p => p.length > 2);
+        const oParts = oName.split(/\s+/).filter(p => p.length > 2);
+        if (cParts.length >= 2 && oParts.length >= 2) {
+          const matchingParts = cParts.filter(p => oParts.includes(p));
+          if (matchingParts.length >= 2) return true;
+        }
+      }
+      return false;
+    }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [orders]);
+
   const renderCustomerList = () => (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-32">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -2904,70 +2934,336 @@ export default function AdminView({
         {customers.filter(c =>
           c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) ||
           c.phone.includes(customerSearchTerm)
-        ).map(customer => (
-          <div key={customer.id} className="bg-white dark:bg-gray-800 p-8 rounded-[40px] shadow-sm border border-gray-100 dark:border-gray-700">
-            <div className="flex items-center space-x-4 mb-4">
-              <div className="w-12 h-12 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center">
-                <User className="w-6 h-6" />
-              </div>
+        ).map(customer => {
+          const customerOrders = getCustomerOrders(customer);
+          const orderCount = customerOrders.length;
+          const totalSpent = customerOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+          const lastOrder = customerOrders[0];
+          const lastOrderDate = lastOrder ? lastOrder.createdAt : customer.lastOrderDate;
+
+          return (
+            <div key={customer.id} className="bg-white dark:bg-gray-800 p-8 rounded-[40px] shadow-sm border border-gray-100 dark:border-gray-700 flex flex-col justify-between hover:border-primary-200 dark:hover:border-primary-800 transition-all">
               <div>
-                <h5 className="font-black text-lg text-gray-900 dark:text-white uppercase">{customer.name}</h5>
-                <a 
-                  href={`https://wa.me/${customer.phone.replace(/\D/g, '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title="Enviar WhatsApp"
-                  className="text-xs font-black text-gray-500 hover:text-emerald-500 transition-colors flex items-center gap-1 group/wa"
+                <div className="flex items-center space-x-4 mb-4">
+                  <CustomerAvatar avatarUrl={customer.avatarUrl} name={customer.name} className="w-12 h-12 rounded-2xl shadow-sm shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <h5 className="font-black text-lg text-gray-900 dark:text-white uppercase truncate">{customer.name}</h5>
+                    <a 
+                      href={`https://wa.me/${(customer.phone || '').replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Enviar WhatsApp"
+                      className="text-xs font-black text-gray-500 hover:text-emerald-500 transition-colors flex items-center gap-1 group/wa"
+                    >
+                      <MessageCircle className="w-3 h-3 group-hover/wa:scale-110 transition-transform" />
+                      {customer.phone}
+                    </a>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setViewingOrdersCustomer(customer)}
+                    className="bg-gray-50 dark:bg-gray-900 p-4 rounded-3xl hover:bg-primary-50 dark:hover:bg-primary-950/30 transition-all group/stat text-left cursor-pointer border border-transparent hover:border-primary-200 dark:hover:border-primary-900"
+                    title="Ver pedidos de este cliente"
+                  >
+                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 group-hover/stat:text-primary-500 mb-1 flex items-center justify-between">
+                      <span>Pedidos</span>
+                      <ShoppingBag className="w-3 h-3 opacity-60" />
+                    </p>
+                    <p className="font-black text-xl text-gray-900 dark:text-white group-hover/stat:text-primary-600 dark:group-hover/stat:text-primary-400">{orderCount}</p>
+                  </button>
+                  <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-3xl text-left border border-transparent">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1 flex items-center justify-between">
+                      <span>Total Gastado</span>
+                      <DollarSign className="w-3 h-3 opacity-60" />
+                    </p>
+                    <p className="font-black text-xl text-primary-500">${totalSpent.toFixed(2)}</p>
+                  </div>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => setViewingOrdersCustomer(customer)}
+                  className="w-full mt-4 p-4 bg-gray-50 dark:bg-gray-900/50 hover:bg-primary-50/50 dark:hover:bg-primary-950/20 rounded-3xl flex items-center justify-between transition-all group/last text-left cursor-pointer border border-transparent hover:border-primary-200 dark:hover:border-primary-900"
+                  title="Ver historial de pedidos"
                 >
-                  <MessageCircle className="w-3 h-3 group-hover/wa:scale-110 transition-transform" />
-                  {customer.phone}
-                </a>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-white dark:bg-gray-800 flex items-center justify-center text-gray-400 group-hover/last:text-primary-500 shadow-sm shrink-0">
+                      <Clock className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Última Compra</p>
+                      <p className="text-[10px] font-bold text-gray-600 dark:text-gray-300 truncate">
+                        {lastOrderDate ? new Date(lastOrderDate).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'SIN COMPRAS'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] font-black text-primary-500 uppercase tracking-wider shrink-0">
+                    <span className="hidden sm:inline">{orderCount > 0 ? 'Ver pedidos' : ''}</span>
+                    <ChevronRight className="w-4 h-4 text-gray-300 group-hover/last:text-primary-500 transition-colors" />
+                  </div>
+                </button>
+              </div>
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setEditingCustomer(customer)}
+                  className="py-3 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-2xl flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-primary-500 transition-all"
+                >
+                  <Edit2 className="w-4 h-4 mr-2" /> Editar
+                </button>
+                <button
+                  onClick={() => setCustomerToDelete(customer)}
+                  className="py-3 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-2xl flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-red-500 transition-all"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+                </button>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4 text-center">
-              <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-3xl">
-                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Pedidos</p>
-                <p className="font-black text-xl text-gray-900 dark:text-white">{customer.totalOrders || 0}</p>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-900 p-4 rounded-3xl">
-                <p className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-1">Total Gastado</p>
-                <p className="font-black text-xl text-primary-500">${customer.totalSpent?.toFixed(2) || '0.00'}</p>
-              </div>
-            </div>
-            
-            <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-3xl flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-white dark:bg-gray-800 flex items-center justify-center text-gray-400 shadow-sm">
-                  <Clock className="w-4 h-4" />
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderCustomerOrdersModal = () => {
+    if (!viewingOrdersCustomer) return null;
+
+    const customerOrders = getCustomerOrders(viewingOrdersCustomer);
+    const totalOrdersCount = customerOrders.length;
+    const totalSpentAmount = customerOrders.reduce((sum, o) => sum + (Number(o.total) || 0), 0);
+    const avgTicket = totalOrdersCount > 0 ? totalSpentAmount / totalOrdersCount : 0;
+
+    return (
+      <div className="fixed inset-0 z-[190] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+        <div
+          className="absolute inset-0 bg-black/75 backdrop-blur-md"
+          onClick={() => setViewingOrdersCustomer(null)}
+        />
+        <div className="bg-white dark:bg-gray-800 w-full max-w-3xl rounded-[36px] sm:rounded-[44px] shadow-2xl relative z-10 overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300 border border-gray-100 dark:border-gray-700">
+          
+          {/* Header */}
+          <div className="p-6 sm:p-8 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 text-white relative shrink-0">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0">
+                <CustomerAvatar
+                  avatarUrl={viewingOrdersCustomer.avatarUrl}
+                  name={viewingOrdersCustomer.name}
+                  className="w-14 h-14 rounded-2xl ring-2 ring-white/20 shrink-0"
+                />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-primary-400">Historial del Cliente</span>
+                  </div>
+                  <h4 className="text-xl sm:text-2xl font-black tracking-tight uppercase truncate">{viewingOrdersCustomer.name}</h4>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-white/60">
+                    <a
+                      href={`https://wa.me/${(viewingOrdersCustomer.phone || '').replace(/\D/g, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-bold flex items-center gap-1.5 hover:text-emerald-400 transition-colors"
+                      title="Contactar por WhatsApp"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                      {viewingOrdersCustomer.phone}
+                    </a>
+                    {viewingOrdersCustomer.addresses && viewingOrdersCustomer.addresses.length > 0 && (
+                      <span className="hidden sm:inline-flex items-center gap-1 truncate text-white/40">
+                        <MapPin className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{viewingOrdersCustomer.addresses[0]}</span>
+                      </span>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Última Compra</p>
-                  <p className="text-[10px] font-bold text-gray-600 dark:text-gray-300">
-                    {customer.lastOrderDate ? new Date(customer.lastOrderDate).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' }) : 'SIN COMPRAS'}
-                  </p>
-                </div>
               </div>
-              <ChevronRight className="w-4 h-4 text-gray-300" />
+
+              <button
+                type="button"
+                onClick={() => setViewingOrdersCustomer(null)}
+                className="p-2.5 text-white/60 hover:text-white hover:bg-white/10 rounded-2xl transition-all shrink-0"
+                title="Cerrar"
+              >
+                <X className="w-6 h-6" />
+              </button>
             </div>
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <button
-                onClick={() => setEditingCustomer(customer)}
-                className="py-3 bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-2xl flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-primary-500 transition-all"
-              >
-                <Edit2 className="w-4 h-4 mr-2" /> Editar
-              </button>
-              <button
-                onClick={() => setCustomerToDelete(customer)}
-                className="py-3 bg-red-50 dark:bg-red-900/10 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-2xl flex items-center justify-center text-[10px] font-black uppercase tracking-widest text-red-500 transition-all"
-              >
-                <Trash2 className="w-4 h-4 mr-2" /> Eliminar
-              </button>
+
+            {/* Quick Metrics Bar */}
+            <div className="grid grid-cols-3 gap-3 mt-6">
+              <div className="bg-white/10 backdrop-blur-sm p-3.5 rounded-2xl border border-white/10">
+                <p className="text-[9px] font-black text-white/50 uppercase tracking-widest flex items-center gap-1">
+                  <ShoppingBag className="w-3 h-3 text-primary-400" />
+                  Pedidos
+                </p>
+                <p className="text-xl sm:text-2xl font-black text-white mt-0.5">{totalOrdersCount}</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm p-3.5 rounded-2xl border border-white/10">
+                <p className="text-[9px] font-black text-white/50 uppercase tracking-widest flex items-center gap-1">
+                  <DollarSign className="w-3 h-3 text-emerald-400" />
+                  Total Gastado
+                </p>
+                <p className="text-xl sm:text-2xl font-black text-emerald-400 mt-0.5">${totalSpentAmount.toFixed(2)}</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm p-3.5 rounded-2xl border border-white/10">
+                <p className="text-[9px] font-black text-white/50 uppercase tracking-widest flex items-center gap-1">
+                  <TrendingUp className="w-3 h-3 text-amber-400" />
+                  Promedio / Pedido
+                </p>
+                <p className="text-xl sm:text-2xl font-black text-amber-300 mt-0.5">${avgTicket.toFixed(2)}</p>
+              </div>
             </div>
           </div>
-        ))}
+
+          {/* Orders List Container */}
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar">
+            {customerOrders.length === 0 ? (
+              <div className="py-16 text-center">
+                <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700/50 rounded-full flex items-center justify-center mx-auto text-gray-400 mb-4">
+                  <ShoppingBag className="w-8 h-8 opacity-40" />
+                </div>
+                <h5 className="font-black text-gray-700 dark:text-gray-200 uppercase tracking-wide">Sin pedidos registrados</h5>
+                <p className="text-xs text-gray-400 mt-1 max-w-xs mx-auto">
+                  Aún no se registran órdenes activas o finalizadas asociadas al teléfono o nombre de este cliente.
+                </p>
+              </div>
+            ) : (
+              customerOrders.map(order => {
+                const statusCfg = STATUS_CONFIG[order.status] || { label: order.status, color: 'bg-gray-100 text-gray-700' };
+                const isPaid = order.paymentStatus === 'paid';
+                return (
+                  <div
+                    key={order.id}
+                    className="p-5 bg-gray-50 dark:bg-gray-900/60 rounded-3xl border border-gray-100 dark:border-gray-700/70 hover:border-primary-300 dark:hover:border-primary-700 transition-all flex flex-col gap-4"
+                  >
+                    {/* Order Header */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200/60 dark:border-gray-700/60 pb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-black text-gray-900 dark:text-white tracking-wider bg-white dark:bg-gray-800 px-3 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex items-center gap-1.5">
+                          #{order.id}
+                          <button
+                            type="button"
+                            onClick={(e) => handleCopyOrderId(order.id, e)}
+                            className="text-gray-400 hover:text-primary-500 transition-colors p-0.5"
+                            title="Copiar ID"
+                          >
+                            {copiedOrderId === order.id ? (
+                              <Check className="w-3 h-3 text-emerald-500" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                        </span>
+                        <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {new Date(order.createdAt).toLocaleDateString('es-MX', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider ${statusCfg.color}`}>
+                          {statusCfg.label}
+                        </span>
+                        <span className={`px-2.5 py-1 rounded-xl text-[9px] font-black uppercase tracking-wider ${
+                          isPaid
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'
+                        }`}>
+                          {isPaid ? 'Pagado' : 'Pendiente'} • {order.paymentMethod?.toUpperCase() || 'EFECTIVO'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Items & Address */}
+                    <div className="flex flex-col sm:flex-row justify-between gap-4">
+                      <div className="flex-1 space-y-1.5">
+                        <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Productos:</p>
+                        <div className="space-y-1">
+                          {(order.items || []).map((item, idx) => (
+                            <div key={idx} className="text-xs font-bold text-gray-700 dark:text-gray-200 flex items-center justify-between">
+                              <span className="truncate pr-2">
+                                <span className="text-primary-500 font-black mr-1">{item.quantity}x</span>
+                                {item.name}
+                                {item.variationLabel ? ` (${item.variationLabel})` : ''}
+                              </span>
+                              <span className="text-gray-500 shrink-0 font-mono">${((item.price || 0) * item.quantity).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {order.address && (
+                          <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 flex items-center gap-1 pt-1">
+                            <MapPin className="w-3 h-3 shrink-0 text-primary-500" />
+                            <span className="truncate">{order.address}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="sm:text-right shrink-0 flex sm:flex-col justify-between items-end">
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">Total del Pedido</p>
+                          <p className="text-2xl font-black text-gray-900 dark:text-white">${(Number(order.total) || 0).toFixed(2)}</p>
+                        </div>
+
+                        {/* Action buttons */}
+                        <div className="flex items-center gap-2 mt-2">
+                          <button
+                            type="button"
+                            onClick={() => generateTicket(order)}
+                            className="p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-gray-600 dark:text-gray-300 hover:text-primary-500 hover:border-primary-400 transition-all shadow-sm"
+                            title="Imprimir Ticket"
+                          >
+                            <Printer className="w-4 h-4" />
+                          </button>
+                          {onViewDigitalTicket && (
+                            <button
+                              type="button"
+                              onClick={() => onViewDigitalTicket(order)}
+                              className="p-2.5 bg-teal-50 dark:bg-teal-950/40 border border-teal-200 dark:border-teal-800 rounded-xl text-teal-600 dark:text-teal-400 hover:bg-teal-100 transition-all shadow-sm"
+                              title="Ver Ticket Digital"
+                            >
+                              <Receipt className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setViewingOrderId(order.id)}
+                            className="px-3.5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-wider hover:opacity-90 transition-all shadow-sm flex items-center gap-1.5"
+                          >
+                            <span>Detalle</span>
+                            <ArrowRight className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="p-4 sm:p-5 bg-gray-50 dark:bg-gray-900/80 border-t border-gray-100 dark:border-gray-700/80 flex items-center justify-between shrink-0">
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+              {totalOrdersCount} {totalOrdersCount === 1 ? 'pedido asociado' : 'pedidos asociados'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setViewingOrdersCustomer(null)}
+              className="px-6 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl text-xs font-black uppercase tracking-wider text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-all shadow-sm"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
       </div>
-    </div >
-  );
+    );
+  };
 
   const renderCustomerModal = () => {
     if (!editingCustomer) return null;
@@ -3952,6 +4248,7 @@ export default function AdminView({
             {renderSearchCustomerModal()}
             {renderFoundCustomerModal()}
             {renderDeleteCustomerConfirmModal()}
+            {renderCustomerOrdersModal()}
             {activeSection === 'menu' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 <div className="flex justify-end mb-4">

@@ -294,8 +294,8 @@ const INITIAL_DRIVERS: DeliveryDriver[] = [
   { id: 'D-004', name: 'Lucía Méndez', phone: '555-0204', status: 'active', vehicleType: 'walking', deliveriesCompleted: 45, rating: 4.9, pin: '4444' },
 ];
 const INITIAL_CUSTOMERS: Customer[] = [
-  { id: 'cust-1', name: 'Juan Pérez', phone: '1234567890', email: 'juan@example.com', totalOrders: 15, totalSpent: 1250.50, lastOrderDate: new Date(Date.now() - 86400000).toISOString(), addresses: ['Calle 10, Col. Centro', 'Av. Juárez 45'], password: '123456' },
-  { id: 'cust-2', name: 'María García', phone: '555-0102', email: 'maria@example.com', totalOrders: 8, totalSpent: 740.00, lastOrderDate: new Date(Date.now() - 172800000).toISOString(), addresses: ['Av. Reforma 200'] },
+  { id: 'cust-1', name: 'Juan Pérez', phone: '555-0101', email: 'juan@example.com', totalOrders: 0, totalSpent: 0, addresses: ['Calle 10, Col. Centro', 'Av. Juárez 45'], password: '123456' },
+  { id: 'cust-2', name: 'María García', phone: '555-0102', email: 'maria@example.com', totalOrders: 0, totalSpent: 0, addresses: ['Av. Reforma 200'] },
 ];
 
 const INITIAL_STAFF: Staff[] = [
@@ -784,6 +784,7 @@ export default function App() {
               onUpdateCustomer={(updated) => handleSetCustomers(prev => prev.map(c => c.id === updated.id ? updated : c))}
               onAddOrder={(order) => {
                 handleSetOrders(prev => [order, ...prev]);
+                updateCustomerStats(order.customerName, order.customerPhone, order.total, true);
                 if (notificationService.isAdmin()) {
                   notificationService.notifyNewOrder(order);
                 }
@@ -962,6 +963,7 @@ export default function App() {
           onUpdateCustomer={(updated) => handleSetCustomers(prev => prev.map(c => c.id === updated.id ? updated : c))}
           onAddOrder={(order) => {
             handleSetOrders(prev => [order, ...prev]);
+            updateCustomerStats(order.customerName, order.customerPhone, order.total, true);
             if (notificationService.isAdmin()) {
               notificationService.notifyNewOrder(order);
             }
