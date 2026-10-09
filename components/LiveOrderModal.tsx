@@ -4,9 +4,9 @@ import {
   Volume2, VolumeX, ChevronRight, MessageCircle, Phone, Lock,
   Check, Store, Truck, Sparkles, Key, Plus, Minus, CreditCard,
   Banknote, RefreshCw, ChevronUp, ChevronDown, Utensils, Award,
-  Clock, ArrowRight, Keyboard, History
+  Clock, ArrowRight, Keyboard, History, AlertCircle, PhoneCall, PhoneOff
 } from 'lucide-react';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, Modality, Type, LiveServerMessage } from '@google/genai';
 import { MenuItem, Category, Order, Customer, PaymentMethod, CustomerCreditMovement } from '../types';
 import { soundManager } from '../utils/soundManager';
 
@@ -32,11 +32,13 @@ interface LiveOrderModalProps {
   onUpdateCustomer?: (customer: Customer) => void;
 }
 
-type SessionStatus = 'idle' | 'listening' | 'thinking' | 'speaking' | 'error';
+type SessionStatus = 'idle' | 'connecting' | 'listening' | 'speaking' | 'thinking' | 'error';
 
 const RESTAURANT_PHONE = '2311024672';
 const WHATSAPP_NUMBER = '522311024672';
-const GEMINI_MODEL = 'gemini-flash-latest';
+const LIVE_MODEL = 'gemini-2.5-flash-native-audio-preview-09-2025';
+const LIVE_VOICE = 'Aoede'; // Prebuilt natural neural voice for Sofia
+const SAMPLE_RATE = 24000;
 
 // Visual image mapping for featured dishes
 const getDishImage = (name: string): string | null => {
@@ -49,10 +51,42 @@ const getDishImage = (name: string): string | null => {
   return null;
 };
 
-// Tool Declarations for Gemini Function Calling
-const updateOrderDeclaration = {
+// PCM & Resampling Utilities for 24kHz Bidirectional Audio
+function downsampleTo24kHz(input: Float32Array, inputSampleRate: number): Float32Array {
+  if (inputSampleRate === 24000) return input;
+  const ratio = inputSampleRate / 24000;
+  const newLength = Math.round(input.length / ratio);
+  const result = new Float32Array(newLength);
+  for (let i = 0; i < newLength; i++) {
+    const origIndex = Math.min(Math.round(i * ratio), input.length - 1);
+    result[i] = input[origIndex];
+  }
+  return result;
+}
+
+function floatTo16BitPCM(input: Float32Array): Int16Array {
+  const output = new Int16Array(input.length);
+  for (let i = 0; i < input.length; i++) {
+    const s = Math.max(-1, Math.min(1, input[i]));
+    output[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  }
+  return output;
+}
+
+function base64FromPCM16(pcm: Int16Array): string {
+  const bytes = new Uint8Array(pcm.buffer);
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+// Gemini Function Calling Declarations
+const updateOrderTool = {
   name: "updateOrder",
-  description: "Agrega, modifica la cantidad o elimina platillos del ticket del pedido.",
+  description: "Agrega, actualiza la cantidad o elimina platillos del ticket vivo del pedido.",
   parameters: {
     type: Type.OBJECT,
     properties: {
@@ -76,24 +110,25 @@ const updateOrderDeclaration = {
   }
 };
 
-const completeOrderDeclaration = {
+const completeOrderTool = {
   name: "completeOrder",
-  description: "Finaliza la toma de la orden cuando el cliente indica que es todo o desea pagar.",
+  description: "Finaliza y resume la orden del cliente para preparar la entrega y el pago cuando el cliente termina.",
   parameters: {
     type: Type.OBJECT,
     properties: {
-      orderType: { type: Type.STRING, enum: ["pickup", "delivery"], description: "Entrega: mostrador o domicilio" },
-      deliveryAddress: { type: Type.STRING, description: "Dirección de entrega" },
-      paymentMethod: { type: Type.STRING, enum: ["efectivo", "tarjeta", "transferencia", "credito"], description: "Forma de pago" }
+      orderType: { type: Type.STRING, enum: ["pickup", "delivery"], description: "Entrega: mostrador (pickup) o domicilio (delivery)" },
+      deliveryAddress: { type: Type.STRING, description: "Dirección de entrega a domicilio" },
+      paymentMethod: { type: Type.STRING, enum: ["efectivo", "tarjeta", "transferencia", "credito"], description: "Forma de pago" },
+      summary: { type: Type.STRING, description: "Resumen breve del pedido" }
     }
   }
 };
 
-function buildMenuSummaryContext(menuItems: MenuItem[], categories: Category[]): string {
+function buildMenuContext(menuItems: MenuItem[], categories: Category[]): string {
   const lines: string[] = [
-    "RESTAURANTE: El Buen Servir - Desayunos, caldos y guisados caseros tradicionales en Teziutlán.",
-    "WHATSAPP: 2311024672.",
-    "CATÁLOGO COMPLETO:"
+    "RESTAURANTE: El Buen Servir - Desayunos tradicionales, caldos y guisados caseros en Teziutlán, Puebla.",
+    "TELÉFONO: 2311024672.",
+    "CATÁLOGO DE PLATILLOS Y PRECIOS:"
   ];
 
   categories.forEach(cat => {
@@ -106,8 +141,8 @@ function buildMenuSummaryContext(menuItems: MenuItem[], categories: Category[]):
     });
   });
 
-  lines.push("\nESPECIALIDADES MÁS VENDIDAS:");
-  lines.push("1. Chilaquiles (chico $60, grande $90, con asada de pollo $120, con asada de puerco $130).");
+  lines.push("\nESPECIALIDADES DESTACADAS:");
+  lines.push("1. Chilaquiles verdes o rojos (chico $60, grande $90, con asada de pollo $120, con asada de puerco $130).");
   lines.push("2. Enchiladas Suizas gratinadas ($90).");
   lines.push("3. Chilpozo de Res tradicional ($95).");
   lines.push("4. Pancita de Res (medio $80, litro $100).");
@@ -137,8 +172,8 @@ export default function LiveOrderModal({
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
   const [inputText, setInputText] = useState('');
+  const [isMuted, setIsMuted] = useState(false);
   const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
-  const [isListeningContinuous, setIsListeningContinuous] = useState(false);
   const [isOrderTrayExpanded, setIsOrderTrayExpanded] = useState(false);
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'delivery' | null>(null);
   const [selectedAddress, setSelectedAddress] = useState('');
@@ -148,20 +183,38 @@ export default function LiveOrderModal({
   const [cashAmountPaid, setCashAmountPaid] = useState<string>('');
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [customApiKey, setCustomApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
 
-  const recognitionRef = useRef<any>(null);
-  const speechSynthRef = useRef<SpeechSynthesisUtterance | null>(null);
+  // Live session & audio references
+  const sessionRef = useRef<any>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
+  const nextStartTimeRef = useRef<number>(0);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const isMutedRef = useRef(isMuted);
+  const isSpeakerMutedRef = useRef(isSpeakerMuted);
+  const isConnectingRef = useRef(false);
 
-  // Sync address with logged customer
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  useEffect(() => {
+    isSpeakerMutedRef.current = isSpeakerMuted;
+  }, [isSpeakerMuted]);
+
+  // Sync customer address
   useEffect(() => {
     if (loggedCustomer && loggedCustomer.addresses && loggedCustomer.addresses.length > 0 && !selectedAddress) {
       setSelectedAddress(loggedCustomer.addresses[0]);
     }
   }, [loggedCustomer]);
 
-  // Current API key detection
+  // Resolved Gemini API key
   const resolvedApiKey = useMemo(() => {
     return (
       customApiKey.trim() ||
@@ -174,7 +227,7 @@ export default function LiveOrderModal({
 
   const hasApiKey = Boolean(resolvedApiKey);
 
-  // Calculate cart total
+  // Cart totals
   const cartTotal = useMemo(() => {
     return cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
   }, [cart]);
@@ -183,136 +236,8 @@ export default function LiveOrderModal({
     return cart.reduce((sum, item) => sum + item.quantity, 0);
   }, [cart]);
 
-  // Text to Speech
-  const speakText = useCallback((text: string) => {
-    if (isSpeakerMuted || typeof window === 'undefined' || !('speechSynthesis' in window)) {
-      setStatus('idle');
-      return;
-    }
-
-    try {
-      window.speechSynthesis.cancel();
-      const cleanText = text.replace(/[*_#•]/g, '').replace(/https?:\/\/\S+/g, '');
-      const utterance = new SpeechSynthesisUtterance(cleanText);
-      utterance.lang = 'es-MX';
-      utterance.rate = 1.05;
-      utterance.pitch = 1.05;
-
-      const voices = window.speechSynthesis.getVoices();
-      const spanishVoice = voices.find(v => v.lang.includes('es-MX') || v.lang.includes('es-US') || v.lang.startsWith('es'));
-      if (spanishVoice) utterance.voice = spanishVoice;
-
-      utterance.onstart = () => setStatus('speaking');
-      utterance.onend = () => {
-        setStatus('idle');
-        // If continuous listening is active, resume listening after speaking
-        if (isListeningContinuous) {
-          startSpeechRecognition();
-        }
-      };
-      utterance.onerror = () => setStatus('idle');
-
-      speechSynthRef.current = utterance;
-      window.speechSynthesis.speak(utterance);
-    } catch (e) {
-      console.warn('Speech synthesis error:', e);
-      setStatus('idle');
-    }
-  }, [isSpeakerMuted, isListeningContinuous]);
-
-  const stopSpeech = useCallback(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-    }
-    if (status === 'speaking') {
-      setStatus('idle');
-    }
-  }, [status]);
-
-  // Speech Recognition (Microphone)
-  const startSpeechRecognition = useCallback(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-
-    try {
-      if (recognitionRef.current) {
-        try { recognitionRef.current.abort(); } catch (e) { }
-      }
-
-      const recognition = new SpeechRecognition();
-      recognition.lang = 'es-MX';
-      recognition.continuous = false;
-      recognition.interimResults = false;
-
-      recognition.onstart = () => {
-        setStatus('listening');
-      };
-
-      recognition.onresult = (event: any) => {
-        const spokenText = event.results[0][0].transcript;
-        if (spokenText) {
-          handleUserInteraction(spokenText);
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.warn("Speech recognition error", event.error);
-        if (status === 'listening') setStatus('idle');
-      };
-
-      recognition.onend = () => {
-        if (status === 'listening') setStatus('idle');
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch (err) {
-      console.error("Speech recognition start failed", err);
-      if (status === 'listening') setStatus('idle');
-    }
-  }, [status]);
-
-  const stopSpeechRecognition = useCallback(() => {
-    if (recognitionRef.current) {
-      try { recognitionRef.current.abort(); } catch (e) { }
-    }
-    if (status === 'listening') setStatus('idle');
-  }, [status]);
-
-  // Toggle voice listening
-  const toggleListening = () => {
-    stopSpeech();
-    if (status === 'listening') {
-      setIsListeningContinuous(false);
-      stopSpeechRecognition();
-      soundManager.play('click');
-    } else {
-      setIsListeningContinuous(true);
-      startSpeechRecognition();
-      soundManager.play('confirm_generic');
-    }
-  };
-
-  // Initial welcome on open
-  useEffect(() => {
-    if (isOpen && transcriptHistory.length === 0) {
-      const now = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-      let greeting = '';
-      if (loggedCustomer) {
-        const firstName = loggedCustomer.name.split(' ')[0];
-        greeting = `¡Hola, ${firstName}! Qué gusto tenerte en El Buen Servir. Mi nombre es Sofía, tu anfitriona. ¿Qué se te antoja ordenar el día de hoy?`;
-      } else {
-        greeting = `¡Hola! Bienvenido a El Buen Servir, soy Sofía. Con mucho gusto te atiendo y tomo tu pedido. ¿Qué te gustaría probar hoy?`;
-      }
-
-      setCurrentSofiaSpeech(greeting);
-      setTranscriptHistory([{ role: 'ai', text: greeting, time: now }]);
-      speakText(greeting);
-    }
-  }, [isOpen, loggedCustomer]);
-
-  // Add / Update item in Sofia's live ticket
-  const updateCartItem = (action: 'add' | 'remove' | 'update', item: { name: string; variation: string; price: number; quantity?: number; dishId?: string }) => {
+  // Cart item modifier
+  const updateCartItem = useCallback((action: 'add' | 'remove' | 'update', item: { name: string; variation: string; price: number; quantity?: number; dishId?: string }) => {
     const itemName = item.name.trim();
     const itemVar = item.variation.trim();
     const qty = item.quantity && item.quantity > 0 ? item.quantity : 1;
@@ -361,9 +286,444 @@ export default function LiveOrderModal({
 
     try { soundManager.play('confirm_generic'); } catch (e) { }
     setTimeout(() => setLastAddedId(null), 2000);
+  }, []);
+
+  // Audio Playback Engine
+  const playAudioChunk = useCallback((base64Data: string) => {
+    if (!audioContextRef.current || isSpeakerMutedRef.current) return;
+    const ctx = audioContextRef.current;
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+
+    try {
+      const binaryString = atob(base64Data);
+      const len = binaryString.length;
+      const pcm16 = new Int16Array(len / 2);
+      for (let i = 0; i < pcm16.length; i++) {
+        pcm16[i] = binaryString.charCodeAt(i * 2) | (binaryString.charCodeAt(i * 2 + 1) << 8);
+      }
+
+      const float32 = new Float32Array(pcm16.length);
+      for (let i = 0; i < pcm16.length; i++) {
+        float32[i] = pcm16[i] / 32768.0;
+      }
+
+      // 24kHz buffer is played and smoothly resampled by browser's audio context
+      const buffer = ctx.createBuffer(1, float32.length, SAMPLE_RATE);
+      buffer.getChannelData(0).set(float32);
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+
+      const currentTime = ctx.currentTime;
+      if (nextStartTimeRef.current < currentTime) {
+        nextStartTimeRef.current = currentTime;
+      }
+
+      source.start(nextStartTimeRef.current);
+      nextStartTimeRef.current += buffer.duration;
+      activeSourcesRef.current.push(source);
+      setStatus('speaking');
+
+      source.onended = () => {
+        activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
+        if (activeSourcesRef.current.length === 0) {
+          setStatus('listening');
+        }
+      };
+    } catch (e) {
+      console.warn("Error decoding audio chunk", e);
+    }
+  }, []);
+
+  // Stop queued and playing audio
+  const stopAllAudio = useCallback(() => {
+    activeSourcesRef.current.forEach(s => {
+      try { s.stop(); } catch (e) { }
+    });
+    activeSourcesRef.current = [];
+    if (audioContextRef.current) {
+      nextStartTimeRef.current = audioContextRef.current.currentTime;
+    } else {
+      nextStartTimeRef.current = 0;
+    }
+    if (status === 'speaking') {
+      setStatus('listening');
+    }
+  }, [status]);
+
+  // Function Calling Tool Handler
+  const handleToolCalls = useCallback((functionCalls: any[]) => {
+    const responses: any[] = [];
+
+    for (const call of functionCalls) {
+      if (call.name === "updateOrder") {
+        const { action, item } = call.args || {};
+        if (item && item.name) {
+          let finalPrice = item.price;
+          let dishId = item.dishId;
+          const itemName = item.name.trim();
+          const itemVar = (item.variation || 'Orden').trim();
+          const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
+
+          // Catalog match for price and dishId
+          const catalogMatch = menuItems.find(mi =>
+            mi.name.toLowerCase().includes(itemName.toLowerCase()) ||
+            itemName.toLowerCase().includes(mi.name.toLowerCase())
+          );
+
+          if (catalogMatch) {
+            dishId = catalogMatch.id;
+            if (!finalPrice || finalPrice <= 0) {
+              const varMatch = catalogMatch.variations.find(v =>
+                v.label.toLowerCase().includes(itemVar.toLowerCase()) ||
+                itemVar.toLowerCase().includes(v.label.toLowerCase())
+              ) || catalogMatch.variations[0];
+              finalPrice = varMatch.price;
+            }
+          }
+
+          updateCartItem(action, {
+            name: itemName,
+            variation: itemVar,
+            price: finalPrice || 0,
+            quantity: quantity,
+            dishId: dishId
+          });
+
+          if (action === 'add') {
+            setCurrentSofiaSpeech(`¡Anotado! Agregué ${quantity}x ${itemName} (${itemVar}) a tu orden.`);
+          } else if (action === 'remove') {
+            setCurrentSofiaSpeech(`¡Listo! Quité ${itemName} de tu orden.`);
+          }
+        }
+
+        responses.push({
+          id: call.id,
+          name: "updateOrder",
+          response: { output: { success: true, message: `Ticket actualizado correctamente con ${item?.name || 'platillo'}` } }
+        });
+      } else if (call.name === "completeOrder") {
+        const { orderType, deliveryAddress, paymentMethod } = call.args || {};
+        if (orderType) setDeliveryMethod(orderType === 'delivery' ? 'delivery' : 'pickup');
+        if (deliveryAddress) setSelectedAddress(deliveryAddress);
+        if (paymentMethod) setSelectedPaymentMethod(paymentMethod);
+        setIsOrderTrayExpanded(true);
+        setCurrentSofiaSpeech("¡Excelente! Tu pedido está preparado. ¿Deseas pasar a recogerlo o te lo enviamos a domicilio?");
+
+        responses.push({
+          id: call.id,
+          name: "completeOrder",
+          response: { output: { success: true, message: "Orden finalizada y lista para confirmación final" } }
+        });
+      }
+    }
+
+    if (sessionRef.current && responses.length > 0) {
+      try {
+        sessionRef.current.sendToolResponse({ functionResponses: responses });
+      } catch (e) {
+        console.warn("Failed to send tool response:", e);
+      }
+    }
+  }, [menuItems, updateCartItem]);
+
+  // Clean disconnect
+  const disconnect = useCallback(() => {
+    isConnectingRef.current = false;
+    stopAllAudio();
+
+    if (processorRef.current) {
+      try { processorRef.current.disconnect(); } catch (e) { }
+      processorRef.current = null;
+    }
+    if (sourceRef.current) {
+      try { sourceRef.current.disconnect(); } catch (e) { }
+      sourceRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      try { mediaStreamRef.current.getTracks().forEach(t => t.stop()); } catch (e) { }
+      mediaStreamRef.current = null;
+    }
+    if (sessionRef.current) {
+      try { sessionRef.current.close(); } catch (e) { }
+      sessionRef.current = null;
+    }
+    if (audioContextRef.current) {
+      try { audioContextRef.current.close(); } catch (e) { }
+      audioContextRef.current = null;
+    }
+
+    setStatus('idle');
+  }, [stopAllAudio]);
+
+  // Connect to Gemini Multimodal Live API
+  const connect = useCallback(async () => {
+    if (isConnectingRef.current || sessionRef.current) return;
+    isConnectingRef.current = true;
+    setConnectionError(null);
+    setStatus('connecting');
+
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) {
+        throw new Error("Web Audio API no soportado en este navegador.");
+      }
+
+      const audioCtx = new AudioCtx({ sampleRate: SAMPLE_RATE });
+      if (audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+      audioContextRef.current = audioCtx;
+
+      // Microphone stream
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            channelCount: 1,
+            sampleRate: SAMPLE_RATE,
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          }
+        });
+        mediaStreamRef.current = stream;
+        sourceRef.current = audioCtx.createMediaStreamSource(stream);
+      } catch (micErr: any) {
+        console.warn("Mic access denied or unavailable:", micErr);
+        setConnectionError("Micrófono no disponible. Puedes escribir con el teclado.");
+      }
+
+      if (!resolvedApiKey) {
+        setShowApiKeyModal(true);
+        throw new Error("Se requiere una API Key de Gemini.");
+      }
+
+      const ai = new GoogleGenAI({ apiKey: resolvedApiKey });
+      const menuContext = buildMenuContext(menuItems, categories);
+      const customerInfo = loggedCustomer
+        ? `Nombre del cliente: ${loggedCustomer.name}, Teléfono: ${loggedCustomer.phone}, Domicilio guardado: ${loggedCustomer.addresses?.[0] || 'Sin domicilio registrado'}.`
+        : 'Cliente invitado.';
+
+      const systemInstruction = `Eres "Sofía", la anfitriona y mesera virtual inteligente de "El Buen Servir", restaurante de cocina casera y desayunos en Teziutlán, Puebla.
+Hablas con voz cálida, alegre, educada, amena y con la hospitalidad mexicana más distinguida.
+
+CLIENTE:
+${customerInfo}
+
+MENÚ DEL RESTAURANTE:
+${menuContext}
+
+INSTRUCCIONES CLAVE:
+1. Saluda al cliente cordialmente con entusiasmo (menciona su nombre si está disponible) y pregúntale qué se le antoja degustar hoy de El Buen Servir.
+2. Cada vez que el cliente mencione o pida un platillo, bebida o postre, USA INMEDIATAMENTE la herramienta 'updateOrder' con action='add', el nombre exacto del platillo, la variación y precio del menú.
+3. Si el cliente pide modificar la cantidad o quitar algo, usa 'updateOrder' con action='update' o 'remove'.
+4. Si el cliente pide recomendaciones, sugiere los platillos estrella: Chilaquiles con asada de pollo ($120), Enchiladas Suizas gratinadas ($90), Chilpozo de Res ($95) o Tampiqueña.
+5. Cuando el cliente diga "es todo", "sería todo", "la cuenta" o termine, pregúntale amablemente si prefiere recoger en mostrador o entrega a domicilio.
+6. Si elige entrega a domicilio, sugiere su dirección registrada o pregúntale a qué dirección enviarlo.
+7. Pregúntale su método de pago (Efectivo, Tarjeta, Transferencia o Crédito).
+8. Cuando tengas método de entrega y dirección, usa la herramienta 'completeOrder' y despídete amablemente agradeciendo la preferencia en El Buen Servir.
+9. Mantén tus intervenciones habladas breves, fluidas y directas (1 a 2 oraciones), para que la conversación sea rápida y amena como una llamada telefónica real.`;
+
+      let sessionInstance: any = null;
+
+      sessionInstance = await ai.live.connect({
+        model: LIVE_MODEL,
+        config: {
+          responseModalities: [Modality.AUDIO],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: LIVE_VOICE
+              }
+            }
+          },
+          systemInstruction
+        },
+        callbacks: {
+          onopen: () => {
+            console.log("Gemini Live session connected!");
+            sessionRef.current = sessionInstance;
+            isConnectingRef.current = false;
+            setStatus('listening');
+
+            const welcomePrompt = loggedCustomer
+              ? `¡Hola! Ya entré a la llamada. Salúdame amablemente por mi nombre ${loggedCustomer.name.split(' ')[0]} y pregúntame qué se me antoja ordenar hoy.`
+              : '¡Hola! Ya entré a la llamada. Salúdame amablemente y pregúntame qué se me antoja ordenar hoy en El Buen Servir.';
+
+            // Greet customer via Gemini's live neural audio
+            setTimeout(() => {
+              if (sessionRef.current) {
+                try {
+                  sessionRef.current.sendClientContent({
+                    turns: [{ role: 'user', parts: [{ text: welcomePrompt }] }],
+                    turnComplete: true
+                  });
+                } catch (e) { }
+              }
+            }, 100);
+
+            // Connect mic streaming
+            if (audioContextRef.current && sourceRef.current) {
+              const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1);
+              processorRef.current = processor;
+              sourceRef.current.connect(processor);
+              processor.connect(audioContextRef.current.destination);
+
+              processor.onaudioprocess = (e) => {
+                if (isMutedRef.current || !sessionRef.current) return;
+                const input = e.inputBuffer.getChannelData(0);
+                const downsampled = downsampleTo24kHz(input, audioContextRef.current?.sampleRate || SAMPLE_RATE);
+                const pcm16 = floatTo16BitPCM(downsampled);
+                const base64 = base64FromPCM16(pcm16);
+
+                try {
+                  sessionRef.current.sendRealtimeInput({
+                    media: { data: base64, mimeType: "audio/pcm;rate=24000" }
+                  });
+                } catch (err) {
+                  console.warn("sendRealtimeInput error", err);
+                }
+              };
+            }
+          },
+          onmessage: (msg: LiveServerMessage) => {
+            // Audio streams from Gemini
+            if (msg.serverContent?.modelTurn?.parts) {
+              msg.serverContent.modelTurn.parts.forEach(part => {
+                if (part.inlineData?.data) {
+                  playAudioChunk(part.inlineData.data);
+                }
+                if (part.text && !part.text.includes('**Initiating') && !part.text.includes("I've decided to")) {
+                  const clean = part.text.trim();
+                  if (clean) {
+                    setCurrentSofiaSpeech(clean);
+                    const now = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+                    setTranscriptHistory(prev => [...prev, { role: 'ai', text: clean, time: now }]);
+                  }
+                }
+              });
+            }
+
+            if (msg.serverContent?.interrupted) {
+              stopAllAudio();
+            }
+
+            if (msg.serverContent?.turnComplete) {
+              if (activeSourcesRef.current.length === 0) {
+                setStatus('listening');
+              }
+            }
+
+            // Function calling execution
+            if (msg.toolCall?.functionCalls) {
+              handleToolCalls(msg.toolCall.functionCalls);
+            }
+          },
+          onerror: (err: any) => {
+            console.error("Gemini Live session error:", err);
+            isConnectingRef.current = false;
+            setStatus('error');
+            setConnectionError("Error en la conexión de audio con Sofía.");
+          },
+          onclose: (e: any) => {
+            console.log("Gemini Live session closed:", e?.reason || '');
+            isConnectingRef.current = false;
+            setStatus('idle');
+          }
+        }
+      });
+
+      sessionRef.current = sessionInstance;
+    } catch (err: any) {
+      console.error("Live connection initialization failed:", err);
+      isConnectingRef.current = false;
+      setStatus('error');
+      setConnectionError(err.message || "No se pudo iniciar la sesión de voz con Sofía.");
+    }
+  }, [hasApiKey, resolvedApiKey, menuItems, categories, loggedCustomer, playAudioChunk, stopAllAudio, handleToolCalls]);
+
+  // Connect automatically when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        connect();
+      }, 300);
+      return () => clearTimeout(timer);
+    } else {
+      disconnect();
+    }
+  }, [isOpen]);
+
+  // Local fallback hospitality engine if live session is unavailable
+  const runLocalHospitalityEngine = (userInput: string): string => {
+    const input = userInput.toLowerCase().trim();
+
+    if (['es todo', 'seria todo', 'sería todo', 'la cuenta', 'ya es todo', 'finalizar', 'pagar'].some(t => input.includes(t))) {
+      if (cart.length === 0) {
+        return "¡Con gusto! Pero aún no tienes platillos en tu orden. ¿Qué te gustaría pedir? Tenemos chilaquiles deliciosos, caldos y guisados caseros.";
+      }
+      setIsOrderTrayExpanded(true);
+      return `¡Perfecto! Llevas ${cartItemsCount} ${cartItemsCount === 1 ? 'platillo' : 'platillos'} con un total de $${cartTotal.toFixed(2)}. ¿Prefieres pasar a recogerlo en mostrador o te lo enviamos a domicilio?`;
+    }
+
+    if (input.includes('recomiend') || input.includes('especialidad') || input.includes('favorito') || input.includes('sugier') || input.includes('mas vendido')) {
+      return "Te súper recomiendo nuestros Chilaquiles Especiales con asada de pollo ($120) o las Enchiladas Suizas gratinadas ($90). Si tienes antojo de algo calientito, el Chilpozo de Res ($95) es una delicia.";
+    }
+
+    // Dish matching
+    for (const item of menuItems.filter(i => i.isActive)) {
+      if (input.includes(item.name.toLowerCase())) {
+        const v = item.variations[0];
+        updateCartItem('add', {
+          name: item.name,
+          variation: v.label,
+          price: v.price,
+          quantity: 1,
+          dishId: item.id
+        });
+        return `¡Anotado! Agregué ${item.name} (${v.label}) por $${v.price}. ¿Gustas alguna bebida o postre?`;
+      }
+    }
+
+    return "Te escucho con atención. Dime qué se te antoja ordenar de nuestro menú tradicional de El Buen Servir.";
   };
 
-  // Add dish directly from card
+  // Send text to live session (from keyboard or quick prompt pills)
+  const handleSendText = (text: string) => {
+    if (!text.trim()) return;
+    const cleanText = text.trim();
+    stopAllAudio();
+
+    const now = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    setLastUserSpeech(cleanText);
+    setTranscriptHistory(prev => [...prev, { role: 'user', text: cleanText, time: now }]);
+    setInputText('');
+    setStatus('thinking');
+
+    if (sessionRef.current) {
+      try {
+        sessionRef.current.sendClientContent({
+          turns: [{ role: 'user', parts: [{ text: cleanText }] }],
+          turnComplete: true
+        });
+        return;
+      } catch (e) {
+        console.warn("sendClientContent error:", e);
+      }
+    }
+
+    // Fallback if session is offline
+    const reply = runLocalHospitalityEngine(cleanText);
+    setCurrentSofiaSpeech(reply);
+    setTranscriptHistory(prev => [...prev, { role: 'ai', text: reply, time: now }]);
+    setStatus('idle');
+  };
+
+  // Quick add dish from carousel
   const handleQuickAddDish = (dish: MenuItem) => {
     const defaultVar = dish.variations[0];
     updateCartItem('add', {
@@ -374,210 +734,26 @@ export default function LiveOrderModal({
       dishId: dish.id
     });
 
-    const reply = `¡Anotado! Te agregué ${dish.name} (${defaultVar.label}) por $${defaultVar.price}. ¿Gustas alguna bebida o postre para acompañar?`;
-    setCurrentSofiaSpeech(reply);
-    setTranscriptHistory(prev => [...prev, {
-      role: 'ai',
-      text: reply,
-      time: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
-    }]);
-    speakText(reply);
-  };
-
-  // Local Intelligent Hospitality Engine
-  const runLocalHospitalityEngine = (userInput: string): string => {
-    const input = userInput.toLowerCase().trim();
-
-    // Finalize
-    if (['es todo', 'seria todo', 'sería todo', 'la cuenta', 'ya es todo', 'finalizar', 'pagar'].some(t => input.includes(t))) {
-      if (cart.length === 0) {
-        return "¡Con gusto! Pero aún no tienes platillos en tu orden. ¿Qué te gustaría pedir primero? Tenemos chilaquiles deliciosos, caldos y guisados.";
-      }
-      setIsOrderTrayExpanded(true);
-      return `¡Perfecto! Llevas ${cartItemsCount} ${cartItemsCount === 1 ? 'platillo' : 'platillos'} con un total de $${cartTotal.toFixed(2)}. ¿Prefieres pasar a recogerlo en mostrador o te lo enviamos a domicilio?`;
-    }
-
-    // Recommendations
-    if (input.includes('recomiend') || input.includes('especialidad') || input.includes('favorito') || input.includes('sugier') || input.includes('mas vendido')) {
-      return "Te súper recomiendo nuestros Chilaquiles Especiales con asada de pollo ($120) o las Enchiladas Suizas gratinadas ($90). Si tienes antojo de algo calientito, el Chilpozo de Res ($95) es una maravilla. ¿Te preparo alguno?";
-    }
-
-    // Delivery or Hours
-    if (input.includes('domicilio') || input.includes('entrega') || input.includes('envio') || input.includes('envío')) {
-      return "¡Sí! Contamos con servicio a domicilio rápido en Teziutlán y alrededores, o puedes pasar a recogerlo calientito al mostrador.";
-    }
-
-    // Drinks or Desserts
-    if (input.includes('bebida') || input.includes('jugo') || input.includes('cafe') || input.includes('café')) {
-      return "De bebidas tenemos Jugo de Naranja natural recién exprimido (medio litro $30, litro $60), café de olla calientito y refrescos.";
-    }
-
-    if (input.includes('postre') || input.includes('fresa')) {
-      return "Nuestras Fresas con Crema especiales de la casa son riquísimas: vaso chico $40 y vaso grande $80. ¿Te gustaría ordenar un vaso?";
-    }
-
-    // Removals
-    if (input.startsWith('quita') || input.startsWith('elimina') || input.startsWith('borra') || input.includes('no quiero')) {
-      for (const cartItem of cart) {
-        if (input.includes(cartItem.name.toLowerCase())) {
-          updateCartItem('remove', { name: cartItem.name, variation: cartItem.variation, price: cartItem.price });
-          return `¡Listo! Ya quité ${cartItem.name} de tu orden. ¿Deseas ordenar algo más?`;
-        }
-      }
-    }
-
-    // Dish Matching
-    let parsedQty = 1;
-    if (input.includes('dos ') || input.includes('2 ')) parsedQty = 2;
-    if (input.includes('tres ') || input.includes('3 ')) parsedQty = 3;
-    if (input.includes('cuatro ') || input.includes('4 ')) parsedQty = 4;
-
-    for (const item of menuItems.filter(i => i.isActive)) {
-      const itemNameLower = item.name.toLowerCase();
-      const match = itemNameLower.split(' ').some(w => w.length > 3 && input.includes(w)) || input.includes(itemNameLower);
-
-      if (match) {
-        let chosenVar = item.variations[0];
-        if (item.variations.length > 1) {
-          for (const v of item.variations) {
-            const vL = v.label.toLowerCase();
-            if (input.includes(vL) || (vL.includes('grande') && input.includes('grande')) || (vL.includes('asada') && input.includes('asada')) || (vL.includes('litro') && input.includes('litro'))) {
-              chosenVar = v;
-              break;
-            }
-          }
-        }
-
-        updateCartItem('add', {
-          name: item.name,
-          variation: chosenVar.label,
-          price: chosenVar.price,
-          quantity: parsedQty,
-          dishId: item.id
-        });
-
-        const newTotal = cartTotal + (chosenVar.price * parsedQty);
-        return `¡Anotado! Agregué ${parsedQty}x ${item.name} (${chosenVar.label}) por $${(chosenVar.price * parsedQty).toFixed(2)}. Tu orden lleva $${newTotal.toFixed(2)}. ¿Deseas agregar alguna bebida o guarnición?`;
-      }
-    }
-
-    return "Te escucho con atención. Puedes decirme qué se te antoja ordenar de nuestro menú, pedirme recomendaciones o decirme 'es todo' para preparar tu cuenta.";
-  };
-
-  // Main interaction handler
-  const handleUserInteraction = async (text: string) => {
-    if (!text.trim()) return;
-    stopSpeech();
-
+    const userText = `Quiero agregar ${dish.name} ${defaultVar.label}`;
     const now = new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
-    setLastUserSpeech(text.trim());
-    setTranscriptHistory(prev => [...prev, { role: 'user', text: text.trim(), time: now }]);
-    setInputText('');
-    setStatus('thinking');
+    setLastUserSpeech(userText);
+    setTranscriptHistory(prev => [...prev, { role: 'user', text: userText, time: now }]);
 
-    // If Gemini API Key is available, use Gemini Flash
-    if (hasApiKey) {
+    if (sessionRef.current) {
       try {
-        const ai = new GoogleGenAI({ apiKey: resolvedApiKey });
-        const menuContext = buildMenuSummaryContext(menuItems, categories);
-
-        const customerInfo = loggedCustomer
-          ? `Nombre: ${loggedCustomer.name}, Teléfono: ${loggedCustomer.phone}, Direcciones: ${loggedCustomer.addresses?.join(' | ') || 'Ninguna'}.`
-          : 'Cliente invitado.';
-
-        const currentCartText = cart.length > 0
-          ? `TICKET ACTUAL:\n${cart.map(c => `- ${c.quantity}x ${c.name} (${c.variation}) a $${c.price}`).join('\n')}\nTOTAL: $${cartTotal.toFixed(2)}`
-          : 'El ticket actual está vacío.';
-
-        const systemInstruction = `Eres "Sofía", la anfitriona y mesera virtual de atención al cliente de "El Buen Servir" en Teziutlán.
-Tu personalidad es extraordinariamente cálida, sonriente, servicial, amena y con la hospitalidad mexicana más distinguida.
-CLIENTE: ${customerInfo}
-MENÚ: ${menuContext}
-TICKET ACTUAL: ${currentCartText}
-
-REGLAS DE ATENCIÓN:
-1. Responde de forma muy amable y concisa (1 o 2 oraciones breves para mantener la plática rápida).
-2. Si el cliente pide platillos, USA SIEMPRE la herramienta 'updateOrder' con action='add', nombre exacto del platillo, variación y precio del catálogo.
-3. Si el cliente dice 'es todo', 'la cuenta' o termina, usa 'completeOrder' y confirma el total amablemente.`;
-
-        const recentHistory = transcriptHistory.slice(-4).map(t => ({
-          role: t.role === 'user' ? 'user' : 'model',
-          parts: [{ text: t.text }]
-        }));
-
-        const response = await ai.models.generateContent({
-          model: GEMINI_MODEL,
-          contents: [
-            ...recentHistory,
-            { role: 'user', parts: [{ text: text.trim() }] }
-          ],
-          config: {
-            systemInstruction,
-            tools: [{ functionDeclarations: [updateOrderDeclaration, completeOrderDeclaration] }],
-            temperature: 0.7
-          }
+        sessionRef.current.sendClientContent({
+          turns: [{
+            role: 'user',
+            parts: [{ text: `Agregué a mi orden ${dish.name} (${defaultVar.label}) por $${defaultVar.price}. Confírmamelo con entusiasmo y recomiéndame una bebida o postre para acompañarlo.` }]
+          }],
+          turnComplete: true
         });
-
-        const parts = response.candidates?.[0]?.content?.parts || [];
-        const functionCalls = parts
-          .filter((p: any) => p.functionCall)
-          .map((p: any) => p.functionCall);
-        let executedAction = false;
-
-        if (functionCalls && functionCalls.length > 0) {
-          for (const call of functionCalls) {
-            if (call.name === "updateOrder") {
-              const args: any = call.args;
-              if (args && args.action && args.item) {
-                let finalPrice = args.item.price;
-                let dishId = args.item.dishId;
-                if (!finalPrice || finalPrice <= 0) {
-                  const foundItem = menuItems.find(mi => mi.name.toLowerCase().includes(args.item.name.toLowerCase()) || args.item.name.toLowerCase().includes(mi.name.toLowerCase()));
-                  if (foundItem) {
-                    dishId = foundItem.id;
-                    const foundVar = foundItem.variations.find(v => v.label.toLowerCase().includes((args.item.variation || '').toLowerCase())) || foundItem.variations[0];
-                    finalPrice = foundVar.price;
-                  }
-                }
-
-                updateCartItem(args.action, {
-                  name: args.item.name,
-                  variation: args.item.variation || 'Platillo',
-                  price: finalPrice || 0,
-                  quantity: args.item.quantity || 1,
-                  dishId: dishId
-                });
-                executedAction = true;
-              }
-            } else if (call.name === "completeOrder") {
-              const args: any = call.args;
-              if (args?.orderType) setDeliveryMethod(args.orderType);
-              if (args?.deliveryAddress) setSelectedAddress(args.deliveryAddress);
-              if (args?.paymentMethod) setSelectedPaymentMethod(args.paymentMethod);
-              setIsOrderTrayExpanded(true);
-              executedAction = true;
-            }
-          }
-        }
-
-        const textParts = parts.filter((p: any) => p.text).map((p: any) => p.text).join(' ').trim();
-        const replyText = textParts || response.text || (executedAction ? "¡Listo! Ya registré tu pedido en el ticket. ¿Deseas agregar alguna bebida o algo más?" : "Con gusto te atiendo. ¿Qué más se te antoja?");
-        setCurrentSofiaSpeech(replyText);
-        setTranscriptHistory(prev => [...prev, { role: 'ai', text: replyText, time: now }]);
-        speakText(replyText);
+        setStatus('thinking');
         return;
-      } catch (geminiError: any) {
-        console.warn("Gemini call error, using local engine:", geminiError);
-      }
+      } catch (e) { }
     }
 
-    // Local fallback
-    setTimeout(() => {
-      const reply = runLocalHospitalityEngine(text);
-      setCurrentSofiaSpeech(reply);
-      setTranscriptHistory(prev => [...prev, { role: 'ai', text: reply, time: now }]);
-      speakText(reply);
-    }, 300);
+    setCurrentSofiaSpeech(`¡Anotado! Te agregué ${dish.name} (${defaultVar.label}). ¿Gustas alguna bebida o postre para acompañar?`);
   };
 
   // WhatsApp order submission
@@ -676,6 +852,7 @@ REGLAS DE ATENCIÓN:
 
     window.open(waUrl, '_blank');
     setIsSending(false);
+    disconnect();
     onClose();
   };
 
@@ -692,6 +869,7 @@ REGLAS DE ATENCIÓN:
       })));
     }
     soundManager.play('confirm_generic');
+    disconnect();
     onClose();
   };
 
@@ -737,29 +915,25 @@ REGLAS DE ATENCIÓN:
         <div className="px-5 sm:px-8 py-4 flex items-center justify-between border-b border-white/10 shrink-0 bg-black/20 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/30">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span className="text-xs font-black uppercase tracking-wider text-emerald-300">Sofía en vivo</span>
+              <span className={`w-2 h-2 rounded-full ${status === 'speaking' ? 'bg-emerald-400 animate-ping' : status === 'listening' ? 'bg-teal-400 animate-pulse' : 'bg-gray-400'}`} />
+              <span className="text-xs font-black uppercase tracking-wider text-emerald-300">
+                {status === 'connecting' ? 'Conectando...' : status === 'speaking' ? 'Sofía hablando' : status === 'listening' ? 'Sofía escuchando' : 'Sofía en vivo'}
+              </span>
             </div>
-            {hasApiKey ? (
-              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:inline">
-                Gemini Flash AI
-              </span>
-            ) : (
-              <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest hidden sm:inline">
-                Modo Nativo
-              </span>
-            )}
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest hidden sm:inline">
+              Voz Gemini Aoede Live 24kHz
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Audio Toggle */}
+            {/* Audio Output Mute Toggle */}
             <button
               type="button"
               onClick={() => {
-                if (!isSpeakerMuted) stopSpeech();
+                if (!isSpeakerMuted) stopAllAudio();
                 setIsSpeakerMuted(!isSpeakerMuted);
               }}
-              title={isSpeakerMuted ? "Activar audio" : "Silenciar audio"}
+              title={isSpeakerMuted ? "Activar audio de Sofía" : "Silenciar voz de Sofía"}
               className={`p-2.5 rounded-2xl border transition-all ${
                 isSpeakerMuted
                   ? 'bg-red-500/15 border-red-500/30 text-red-400'
@@ -769,7 +943,7 @@ REGLAS DE ATENCIÓN:
               {isSpeakerMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4 text-emerald-400" />}
             </button>
 
-            {/* History Drawer Toggle */}
+            {/* Conversation History Toggle */}
             <button
               type="button"
               onClick={() => setIsHistoryOpen(!isHistoryOpen)}
@@ -783,6 +957,19 @@ REGLAS DE ATENCIÓN:
               <History className="w-4 h-4" />
             </button>
 
+            {/* Reconnect Call Button */}
+            <button
+              type="button"
+              onClick={() => {
+                disconnect();
+                setTimeout(() => connect(), 200);
+              }}
+              title="Reiniciar llamada de voz"
+              className="p-2.5 rounded-2xl border border-white/10 bg-white/5 text-gray-300 hover:text-white hover:bg-white/10 transition-all"
+            >
+              <RefreshCw className="w-4 h-4" />
+            </button>
+
             {/* API Key Modal Button */}
             <button
               type="button"
@@ -793,12 +980,11 @@ REGLAS DE ATENCIÓN:
               <Key className="w-4 h-4" />
             </button>
 
-            {/* Close */}
+            {/* Close Modal */}
             <button
               type="button"
               onClick={() => {
-                stopSpeech();
-                stopSpeechRecognition();
+                disconnect();
                 onClose();
               }}
               className="p-2.5 rounded-2xl border border-white/10 bg-white/5 text-gray-300 hover:text-white hover:bg-red-500/20 hover:border-red-500/30 transition-all ml-1"
@@ -814,10 +1000,13 @@ REGLAS DE ATENCIÓN:
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Key className="w-4 h-4 text-emerald-400" />
-                <h4 className="text-xs font-black uppercase tracking-wider text-white">Clave de API Gemini</h4>
+                <h4 className="text-xs font-black uppercase tracking-wider text-white">Clave de API Gemini Live</h4>
               </div>
               <button onClick={() => setShowApiKeyModal(false)} className="text-gray-400 hover:text-white"><X className="w-4 h-4" /></button>
             </div>
+            <p className="text-xs text-gray-400">
+              Usa tu clave de Google AI Studio para disfrutar la voz neuronal Gemini Aoede con streaming en tiempo real.
+            </p>
             <div className="flex gap-2">
               <input
                 type="password"
@@ -832,56 +1021,101 @@ REGLAS DE ATENCIÓN:
                   localStorage.setItem('gemini_api_key', customApiKey.trim());
                   setShowApiKeyModal(false);
                   soundManager.play('confirm_generic');
+                  disconnect();
+                  setTimeout(() => connect(), 200);
                 }}
                 className="px-4 py-2 bg-emerald-500 text-white rounded-xl text-xs font-black uppercase tracking-wider"
               >
-                Guardar
+                Guardar y Conectar
               </button>
             </div>
           </div>
         )}
 
-        {/* 2. Central Interactive Living Voice Stage */}
+        {/* Error Notification Banner if Any */}
+        {connectionError && (
+          <div className="px-5 py-2.5 bg-amber-500/15 border-b border-amber-500/30 flex items-center justify-between text-xs text-amber-300">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 text-amber-400" />
+              <span>{connectionError}</span>
+            </div>
+            <button
+              onClick={() => {
+                disconnect();
+                setTimeout(() => connect(), 200);
+              }}
+              className="text-[10px] font-black uppercase tracking-wider underline hover:text-white"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
+        {/* 2. Central Living Voice Stage */}
         <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-4 sm:py-6 overflow-y-auto custom-scrollbar relative">
 
-          {/* Living Orb Component */}
-          <div className="relative flex items-center justify-center my-3 sm:my-5 cursor-pointer" onClick={toggleListening}>
-            {/* Concentric ambient ripples */}
+          {/* Living Interactive Orb */}
+          <div
+            className="relative flex items-center justify-center my-3 sm:my-5 cursor-pointer"
+            onClick={() => {
+              if (status === 'idle') {
+                connect();
+              } else {
+                setIsMuted(!isMuted);
+                soundManager.play('click');
+              }
+            }}
+          >
+            {/* Concentric Ambient Waves */}
             <div className={`absolute rounded-full transition-all duration-700 pointer-events-none ${
               status === 'speaking'
-                ? 'w-48 h-48 bg-emerald-500/25 blur-2xl animate-ping'
+                ? 'w-52 h-52 bg-emerald-500/30 blur-2xl animate-ping'
                 : status === 'listening'
-                  ? 'w-52 h-52 bg-teal-400/20 blur-2xl animate-pulse'
-                  : 'w-36 h-36 bg-emerald-500/10 blur-xl'
+                  ? 'w-56 h-56 bg-teal-400/20 blur-2xl animate-pulse'
+                  : status === 'connecting' || status === 'thinking'
+                    ? 'w-44 h-44 bg-amber-400/20 blur-xl animate-pulse'
+                    : 'w-36 h-36 bg-emerald-500/10 blur-xl'
             }`} />
 
             <div className={`absolute rounded-full border border-emerald-500/30 transition-all duration-500 pointer-events-none ${
-              status === 'speaking' ? 'w-40 h-40 scale-110' : status === 'listening' ? 'w-36 h-36 animate-spin' : 'w-32 h-32'
+              status === 'speaking' ? 'w-44 h-44 scale-110' : status === 'listening' ? 'w-40 h-40 animate-spin' : 'w-32 h-32'
             }`} />
 
-            {/* Core Glowing Orb */}
-            <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full p-1 transition-all duration-500 shadow-2xl flex items-center justify-center relative ${
+            {/* Core Orb */}
+            <div className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full p-1.5 transition-all duration-500 shadow-2xl flex items-center justify-center relative ${
               status === 'speaking'
-                ? 'bg-gradient-to-tr from-emerald-400 via-teal-300 to-cyan-400 shadow-emerald-500/50 scale-105'
+                ? 'bg-gradient-to-tr from-emerald-400 via-teal-300 to-cyan-400 shadow-emerald-500/60 scale-105 ring-4 ring-emerald-400/40'
                 : status === 'listening'
-                  ? 'bg-gradient-to-tr from-teal-400 via-emerald-400 to-amber-300 shadow-teal-400/50 scale-110 ring-4 ring-emerald-400/30'
-                  : status === 'thinking'
+                  ? isMuted
+                    ? 'bg-gradient-to-tr from-red-500 to-rose-600 shadow-red-500/40 scale-100'
+                    : 'bg-gradient-to-tr from-teal-400 via-emerald-400 to-amber-300 shadow-teal-400/50 scale-110 ring-4 ring-emerald-400/30'
+                  : status === 'connecting' || status === 'thinking'
                     ? 'bg-gradient-to-tr from-amber-400 to-orange-500 shadow-amber-400/30 animate-pulse'
                     : 'bg-gradient-to-tr from-emerald-500 via-teal-500 to-emerald-700 hover:scale-105 shadow-emerald-500/30'
             }`}>
               <div className="w-full h-full rounded-full bg-gray-950 flex flex-col items-center justify-center relative overflow-hidden">
                 <span className="text-3xl sm:text-4xl filter drop-shadow">👩‍🍳</span>
 
-                {/* Audio wave bars under avatar */}
-                <div className="flex items-center gap-1 mt-1">
-                  {[4, 8, 12, 8, 4].map((h, i) => (
+                {/* Real-time reactive audio wave bars under avatar */}
+                <div className="flex items-center gap-1 mt-1.5">
+                  {[4, 10, 16, 10, 4].map((h, i) => (
                     <div
                       key={i}
-                      style={{ height: `${status === 'speaking' || status === 'listening' ? Math.max(4, (h * (status === 'speaking' ? 1.5 : 1.2))) : 3}px` }}
+                      style={{
+                        height: `${
+                          status === 'speaking'
+                            ? Math.max(5, h * 1.4)
+                            : status === 'listening' && !isMuted
+                              ? Math.max(4, h * 1.1)
+                              : 3
+                        }px`
+                      }}
                       className={`w-1 rounded-full transition-all duration-200 ${
-                        status === 'listening' ? 'bg-teal-400 animate-pulse' :
-                        status === 'speaking' ? 'bg-emerald-400 animate-bounce' :
-                        'bg-gray-600'
+                        status === 'speaking'
+                          ? 'bg-emerald-400 animate-bounce'
+                          : status === 'listening' && !isMuted
+                            ? 'bg-teal-400 animate-pulse'
+                            : 'bg-gray-600'
                       }`}
                     />
                   ))}
@@ -890,7 +1124,7 @@ REGLAS DE ATENCIÓN:
             </div>
           </div>
 
-          {/* User's Last Spoken Expression Badge */}
+          {/* User's Last Expression Pill */}
           {lastUserSpeech && (
             <div className="mb-2 max-w-lg px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs text-gray-300 flex items-center gap-2 animate-in fade-in duration-300">
               <span className="text-emerald-400 font-black text-[10px] uppercase tracking-wider shrink-0">Tú:</span>
@@ -900,14 +1134,19 @@ REGLAS DE ATENCIÓN:
 
           {/* Sofia's Real-time Dynamic Hero Caption */}
           <div className="max-w-2xl text-center px-4 py-3 rounded-3xl bg-white/[0.03] border border-white/5 backdrop-blur-md shadow-lg min-h-[72px] flex items-center justify-center transition-all">
-            {status === 'thinking' ? (
+            {status === 'connecting' ? (
+              <div className="flex items-center gap-2.5 text-emerald-300 font-medium text-sm animate-pulse">
+                <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+                <span>Conectando con la voz de Sofía...</span>
+              </div>
+            ) : status === 'thinking' ? (
               <div className="flex items-center gap-2.5 text-amber-300 font-medium text-sm animate-pulse">
                 <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
                 <span>Sofía está preparando tu respuesta...</span>
               </div>
             ) : (
               <p className="text-base sm:text-lg font-medium leading-snug text-white/95 transition-all duration-300">
-                "{currentSofiaSpeech || '¿Qué se te antoja ordenar el día de hoy?'}"
+                "{currentSofiaSpeech || '¡Hola! Soy Sofía. ¿Qué se te antoja ordenar el día de hoy?'}"
               </p>
             )}
           </div>
@@ -916,7 +1155,7 @@ REGLAS DE ATENCIÓN:
           <div className="w-full max-w-3xl mt-4 sm:mt-6">
             <div className="flex items-center justify-between px-2 mb-2">
               <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                Platillos Populares · Toca para ordenar
+                Platillos Populares · Toca para pedir
               </span>
               <span className="text-[10px] font-bold text-emerald-400 flex items-center gap-1">
                 <Sparkles className="w-3 h-3" /> Recomendados
@@ -954,7 +1193,7 @@ REGLAS DE ATENCIÓN:
                       className="mt-2 w-full py-1.5 rounded-xl bg-emerald-500/20 group-hover:bg-emerald-500 group-hover:text-white border border-emerald-500/30 text-emerald-300 text-[10px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1"
                     >
                       <Plus className="w-3 h-3" />
-                      <span>Agregar</span>
+                      <span>Pedir Platillo</span>
                     </button>
                   </div>
                 );
@@ -963,22 +1202,22 @@ REGLAS DE ATENCIÓN:
           </div>
         </div>
 
-        {/* 3. Bottom Command Island (Voice Trigger & Dynamic Cart Pill) */}
+        {/* 3. Bottom Command Island */}
         <div className="p-4 sm:p-6 border-t border-white/10 bg-black/40 backdrop-blur-xl shrink-0 flex flex-col gap-3">
 
           {/* Quick Prompts Carousel */}
           <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-1">
             {[
-              "🌟 ¿Qué me recomiendas?",
-              "🥣 Chilaquiles con asada de pollo",
-              "🍲 Caldos del día",
-              "🥤 Bebidas y jugos",
-              "✅ Ya es todo, la cuenta"
+              "🌟 ¿Qué me recomiendas hoy?",
+              "🥣 Quiero unos Chilaquiles con pollo",
+              "🍲 ¿Qué caldos tienen preparados?",
+              "🥤 ¿Tienen jugo de naranja natural?",
+              "✅ Ya es todo, la cuenta por favor"
             ].map((promptText, i) => (
               <button
                 key={i}
                 type="button"
-                onClick={() => handleUserInteraction(promptText)}
+                onClick={() => handleSendText(promptText)}
                 className="px-3.5 py-1.5 rounded-full bg-white/5 hover:bg-emerald-500/20 border border-white/10 hover:border-emerald-500/40 text-gray-300 hover:text-emerald-300 text-xs font-semibold whitespace-nowrap transition-all shrink-0 active:scale-95"
               >
                 {promptText}
@@ -986,12 +1225,12 @@ REGLAS DE ATENCIÓN:
             ))}
           </div>
 
-          {/* Text Input Row (Expandable via keyboard toggle) */}
+          {/* Text Input Row */}
           {isKeyboardOpen && (
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (inputText.trim()) handleUserInteraction(inputText);
+                if (inputText.trim()) handleSendText(inputText);
               }}
               className="flex gap-2 animate-in fade-in slide-in-from-bottom-2 duration-300"
             >
@@ -1028,25 +1267,44 @@ REGLAS DE ATENCIÓN:
               <Keyboard className="w-5 h-5" />
             </button>
 
-            {/* Central Mic Pulse Button */}
+            {/* Central Mic / Call Toggle */}
             <button
               type="button"
-              onClick={toggleListening}
+              onClick={() => {
+                if (status === 'idle') {
+                  connect();
+                } else {
+                  setIsMuted(!isMuted);
+                  soundManager.play('click');
+                }
+              }}
               className={`flex-1 py-4 px-6 rounded-2xl font-black uppercase text-xs sm:text-sm tracking-wider flex items-center justify-center gap-3 transition-all shadow-xl cursor-pointer ${
-                status === 'listening'
-                  ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/40 animate-pulse'
-                  : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-500/30 active:scale-95'
+                status === 'idle'
+                  ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-500/30'
+                  : isMuted
+                    ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/40'
+                    : 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white shadow-emerald-500/30 active:scale-95'
               }`}
             >
-              {status === 'listening' ? (
+              {status === 'idle' ? (
+                <>
+                  <PhoneCall className="w-5 h-5" />
+                  <span>Conectar con Sofía</span>
+                </>
+              ) : isMuted ? (
                 <>
                   <MicOff className="w-5 h-5" />
-                  <span>Escuchando... Toca para pausar</span>
+                  <span>Micrófono Silenciado (Toca para activar)</span>
+                </>
+              ) : status === 'speaking' ? (
+                <>
+                  <Volume2 className="w-5 h-5 animate-pulse" />
+                  <span>Sofía hablando... (Toca para silenciar mic)</span>
                 </>
               ) : (
                 <>
                   <Mic className="w-5 h-5 animate-pulse" />
-                  <span>Hablar con Sofía</span>
+                  <span>Escuchando en vivo... (Toca para silenciar)</span>
                 </>
               )}
             </button>
@@ -1151,6 +1409,7 @@ REGLAS DE ATENCIÓN:
                 <div className="py-16 text-center text-gray-500 space-y-2">
                   <Utensils className="w-10 h-10 mx-auto text-gray-600" />
                   <p className="text-xs font-black uppercase tracking-wider">Aún no tienes platillos agregados</p>
+                  <p className="text-[11px] text-gray-500">Pídele a Sofía lo que se te antoje o toca los platillos recomendados.</p>
                 </div>
               )}
 
