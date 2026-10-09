@@ -366,7 +366,41 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   const handleRegisterCustomer = (newCustomer: Customer) => {
     onAddCustomer(newCustomer);
     handleSetLoggedCustomer(newCustomer);
-    triggerOnboardingGuide(newCustomer);
+    if (authIntent === 'live') {
+      setIsAuthModalOpen(false);
+      setIsLiveOrderOpen(true);
+    } else {
+      triggerOnboardingGuide(newCustomer);
+    }
+  };
+
+  const handleTransferFromSofia = (items: { dishId: string; name: string; variationLabel: string; price: number; quantity: number }[]) => {
+    setCartItems(prev => {
+      const updated = [...prev];
+      for (const item of items) {
+        const existingIdx = updated.findIndex(ci => ci.name.toLowerCase() === item.name.toLowerCase() && ci.variationLabel.toLowerCase() === item.variationLabel.toLowerCase());
+        if (existingIdx > -1) {
+          updated[existingIdx] = {
+            ...updated[existingIdx],
+            quantity: updated[existingIdx].quantity + item.quantity
+          };
+        } else {
+          updated.push({
+            id: `cart-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+            dishId: item.dishId,
+            name: item.name,
+            variationLabel: item.variationLabel,
+            price: item.price,
+            quantity: item.quantity,
+            sides: []
+          });
+        }
+      }
+      return updated;
+    });
+    setIsLiveOrderOpen(false);
+    setOrderStep(3);
+    setIsOrderModalOpen(true);
   };
 
   // Mobile Back Button Navigation Logic
@@ -641,6 +675,24 @@ export default function PublicView({ categories, menuItems, customers, orders = 
               </button>
             )}
 
+            {/* Sofia AI Button */}
+            <button
+              type="button"
+              onClick={() => {
+                soundManager.play('click');
+                setIsLiveOrderOpen(true);
+              }}
+              title="Hablar con Sofía IA - Asistente de Pedidos"
+              className={`hidden md:flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-500/40 transition-all hover:scale-105 active:scale-95 shadow-sm font-black text-xs uppercase tracking-wider cursor-pointer ${
+                isScrolled || isPreview
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white dark:hover:bg-emerald-500 dark:hover:text-white'
+                  : 'bg-white/10 text-white hover:bg-emerald-500 backdrop-blur-md'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
+              <span>Sofía IA</span>
+            </button>
+
             {/* Customer Profile / Login Button */}
             {loggedCustomer ? (
               <div className="relative">
@@ -896,11 +948,15 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                 </button>
 
                 <button
-                  disabled
-                  className="w-full bg-gray-100 dark:bg-gray-800 text-gray-400 py-5 rounded-[24px] font-black uppercase tracking-widest flex items-center justify-center gap-3 cursor-not-allowed opacity-60"
+                  onClick={() => {
+                    soundManager.play('click');
+                    setIsLiveOrderOpen(true);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-white py-5 rounded-[24px] font-black uppercase tracking-widest shadow-xl shadow-emerald-500/30 flex items-center justify-center gap-3 active:scale-95 transition-all cursor-pointer"
                 >
-                  <Mic className="w-5 h-5" />
-                  Sofía AI (Próximamente)
+                  <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
+                  <span>Hablar con Sofía (IA)</span>
                 </button>
               </div>
             </div>
@@ -943,6 +999,16 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                     className="w-full sm:w-auto bg-primary-500 hover:bg-primary-600 text-white px-12 py-6 rounded-3xl text-lg font-black uppercase tracking-widest shadow-2xl shadow-primary-500/40 transition-all hover:-translate-y-1 active:scale-95 text-center cursor-pointer"
                   >
                     Descubrir Menú
+                  </button>
+                  <button
+                    onClick={() => {
+                      soundManager.play('click');
+                      setIsLiveOrderOpen(true);
+                    }}
+                    className="w-full sm:w-auto group flex items-center justify-center gap-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-white px-9 py-6 rounded-3xl text-lg font-black uppercase tracking-wider shadow-2xl shadow-emerald-500/30 transition-all hover:-translate-y-1 active:scale-95 cursor-pointer"
+                  >
+                    <Sparkles className="w-6 h-6 text-amber-300 animate-pulse" />
+                    <span>Pedir con Sofía IA</span>
                   </button>
                   <button
                     onClick={() => {
@@ -1402,6 +1468,30 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                 {/* Step 1: Main Dishes (Multi-Selection) */}
                 {orderStep === 1 && (
                   <div className="space-y-6">
+                    {/* Sofia AI Ordering Banner */}
+                    <div className="p-4 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/5 border border-emerald-500/30 rounded-3xl flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center text-lg shadow-md shrink-0">
+                          👩‍🍳
+                        </div>
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-tight text-gray-900 dark:text-white">¿Prefieres ordenar platicando?</p>
+                          <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">Sofía IA te atiende por voz o texto y arma tu orden al instante.</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          soundManager.play('click');
+                          setIsOrderModalOpen(false);
+                          setIsLiveOrderOpen(true);
+                        }}
+                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 active:scale-95 shadow-md shadow-emerald-500/20 cursor-pointer"
+                      >
+                        Hablar con Sofía
+                      </button>
+                    </div>
+
                     {/* Cart Summary Bar inside Step 1 (if items added) */}
                     {cartItems.length > 0 && (
                       <div className="p-4 sm:p-5 bg-primary-50 dark:bg-primary-950/40 border border-primary-200 dark:border-primary-800 rounded-3xl space-y-3">
@@ -1922,6 +2012,8 @@ export default function PublicView({ categories, menuItems, customers, orders = 
           setAuthIntent('live');
           setIsAuthModalOpen(true);
         }}
+        onTransferToCart={handleTransferFromSofia}
+        onUpdateCustomer={onUpdateCustomer}
       />
 
       {/* Customer Authentication Modal */}
@@ -2443,6 +2535,36 @@ export default function PublicView({ categories, menuItems, customers, orders = 
               <span className="text-base font-black text-primary-400 dark:text-primary-600">${cartTotal.toFixed(2)}</span>
               <ArrowRight className="w-4 h-4 text-primary-400 dark:text-primary-600" />
             </div>
+          </button>
+        </aside>
+      )}
+
+      {/* Floating Sofia AI Button */}
+      {!hasOpenPublicModal && (
+        <aside
+          aria-label="Hablar con Sofía Asistente IA"
+          className={`fixed ${cartItems.length > 0 ? 'bottom-24 left-4 sm:bottom-6 sm:left-8' : 'bottom-6 left-4 sm:left-8'} z-40 animate-in slide-in-from-bottom-5 duration-300`}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              soundManager.play('click');
+              setIsLiveOrderOpen(true);
+            }}
+            className="flex items-center gap-3 px-4 sm:px-5 py-3.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white rounded-full shadow-[0_15px_35px_rgba(16,185,129,0.35)] hover:scale-105 active:scale-95 transition-all border border-white/20 cursor-pointer group"
+            title="Pedir con Sofía IA"
+          >
+            <div className="relative">
+              <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-sm shadow-inner">
+                👩‍🍳
+              </span>
+              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full animate-ping" />
+            </div>
+            <div className="text-left hidden sm:block">
+              <p className="text-[10px] font-bold text-emerald-200 uppercase tracking-widest leading-none">Asistente Virtual</p>
+              <p className="text-xs font-black uppercase tracking-tight">Pedir con Sofía</p>
+            </div>
+            <Sparkles className="w-4 h-4 text-amber-300 animate-pulse hidden sm:block" />
           </button>
         </aside>
       )}
