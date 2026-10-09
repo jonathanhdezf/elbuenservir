@@ -36,7 +36,7 @@ type SessionStatus = 'idle' | 'listening' | 'thinking' | 'speaking' | 'error';
 
 const RESTAURANT_PHONE = '2311024672';
 const WHATSAPP_NUMBER = '522311024672';
-const GEMINI_MODEL = 'gemini-2.5-flash';
+const GEMINI_MODEL = 'gemini-flash-latest';
 
 // Tool Declarations for Gemini
 const updateOrderDeclaration = {
@@ -537,8 +537,11 @@ INSTRUCCIONES CLAVE:
           }
         });
 
-        // Check for function calls
-        const functionCalls = response.functionCalls();
+        // Check for function calls in candidates parts
+        const parts = response.candidates?.[0]?.content?.parts || [];
+        const functionCalls = parts
+          .filter((p: any) => p.functionCall)
+          .map((p: any) => p.functionCall);
         let executedAction = false;
 
         if (functionCalls && functionCalls.length > 0) {
@@ -546,7 +549,24 @@ INSTRUCCIONES CLAVE:
             if (call.name === "updateOrder") {
               const args: any = call.args;
               if (args && args.action && args.item) {
-                updateCartItem(args.action, args.item);
+                let finalPrice = args.item.price;
+                let dishId = args.item.dishId;
+                if (!finalPrice || finalPrice <= 0) {
+                  const foundItem = menuItems.find(mi => mi.name.toLowerCase().includes(args.item.name.toLowerCase()) || args.item.name.toLowerCase().includes(mi.name.toLowerCase()));
+                  if (foundItem) {
+                    dishId = foundItem.id;
+                    const foundVar = foundItem.variations.find(v => v.label.toLowerCase().includes((args.item.variation || '').toLowerCase())) || foundItem.variations[0];
+                    finalPrice = foundVar.price;
+                  }
+                }
+
+                updateCartItem(args.action, {
+                  name: args.item.name,
+                  variation: args.item.variation || 'Platillo',
+                  price: finalPrice || 0,
+                  quantity: args.item.quantity || 1,
+                  dishId: dishId
+                });
                 executedAction = true;
               }
             } else if (call.name === "completeOrder") {
@@ -560,7 +580,8 @@ INSTRUCCIONES CLAVE:
           }
         }
 
-        const replyText = response.text || (executedAction ? "¡Listo! Ya actualicé tu pedido. ¿Deseas algo más?" : "Con gusto te atiendo. ¿Qué más te gustaría?");
+        const textParts = parts.filter((p: any) => p.text).map((p: any) => p.text).join(' ').trim();
+        const replyText = textParts || response.text || (executedAction ? "¡Listo! Ya registré tu pedido. ¿Deseas agregar alguna bebida o algo más?" : "Con gusto te atiendo. ¿Qué más se te antoja?");
         const aiMsg = { role: 'ai' as const, text: replyText, time: new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) };
         setTranscript(prev => [...prev, aiMsg]);
         speakText(replyText);
