@@ -11,9 +11,10 @@ import {
   Banknote, Receipt, ArrowRight, Printer, CheckCircle,
   Monitor, Maximize2, Bell, Truck, UserMinus, Navigation, ShieldCheck, Layers,
   History, Wallet, ArrowUpRight, Store, Utensils, Zap, Save, UserCheck, Scan, Shield, Sun, Moon,
-  ArrowUp, ArrowDown, Move, MessageCircle, Copy
+  ArrowUp, ArrowDown, Move, MessageCircle, Copy,
+  Landmark, HandCoins, FileText, BadgePercent
 } from 'lucide-react';
-import { MenuItem, Category, TabId, Order, OrderItem, OrderStatus, Customer, AdminSection, DeliveryDriver, VehicleType, PaymentMethod, PaymentStatus, TransferStatus, Staff, StaffRole, SiteLog, PayrollEntry, Loan } from '../types';
+import { MenuItem, Category, TabId, Order, OrderItem, OrderStatus, Customer, CustomerCreditMovement, AdminSection, DeliveryDriver, VehicleType, PaymentMethod, PaymentStatus, TransferStatus, Staff, StaffRole, SiteLog, PayrollEntry, Loan } from '../types';
 import { soundManager, AudioAction } from '../utils/soundManager';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -101,6 +102,7 @@ export default function AdminView({
     efectivo: { label: 'Efectivo', icon: Banknote, color: 'text-emerald-500' },
     tarjeta: { label: 'Tarjeta', icon: CreditCard, color: 'text-blue-500' },
     transferencia: { label: 'Transferencia', icon: Receipt, color: 'text-purple-500' },
+    credito: { label: 'Crédito', icon: Landmark, color: 'text-amber-500' },
   };
 
   const PAYMENT_STATUS_CONFIG: Record<PaymentStatus, { label: string, color: string }> = {
@@ -270,6 +272,13 @@ export default function AdminView({
   const [regAddresses, setRegAddresses] = useState<string[]>([]);
   const [customerSearchTerm, setCustomerSearchTerm] = useState('');
   const [viewingOrdersCustomer, setViewingOrdersCustomer] = useState<Customer | null>(null);
+  const [managingCreditCustomer, setManagingCreditCustomer] = useState<Customer | null>(null);
+  const [creditTab, setCreditTab] = useState<'details' | 'abono' | 'cargo' | 'history'>('details');
+  const [abonoAmount, setAbonoAmount] = useState('');
+  const [abonoPaymentMethod, setAbonoPaymentMethod] = useState<'efectivo' | 'transferencia' | 'tarjeta'>('efectivo');
+  const [abonoNotes, setAbonoNotes] = useState('');
+  const [cargoAmount, setCargoAmount] = useState('');
+  const [cargoReason, setCargoReason] = useState('');
 
   // Reordering State
   const [isReordering, setIsReordering] = useState(false);
@@ -1207,8 +1216,8 @@ export default function AdminView({
                 {/* Payment Method */}
                 <div className="space-y-3">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Método de Pago</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    {(['efectivo', 'tarjeta', 'transferencia'] as const).map(method => (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    {(['efectivo', 'tarjeta', 'transferencia', 'credito'] as PaymentMethod[]).map(method => (
                       <button
                         key={method}
                         onClick={() => {
@@ -1217,14 +1226,27 @@ export default function AdminView({
                           setTempOpNumber('');
                           setPaymentError(null);
                         }}
-                        className={`py-4 rounded-2xl border-2 font-black text-[9px] uppercase tracking-widest transition-all flex flex-col items-center gap-2 ${tempPaymentMethod === method ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 shadow-lg shadow-emerald-500/10' : 'border-gray-100 dark:border-gray-700 text-gray-400 hover:border-gray-200'}`}
+                        className={`py-3.5 rounded-2xl border-2 font-black text-[9px] uppercase tracking-wider transition-all flex flex-col items-center gap-1.5 cursor-pointer ${tempPaymentMethod === method ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 shadow-lg shadow-emerald-500/10' : 'border-gray-100 dark:border-gray-700 text-gray-400 hover:border-gray-200'}`}
                       >
-                        {method === 'efectivo' ? <Banknote className="w-5 h-5" /> : method === 'tarjeta' ? <CreditCard className="w-5 h-5" /> : <Scan className="w-5 h-5" />}
+                        {method === 'efectivo' ? <Banknote className="w-5 h-5" /> : method === 'tarjeta' ? <CreditCard className="w-5 h-5" /> : method === 'transferencia' ? <Scan className="w-5 h-5" /> : <Landmark className="w-5 h-5" />}
                         {method}
                       </button>
                     ))}
                   </div>
                 </div>
+
+                {/* Crédito Notice */}
+                {tempPaymentMethod === 'credito' && (
+                  <div className="p-4 bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/40 rounded-2xl space-y-1.5 animate-in slide-in-from-top-2 duration-200 text-left">
+                    <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-black text-xs uppercase tracking-wide">
+                      <Landmark className="w-4 h-4 text-amber-500" />
+                      <span>Pago a Crédito / Cuenta Abierta</span>
+                    </div>
+                    <p className="text-[10px] text-gray-600 dark:text-gray-300 leading-tight">
+                      El monto de <strong>${viewingOrder.total.toFixed(2)}</strong> se asocia a la cuenta del cliente.
+                    </p>
+                  </div>
+                )}
 
                 {/* Cash Input */}
                 {tempPaymentMethod === 'efectivo' && (
@@ -3005,6 +3027,71 @@ export default function AdminView({
                     <ChevronRight className="w-4 h-4 text-gray-300 group-hover/last:text-primary-500 transition-colors" />
                   </div>
                 </button>
+
+                {/* Credit Management Bar / Badge on Customer Card */}
+                <div className={`mt-4 p-3.5 rounded-3xl border transition-all ${
+                  customer.creditEnabled
+                    ? (customer.creditBalance && customer.creditBalance > 0)
+                      ? 'bg-amber-50/80 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50'
+                      : 'bg-emerald-50/70 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-900/50'
+                    : 'bg-gray-50/70 dark:bg-gray-900/40 border-gray-100 dark:border-gray-800'
+                }`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                        customer.creditEnabled
+                          ? (customer.creditBalance && customer.creditBalance > 0 ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white')
+                          : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
+                      }`}>
+                        <Landmark className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[9px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                            {customer.creditEnabled ? 'Crédito' : 'Sin Crédito'}
+                          </p>
+                          {customer.creditEnabled && (
+                            <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                              (customer.creditBalance || 0) > 0 ? 'bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300' : 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300'
+                            }`}>
+                              {(customer.creditBalance || 0) > 0 ? 'Deuda' : 'Al Día'}
+                            </span>
+                          )}
+                        </div>
+                        {customer.creditEnabled ? (
+                          <p className="text-xs font-black text-gray-900 dark:text-white truncate">
+                            <span className={(customer.creditBalance || 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                              ${(customer.creditBalance || 0).toFixed(2)}
+                            </span>
+                            <span className="text-[10px] font-normal text-gray-400 ml-1">/ Límite ${(customer.creditLimit || 0).toFixed(2)}</span>
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-gray-400 truncate">Habilitar cuenta abierta</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setManagingCreditCustomer(customer);
+                        setCreditTab('details');
+                        setAbonoAmount('');
+                        setAbonoNotes('');
+                        setCargoAmount('');
+                        setCargoReason('');
+                      }}
+                      className={`px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shrink-0 shadow-xs flex items-center gap-1 ${
+                        customer.creditEnabled
+                          ? 'bg-amber-500 hover:bg-amber-600 active:scale-95 text-white shadow-amber-500/20'
+                          : 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:opacity-90 active:scale-95'
+                      }`}
+                    >
+                      <Landmark className="w-3 h-3" />
+                      <span>{customer.creditEnabled ? 'Gestionar' : 'Activar'}</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
               <div className="mt-6 grid grid-cols-2 gap-3">
@@ -3265,6 +3352,618 @@ export default function AdminView({
     );
   };
 
+  // Credit Management Actions
+  const handleUpdateCreditSettings = (updates: Partial<Customer>) => {
+    if (!managingCreditCustomer) return;
+    const updated: Customer = {
+      ...managingCreditCustomer,
+      ...updates
+    };
+    setCustomers(prev => prev.map(c => c.id === updated.id ? updated : c));
+    setManagingCreditCustomer(updated);
+    addNotification('Configuración de crédito actualizada', 'success');
+  };
+
+  const handleApplyCreditAbono = () => {
+    if (!managingCreditCustomer) return;
+    const amount = parseFloat(abonoAmount);
+    if (isNaN(amount) || amount <= 0) {
+      addNotification('Ingresa un monto válido para el abono', 'warning');
+      return;
+    }
+
+    const currentBalance = Number(managingCreditCustomer.creditBalance || 0);
+    const newBalance = Math.max(0, currentBalance - amount);
+    const movement: CustomerCreditMovement = {
+      id: `cm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type: 'abono',
+      amount: amount,
+      balanceAfter: newBalance,
+      date: new Date().toISOString(),
+      notes: abonoNotes ? `Abono (${abonoPaymentMethod.toUpperCase()}): ${abonoNotes}` : `Abono recibido vía ${abonoPaymentMethod.toUpperCase()}`,
+      registeredBy: 'Admin'
+    };
+
+    const updated: Customer = {
+      ...managingCreditCustomer,
+      creditBalance: newBalance,
+      creditHistory: [movement, ...(managingCreditCustomer.creditHistory || [])]
+    };
+
+    setCustomers(prev => prev.map(c => c.id === updated.id ? updated : c));
+    setManagingCreditCustomer(updated);
+    setAbonoAmount('');
+    setAbonoNotes('');
+    addNotification(`Abono de $${amount.toFixed(2)} registrado con éxito`, 'success');
+    playUISound('success');
+  };
+
+  const handleLiquidateDebt = (method: 'efectivo' | 'transferencia' | 'tarjeta') => {
+    if (!managingCreditCustomer) return;
+    const debt = Number(managingCreditCustomer.creditBalance || 0);
+    if (debt <= 0) {
+      addNotification('El cliente no tiene deuda pendiente', 'info');
+      return;
+    }
+
+    const movement: CustomerCreditMovement = {
+      id: `cm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type: 'liquidacion',
+      amount: debt,
+      balanceAfter: 0,
+      date: new Date().toISOString(),
+      notes: `Liquidación total de deuda recibida vía ${method.toUpperCase()}`,
+      registeredBy: 'Admin'
+    };
+
+    const updated: Customer = {
+      ...managingCreditCustomer,
+      creditBalance: 0,
+      creditHistory: [movement, ...(managingCreditCustomer.creditHistory || [])]
+    };
+
+    setCustomers(prev => prev.map(c => c.id === updated.id ? updated : c));
+    setManagingCreditCustomer(updated);
+    addNotification(`Deuda de $${debt.toFixed(2)} liquidada por completo`, 'success');
+    playUISound('success');
+  };
+
+  const handleApplyManualCargo = () => {
+    if (!managingCreditCustomer) return;
+    const amount = parseFloat(cargoAmount);
+    if (isNaN(amount) || amount <= 0) {
+      addNotification('Ingresa un monto válido para el cargo', 'warning');
+      return;
+    }
+
+    const currentBalance = Number(managingCreditCustomer.creditBalance || 0);
+    const newBalance = currentBalance + amount;
+    const movement: CustomerCreditMovement = {
+      id: `cm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      type: 'cargo',
+      amount: amount,
+      balanceAfter: newBalance,
+      date: new Date().toISOString(),
+      notes: cargoReason ? `Cargo: ${cargoReason}` : 'Cargo manual administrativo',
+      registeredBy: 'Admin'
+    };
+
+    const updated: Customer = {
+      ...managingCreditCustomer,
+      creditBalance: newBalance,
+      creditHistory: [movement, ...(managingCreditCustomer.creditHistory || [])]
+    };
+
+    setCustomers(prev => prev.map(c => c.id === updated.id ? updated : c));
+    setManagingCreditCustomer(updated);
+    setCargoAmount('');
+    setCargoReason('');
+    addNotification(`Cargo de $${amount.toFixed(2)} aplicado a la cuenta`, 'info');
+    playUISound('click');
+  };
+
+  const handleSendWhatsAppCreditStatement = (cust: Customer) => {
+    const cleanPhone = (cust.phone || '').replace(/\D/g, '');
+    if (!cleanPhone) {
+      addNotification('El cliente no tiene teléfono registrado', 'warning');
+      return;
+    }
+
+    const limit = Number(cust.creditLimit || 0);
+    const balance = Number(cust.creditBalance || 0);
+    const available = Math.max(0, limit - balance);
+    const recentMovs = (cust.creditHistory || []).slice(0, 5);
+
+    let movsText = '';
+    if (recentMovs.length > 0) {
+      movsText = `\n\n*ÚLTIMOS MOVIMIENTOS:*\n` + recentMovs.map(m => {
+        const sign = m.type === 'cargo' ? '🔴 +' : '🟢 -';
+        const typeLabel = m.type === 'cargo' ? 'Cargo' : m.type === 'abono' ? 'Abono' : 'Liquidación';
+        const dateStr = new Date(m.date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
+        return `${sign}$${m.amount.toFixed(2)} (${typeLabel} ${dateStr}) - ${m.notes || ''}`;
+      }).join('\n');
+    }
+
+    const message = `*ESTADO DE CUENTA - CRÉDITO EL BUEN SERVIR*\n\n` +
+      `Estimado(a) *${cust.name}*:\n` +
+      `Te compartimos el resumen de tu crédito / cuenta abierta:\n\n` +
+      `💳 *Límite de Crédito:* $${limit.toFixed(2)}\n` +
+      `🔴 *Saldo Deudor Actual:* $${balance.toFixed(2)}\n` +
+      `🟢 *Crédito Disponible:* $${available.toFixed(2)}\n` +
+      movsText +
+      `\n\n_Para realizar abonos o liquidaciones, puedes acudir al restaurante o solicitar datos bancarios por este medio. ¡Gracias por tu preferencia!_`;
+
+    window.open(`https://wa.me/52${cleanPhone}?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  const renderCustomerCreditModal = () => {
+    if (!managingCreditCustomer) return null;
+
+    const creditLimit = Number(managingCreditCustomer.creditLimit || 0);
+    const creditBalance = Number(managingCreditCustomer.creditBalance || 0);
+    const availableCredit = Math.max(0, creditLimit - creditBalance);
+    const pctUsed = Math.min(100, Math.round((creditBalance / (creditLimit || 1)) * 100));
+    const history = managingCreditCustomer.creditHistory || [];
+
+    return (
+      <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 sm:p-6 animate-in fade-in duration-300">
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setManagingCreditCustomer(null)}></div>
+        <div className="bg-white dark:bg-gray-800 w-full max-w-2xl rounded-[40px] shadow-2xl relative z-10 overflow-hidden animate-in zoom-in-95 duration-300 flex flex-col max-h-[92vh]">
+          {/* Header */}
+          <div className="p-6 sm:p-8 border-b border-gray-100 dark:border-gray-700 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/30 shrink-0">
+                <Landmark className="w-6 h-6" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xl sm:text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase truncate">
+                    {managingCreditCustomer.name}
+                  </h4>
+                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                    managingCreditCustomer.creditEnabled
+                      ? 'bg-amber-100 dark:bg-amber-900/60 text-amber-700 dark:text-amber-300'
+                      : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
+                  }`}>
+                    {managingCreditCustomer.creditEnabled ? 'Crédito Activo' : 'Inactivo'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 mt-1">
+                  <a
+                    href={`https://wa.me/${(managingCreditCustomer.phone || '').replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs font-bold text-gray-500 hover:text-emerald-500 flex items-center gap-1 transition-colors"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>{managingCreditCustomer.phone}</span>
+                  </a>
+                  <span className="text-gray-300 dark:text-gray-600">•</span>
+                  <span className="text-xs font-bold text-gray-400">ID: {managingCreditCustomer.id}</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              title="Cerrar modal"
+              onClick={() => setManagingCreditCustomer(null)}
+              className="p-2.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-full transition-colors cursor-pointer"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 sm:p-8 overflow-y-auto custom-scrollbar flex-1 space-y-6">
+            {/* Top Overview & Controls */}
+            <div className="p-5 bg-gray-50 dark:bg-gray-900/60 rounded-3xl border border-gray-100 dark:border-gray-800 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-200/60 dark:border-gray-800">
+                <div className="flex items-center gap-3">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={managingCreditCustomer.creditEnabled ?? false}
+                      onChange={e => handleUpdateCreditSettings({ creditEnabled: e.target.checked })}
+                      className="sr-only peer"
+                    />
+                    <div className="w-12 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                  </label>
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">
+                      {managingCreditCustomer.creditEnabled ? 'Crédito Habilitado' : 'Crédito Desactivado'}
+                    </p>
+                    <p className="text-[10px] text-gray-400">
+                      {managingCreditCustomer.creditEnabled ? 'El cliente puede elegir pagar a crédito' : 'El cliente no verá la opción de crédito'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSendWhatsAppCreditStatement(managingCreditCustomer)}
+                    className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+                    title="Enviar estado de cuenta detallado por WhatsApp"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>WhatsApp Estado de Cuenta</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="p-3 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-xs">
+                  <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Límite Autorizado</p>
+                  <div className="flex items-center justify-center gap-1 mt-1">
+                    <span className="text-xs font-bold text-gray-400">$</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="50"
+                      value={managingCreditCustomer.creditLimit ?? 0}
+                      onChange={e => handleUpdateCreditSettings({ creditLimit: parseFloat(e.target.value) || 0 })}
+                      className="w-24 text-center font-black text-lg text-gray-900 dark:text-white bg-transparent outline-none border-b border-dashed border-gray-300 dark:border-gray-600 focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-xs">
+                  <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Deuda Actual</p>
+                  <p className={`text-xl font-black mt-1 ${creditBalance > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    ${creditBalance.toFixed(2)}
+                  </p>
+                </div>
+
+                <div className="p-3 bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 shadow-xs">
+                  <p className="text-[9px] font-black uppercase text-gray-400 tracking-wider">Crédito Disponible</p>
+                  <p className="text-xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+                    ${availableCredit.toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Usage Bar */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-[10px] font-black uppercase text-gray-400">
+                  <span>Capacidad en uso: {pctUsed}%</span>
+                  <span>{creditBalance > 0 ? `Resta $${availableCredit.toFixed(2)}` : 'Cuenta en ceros'}</span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 h-2.5 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-500 ${pctUsed > 85 ? 'bg-red-500' : pctUsed > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                    style={{ width: `${pctUsed}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Navigation Tabs for Actions */}
+            <div className="flex border-b border-gray-200 dark:border-gray-700 gap-2">
+              <button
+                type="button"
+                onClick={() => setCreditTab('abono')}
+                className={`pb-3 px-4 text-xs font-black uppercase tracking-wider transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
+                  creditTab === 'abono'
+                    ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                    : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                }`}
+              >
+                <HandCoins className="w-4 h-4" />
+                <span>Registrar Abono</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCreditTab('details')}
+                className={`pb-3 px-4 text-xs font-black uppercase tracking-wider transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
+                  creditTab === 'details'
+                    ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                    : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                }`}
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>Liquidación</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCreditTab('cargo')}
+                className={`pb-3 px-4 text-xs font-black uppercase tracking-wider transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
+                  creditTab === 'cargo'
+                    ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                    : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                }`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>Cargo Manual</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCreditTab('history')}
+                className={`pb-3 px-4 text-xs font-black uppercase tracking-wider transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
+                  creditTab === 'history'
+                    ? 'border-amber-500 text-amber-600 dark:text-amber-400'
+                    : 'border-transparent text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
+                }`}
+              >
+                <History className="w-4 h-4" />
+                <span>Historial ({history.length})</span>
+              </button>
+            </div>
+
+            {/* TAB: ABONO (Pago Parcial) */}
+            {creditTab === 'abono' && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="p-4 bg-emerald-50/60 dark:bg-emerald-950/20 rounded-2xl border border-emerald-100 dark:border-emerald-900/50">
+                  <p className="text-xs font-bold text-emerald-900 dark:text-emerald-200">
+                    Abonar al Saldo Deudor (Deuda actual: ${creditBalance.toFixed(2)})
+                  </p>
+                  <p className="text-[10px] text-emerald-700/80 dark:text-emerald-300/80">
+                    Registra un pago parcial entregado por el cliente en mostrador o recibido por transferencia.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Monto del Abono ($)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-emerald-500">$</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={abonoAmount}
+                      onChange={e => setAbonoAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full pl-9 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl font-black text-lg outline-none focus:border-emerald-500 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="flex gap-2 flex-wrap">
+                    {[50, 100, 200, 500].filter(amt => amt <= (creditBalance || 500)).map(amt => (
+                      <button
+                        key={amt}
+                        type="button"
+                        onClick={() => setAbonoAmount(amt.toString())}
+                        className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl text-xs font-bold hover:bg-emerald-50 hover:text-emerald-600 transition-colors cursor-pointer"
+                      >
+                        ${amt}
+                      </button>
+                    ))}
+                    {creditBalance > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setAbonoAmount(creditBalance.toString())}
+                        className="px-3 py-1 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 rounded-xl text-xs font-black hover:bg-amber-200 transition-colors cursor-pointer"
+                      >
+                        Liquidar Todo (${creditBalance.toFixed(2)})
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Forma en que Recibiste el Pago</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(['efectivo', 'transferencia', 'tarjeta'] as const).map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setAbonoPaymentMethod(m)}
+                        className={`py-2.5 px-3 rounded-xl border text-xs font-black uppercase transition-all cursor-pointer ${
+                          abonoPaymentMethod === m
+                            ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600'
+                            : 'border-gray-200 dark:border-gray-700 text-gray-500'
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nota / Folio de Comprobante (Opcional)</label>
+                  <input
+                    type="text"
+                    value={abonoNotes}
+                    onChange={e => setAbonoNotes(e.target.value)}
+                    placeholder="Ej. Recibido en caja por Don Mario, folio #1234"
+                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleApplyCreditAbono}
+                  disabled={!abonoAmount || parseFloat(abonoAmount) <= 0}
+                  className="w-full py-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20 active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Aplicar Abono de ${parseFloat(abonoAmount || '0').toFixed(2)}</span>
+                </button>
+              </div>
+            )}
+
+            {/* TAB: LIQUIDACIÓN COMPLETA */}
+            {creditTab === 'details' && (
+              <div className="space-y-5 animate-in fade-in duration-200 text-center py-4">
+                {creditBalance > 0 ? (
+                  <>
+                    <div className="w-16 h-16 bg-amber-100 dark:bg-amber-900/30 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-2 shadow-xs">
+                      <Receipt className="w-8 h-8" />
+                    </div>
+                    <div>
+                      <h5 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Liquidación de Cuenta Completa</h5>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                        El saldo pendiente total de este cliente es de <strong className="text-amber-600 dark:text-amber-400 font-black text-lg">${creditBalance.toFixed(2)} MXN</strong>
+                      </p>
+                    </div>
+
+                    <div className="p-4 bg-gray-50 dark:bg-gray-900/50 rounded-2xl border border-gray-100 dark:border-gray-800 space-y-3 max-w-md mx-auto">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Selecciona el método recibido para liquidar:</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleLiquidateDebt('efectivo')}
+                          className="py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition-all cursor-pointer active:scale-95"
+                        >
+                          Efectivo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleLiquidateDebt('transferencia')}
+                          className="py-3 bg-purple-500 hover:bg-purple-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition-all cursor-pointer active:scale-95"
+                        >
+                          Transferencia
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleLiquidateDebt('tarjeta')}
+                          className="py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm transition-all cursor-pointer active:scale-95"
+                        >
+                          Tarjeta
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="py-8 space-y-3">
+                    <div className="w-16 h-16 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-500 rounded-full flex items-center justify-center mx-auto">
+                      <CheckCircle2 className="w-8 h-8" />
+                    </div>
+                    <h5 className="text-xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Cuenta al Corriente</h5>
+                    <p className="text-sm text-gray-400">
+                      Este cliente no tiene ningún saldo deudor pendiente ($0.00 de deuda).
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* TAB: CARGO MANUAL */}
+            {creditTab === 'cargo' && (
+              <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="p-4 bg-amber-50/60 dark:bg-amber-950/20 rounded-2xl border border-amber-100 dark:border-amber-900/50">
+                  <p className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                    Cargar Consumo o Ajuste Manual
+                  </p>
+                  <p className="text-[10px] text-amber-700/80 dark:text-amber-300/80">
+                    Úsalo si el cliente realizó un consumo directo en restaurante o por llamada telefónica y pidió anotarlo en su cuenta abierta.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Monto a Cargar ($)</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-lg text-amber-500">$</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={cargoAmount}
+                      onChange={e => setCargoAmount(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full pl-9 pr-4 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-2xl font-black text-lg outline-none focus:border-amber-500 text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Motivo / Concepto del Cargo *</label>
+                  <input
+                    type="text"
+                    value={cargoReason}
+                    onChange={e => setCargoReason(e.target.value)}
+                    placeholder="Ej. Consumo presencial 2 pozoles y refrescos"
+                    className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium outline-none text-gray-900 dark:text-white"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleApplyManualCargo}
+                  disabled={!cargoAmount || parseFloat(cargoAmount) <= 0 || !cargoReason.trim()}
+                  className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-2xl font-black text-xs uppercase tracking-widest transition-all shadow-lg shadow-amber-500/20 active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Aplicar Cargo a Cuenta</span>
+                </button>
+              </div>
+            )}
+
+            {/* TAB: HISTORIAL */}
+            {creditTab === 'history' && (
+              <div className="space-y-3 animate-in fade-in duration-200">
+                {history.length === 0 ? (
+                  <div className="py-12 text-center text-gray-400 space-y-2">
+                    <History className="w-8 h-8 mx-auto opacity-40" />
+                    <p className="text-xs font-bold">Sin movimientos de crédito registrados para este cliente.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar">
+                    {history.map((mov, i) => (
+                      <div
+                        key={mov.id || i}
+                        className="p-3.5 bg-gray-50 dark:bg-gray-900/60 rounded-2xl border border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                            mov.type === 'cargo'
+                              ? 'bg-red-100 dark:bg-red-950 text-red-600'
+                              : 'bg-emerald-100 dark:bg-emerald-950 text-emerald-600'
+                          }`}>
+                            {mov.type === 'cargo' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className={`font-black uppercase text-[10px] px-1.5 py-0.5 rounded ${
+                                mov.type === 'cargo' ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' : 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300'
+                              }`}>
+                                {mov.type === 'cargo' ? 'Cargo' : mov.type === 'abono' ? 'Abono' : 'Liquidación'}
+                              </span>
+                              <span className="text-[10px] text-gray-400">
+                                {new Date(mov.date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="text-[11px] font-bold text-gray-700 dark:text-gray-300 truncate mt-0.5">
+                              {mov.notes || 'Movimiento de cuenta'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <p className={`font-black text-sm ${mov.type === 'cargo' ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                            {mov.type === 'cargo' ? `+$${mov.amount.toFixed(2)}` : `-$${mov.amount.toFixed(2)}`}
+                          </p>
+                          <p className="text-[9px] text-gray-400 font-bold">Saldo: ${mov.balanceAfter.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div className="p-4 sm:p-5 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/80 flex items-center justify-between shrink-0">
+            <span className="text-xs font-bold text-gray-400">
+              {managingCreditCustomer.creditEnabled ? 'Crédito Autorizado' : 'Sin Crédito Habilitado'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setManagingCreditCustomer(null)}
+              className="px-6 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl text-xs font-black uppercase tracking-wider hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-sm"
+            >
+              Listo / Cerrar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderCustomerModal = () => {
     if (!editingCustomer) return null;
 
@@ -3312,6 +4011,68 @@ export default function AdminView({
                   className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-transparent focus:border-primary-500 rounded-2xl px-4 py-3 font-bold outline-none transition-all"
                 />
               </div>
+            </div>
+
+            {/* Crédito de Tienda en Modal Editar Cliente */}
+            <div className="p-5 bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/50 rounded-2xl space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+                    <Landmark className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h6 className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">Crédito de Tienda</h6>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400">Permitir a este cliente ordenar a cuenta abierta</p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={editingCustomer.creditEnabled ?? false}
+                    onChange={e => setEditingCustomer({ ...editingCustomer, creditEnabled: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+                </label>
+              </div>
+
+              {editingCustomer.creditEnabled && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Límite de Crédito ($)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="50"
+                      placeholder="0.00"
+                      value={editingCustomer.creditLimit ?? 0}
+                      onChange={e => setEditingCustomer({ ...editingCustomer, creditLimit: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-white dark:bg-gray-900 border border-amber-300 dark:border-amber-800 rounded-xl px-4 py-2.5 font-black text-sm outline-none text-gray-900 dark:text-white"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Saldo Deudor Actual ($)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={editingCustomer.creditBalance ?? 0}
+                      onChange={e => setEditingCustomer({ ...editingCustomer, creditBalance: parseFloat(e.target.value) || 0 })}
+                      className="w-full bg-white dark:bg-gray-900 border border-amber-300 dark:border-amber-800 rounded-xl px-4 py-2.5 font-black text-sm outline-none text-amber-600 dark:text-amber-400"
+                    />
+                  </div>
+                  <div className="sm:col-span-2 space-y-1">
+                    <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">Notas / Condiciones de Crédito</label>
+                    <input
+                      type="text"
+                      placeholder="Ej. Liquidación quincenal, autorizado por Don Mario"
+                      value={editingCustomer.creditNotes || ''}
+                      onChange={e => setEditingCustomer({ ...editingCustomer, creditNotes: e.target.value })}
+                      className="w-full bg-white dark:bg-gray-900 border border-amber-300 dark:border-amber-800 rounded-xl px-4 py-2.5 text-xs font-medium outline-none text-gray-900 dark:text-white"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="space-y-4">
@@ -4244,6 +5005,7 @@ export default function AdminView({
               />
             )}
             {renderCustomerModal()}
+            {renderCustomerCreditModal()}
             {renderRegisterCustomerModal()}
             {renderSearchCustomerModal()}
             {renderFoundCustomerModal()}

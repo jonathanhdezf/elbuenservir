@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, Minus, Trash2, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap, Mic, Download, Smartphone, Sparkles, User } from 'lucide-react';
-import { Category, MenuItem, Customer, Order } from '../types';
+import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, Minus, Trash2, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap, Mic, Download, Smartphone, Sparkles, User, CreditCard, Banknote, Building2, Landmark, Wallet, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Category, MenuItem, Customer, Order, PaymentMethod, CustomerCreditMovement } from '../types';
 import { soundManager } from '../utils/soundManager';
 import LiveOrderModal from '../components/LiveOrderModal';
 import { useMobileBack } from '../hooks/useMobileBack';
@@ -255,11 +255,34 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     }
   }, [showProfileTooltip]);
 
-  // Delivery Choice States
+  // Delivery & Payment Choice States
   const [deliveryMethod, setDeliveryMethod] = useState<'pickup' | 'table' | 'delivery' | null>(null);
   const [selectedAddress, setSelectedAddress] = useState('');
   const [tableNumber, setTableNumber] = useState('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('efectivo');
+  const [cashAmountPaid, setCashAmountPaid] = useState<string>('');
   const [isDeliverySelectionOpen, setIsDeliverySelectionOpen] = useState(false);
+
+  // Keep loggedCustomer in sync with real-time updates from database / admin changes
+  useEffect(() => {
+    if (loggedCustomer) {
+      const match = customers.find(c => c.id === loggedCustomer.id || (c.phone && c.phone === loggedCustomer.phone));
+      if (match) {
+        const isDifferent =
+          match.creditEnabled !== loggedCustomer.creditEnabled ||
+          match.creditLimit !== loggedCustomer.creditLimit ||
+          match.creditBalance !== loggedCustomer.creditBalance ||
+          match.name !== loggedCustomer.name ||
+          match.phone !== loggedCustomer.phone ||
+          JSON.stringify(match.addresses || []) !== JSON.stringify(loggedCustomer.addresses || []) ||
+          JSON.stringify(match.creditHistory || []) !== JSON.stringify(loggedCustomer.creditHistory || []);
+
+        if (isDifferent) {
+          handleSetLoggedCustomer(match);
+        }
+      }
+    }
+  }, [customers]);
 
   const handleSetLoggedCustomer = (customer: Customer | null) => {
     setLoggedCustomer(customer);
@@ -350,6 +373,22 @@ export default function PublicView({ categories, menuItems, customers, orders = 
       deliveryInfo = `🏠 *Entrega:* Domicilio - ${selectedAddress}\n`;
     }
 
+    let paymentInfo = '';
+    const parsedCash = parseFloat(cashAmountPaid);
+    if (selectedPaymentMethod === 'efectivo') {
+      const changeAmount = !isNaN(parsedCash) && parsedCash >= cartTotal ? (parsedCash - cartTotal) : 0;
+      paymentInfo = `💵 *Forma de Pago:* Efectivo` + (!isNaN(parsedCash) && parsedCash >= cartTotal ? ` (Paga con: $${parsedCash.toFixed(2)}, Cambio: $${changeAmount.toFixed(2)})\n` : ` (Pago exacto)\n`);
+    } else if (selectedPaymentMethod === 'tarjeta') {
+      paymentInfo = `💳 *Forma de Pago:* Tarjeta (Llevar terminal bancaria al entregar)\n`;
+    } else if (selectedPaymentMethod === 'transferencia') {
+      paymentInfo = `🏦 *Forma de Pago:* Transferencia Bancaria (Comprobante adjunto)\n`;
+    } else if (selectedPaymentMethod === 'credito') {
+      const currentBal = Number(customer.creditBalance || 0);
+      const newBal = currentBal + cartTotal;
+      paymentInfo = `🏷️ *Forma de Pago:* CRÉDITO DE TIENDA (Cuenta Abierta)\n` +
+                    `📊 *Saldo en Cuenta:* $${newBal.toFixed(2)} (Límite: $${(customer.creditLimit || 0).toFixed(2)})\n`;
+    }
+
     const itemsSummary = cartItems.map(item => {
       const sidesText = item.sides && item.sides.length > 0 ? `\n   ↳ Guarnición: ${item.sides.join(', ')}` : '';
       const notesText = item.comments ? `\n   ↳ Nota: ${item.comments}` : '';
@@ -361,6 +400,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
       `👤 *Cliente:* ${customer.name}\n` +
       `📱 *Teléfono:* ${customer.phone}\n` +
       deliveryInfo +
+      paymentInfo +
       `\n*PLATILLOS Y PRODUCTOS:*\n` +
       itemsSummary +
       `\n\n` +
@@ -370,7 +410,36 @@ export default function PublicView({ categories, menuItems, customers, orders = 
 
     window.open(`https://wa.me/52${number}?text=${encodeURIComponent(orderText)}`, '_blank');
 
+    // If payment method is credit, register cargo in customer ledger
+    if (selectedPaymentMethod === 'credito') {
+      const currentBal = Number(customer.creditBalance || 0);
+      const newBalance = currentBal + cartTotal;
+      const creditMovement: CustomerCreditMovement = {
+        id: `cm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        orderId: orderId,
+        type: 'cargo',
+        amount: cartTotal,
+        balanceAfter: newBalance,
+        date: new Date().toISOString(),
+        notes: `Cargo por pedido en línea #${orderId}`,
+        registeredBy: 'Cliente (Pedido Online)'
+      };
+
+      const updatedCustomer: Customer = {
+        ...customer,
+        creditBalance: newBalance,
+        creditHistory: [creditMovement, ...(customer.creditHistory || [])]
+      };
+
+      handleUpdateCustomer(updatedCustomer);
+    }
+
     if (onAddOrder) {
+      const parsedCash = parseFloat(cashAmountPaid);
+      const isCash = selectedPaymentMethod === 'efectivo';
+      const cashReceived = isCash && !isNaN(parsedCash) && parsedCash >= cartTotal ? parsedCash : undefined;
+      const change = cashReceived ? (cashReceived - cartTotal) : undefined;
+
       const newOrder: Order = {
         id: orderId,
         customerName: customer.name,
@@ -387,8 +456,10 @@ export default function PublicView({ categories, menuItems, customers, orders = 
         })),
         total: parseFloat(total),
         status: 'pending',
-        paymentMethod: 'efectivo',
+        paymentMethod: selectedPaymentMethod,
         paymentStatus: 'pending',
+        cashReceived: cashReceived,
+        change: change,
         createdAt: new Date().toISOString(),
         source: 'online',
         notes: customerComments
@@ -403,6 +474,8 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     setDeliveryMethod(null);
     setTableNumber('');
     setSelectedAddress('');
+    setSelectedPaymentMethod('efectivo');
+    setCashAmountPaid('');
   };
 
   useEffect(() => {
@@ -1940,19 +2013,278 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   </div>
                 </div>
               )}
+
+              {/* Sección 2: Forma de Pago */}
+              <div className="pt-6 border-t border-gray-100 dark:border-gray-800 space-y-4 text-left">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-gray-500 dark:text-gray-300 uppercase tracking-widest flex items-center gap-1.5">
+                    <CreditCard className="w-3.5 h-3.5 text-primary-500" />
+                    Forma de Pago
+                  </label>
+                  <span className="text-[10px] font-black text-primary-600 dark:text-primary-400">
+                    Total: ${cartTotal.toFixed(2)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2.5">
+                  {/* Efectivo */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPaymentMethod('efectivo');
+                      soundManager.play('click');
+                    }}
+                    className={`p-3.5 rounded-2xl border-2 text-left flex flex-col justify-between transition-all cursor-pointer ${
+                      selectedPaymentMethod === 'efectivo'
+                        ? 'border-emerald-500 bg-emerald-50/70 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-300 shadow-sm'
+                        : 'border-gray-100 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <Banknote className="w-5 h-5 text-emerald-500" />
+                      {selectedPaymentMethod === 'efectivo' && <Check className="w-3.5 h-3.5 text-emerald-600" />}
+                    </div>
+                    <div>
+                      <p className="font-black text-xs uppercase tracking-tight text-gray-900 dark:text-white">Efectivo</p>
+                      <p className="text-[9px] font-bold text-gray-400">Pago al recibir</p>
+                    </div>
+                  </button>
+
+                  {/* Tarjeta */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPaymentMethod('tarjeta');
+                      soundManager.play('click');
+                    }}
+                    className={`p-3.5 rounded-2xl border-2 text-left flex flex-col justify-between transition-all cursor-pointer ${
+                      selectedPaymentMethod === 'tarjeta'
+                        ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/20 text-blue-700 dark:text-blue-300 shadow-sm'
+                        : 'border-gray-100 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <CreditCard className="w-5 h-5 text-blue-500" />
+                      {selectedPaymentMethod === 'tarjeta' && <Check className="w-3.5 h-3.5 text-blue-600" />}
+                    </div>
+                    <div>
+                      <p className="font-black text-xs uppercase tracking-tight text-gray-900 dark:text-white">Tarjeta</p>
+                      <p className="text-[9px] font-bold text-gray-400">Terminal física</p>
+                    </div>
+                  </button>
+
+                  {/* Transferencia */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPaymentMethod('transferencia');
+                      soundManager.play('click');
+                    }}
+                    className={`p-3.5 rounded-2xl border-2 text-left flex flex-col justify-between transition-all cursor-pointer ${
+                      selectedPaymentMethod === 'transferencia'
+                        ? 'border-purple-500 bg-purple-50/70 dark:bg-purple-950/20 text-purple-700 dark:text-purple-300 shadow-sm'
+                        : 'border-gray-100 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <Building2 className="w-5 h-5 text-purple-500" />
+                      {selectedPaymentMethod === 'transferencia' && <Check className="w-3.5 h-3.5 text-purple-600" />}
+                    </div>
+                    <div>
+                      <p className="font-black text-xs uppercase tracking-tight text-gray-900 dark:text-white">Transferencia</p>
+                      <p className="text-[9px] font-bold text-gray-400">SPEI / Banco</p>
+                    </div>
+                  </button>
+
+                  {/* Crédito Autorizado (ONLY IF loggedCustomer.creditEnabled) */}
+                  {loggedCustomer.creditEnabled && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPaymentMethod('credito');
+                        soundManager.play('click');
+                      }}
+                      className={`p-3.5 rounded-2xl border-2 text-left flex flex-col justify-between transition-all cursor-pointer ${
+                        selectedPaymentMethod === 'credito'
+                          ? 'border-amber-500 bg-amber-50/70 dark:bg-amber-950/20 text-amber-700 dark:text-amber-300 shadow-sm ring-2 ring-amber-500/20'
+                          : 'border-amber-200/60 dark:border-amber-900/40 bg-amber-50/30 dark:bg-amber-950/10 text-gray-600 dark:text-gray-400 hover:border-amber-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <Landmark className="w-5 h-5 text-amber-500" />
+                        <span className="text-[8px] font-black uppercase bg-amber-500 text-white px-1.5 py-0.5 rounded-md">
+                          Autorizado
+                        </span>
+                      </div>
+                      <div>
+                        <p className="font-black text-xs uppercase tracking-tight text-gray-900 dark:text-white">Crédito</p>
+                        <p className="text-[9px] font-bold text-amber-600 dark:text-amber-400">Cuenta Abierta</p>
+                      </div>
+                    </button>
+                  )}
+                </div>
+
+                {/* Sub-paneles según forma de pago seleccionada */}
+                {selectedPaymentMethod === 'efectivo' && (
+                  <div className="p-4 bg-gray-50 dark:bg-gray-800/80 rounded-2xl border border-gray-100 dark:border-gray-700/80 space-y-3 animate-in slide-in-from-top-1 duration-200">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-black text-gray-500 dark:text-gray-400 uppercase tracking-wider">¿Con cuánto vas a pagar?</label>
+                      {parseFloat(cashAmountPaid) >= cartTotal && (
+                        <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-400">
+                          Cambio: ${(parseFloat(cashAmountPaid) - cartTotal).toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-gray-400 font-bold">$</span>
+                      <input
+                        type="number"
+                        min={cartTotal}
+                        value={cashAmountPaid}
+                        onChange={(e) => setCashAmountPaid(e.target.value)}
+                        placeholder={`Monto exacto: $${cartTotal.toFixed(2)}`}
+                        className="flex-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-primary-500 text-gray-900 dark:text-white"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setCashAmountPaid(cartTotal.toFixed(2))}
+                        className="px-2.5 py-1 text-[10px] font-bold bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-100 cursor-pointer"
+                      >
+                        Exacto (${cartTotal.toFixed(2)})
+                      </button>
+                      {[100, 200, 500].filter(amt => amt >= cartTotal).map(amt => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setCashAmountPaid(amt.toString())}
+                          className="px-2.5 py-1 text-[10px] font-bold bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg border border-gray-200 dark:border-gray-600 hover:bg-gray-100 cursor-pointer"
+                        >
+                          ${amt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedPaymentMethod === 'tarjeta' && (
+                  <div className="p-4 bg-blue-50/70 dark:bg-blue-950/20 rounded-2xl border border-blue-100 dark:border-blue-900/50 flex items-start gap-3 text-left animate-in slide-in-from-top-1 duration-200">
+                    <CreditCard className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-bold text-blue-900 dark:text-blue-200">Terminal Bancaria en Entrega</p>
+                      <p className="text-[10px] text-blue-700/80 dark:text-blue-300/80 mt-0.5">
+                        El repartidor o cajero llevará la terminal bancaria. Aceptamos tarjetas de débito y crédito (Visa, Mastercard, Carnet, AMEX).
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {selectedPaymentMethod === 'transferencia' && (
+                  <div className="p-4 bg-purple-50/70 dark:bg-purple-950/20 rounded-2xl border border-purple-100 dark:border-purple-900/50 space-y-2 text-left animate-in slide-in-from-top-1 duration-200">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
+                        <Building2 className="w-4 h-4 text-purple-500" />
+                        Datos Bancarios El Buen Servir
+                      </p>
+                      <span className="text-[9px] font-black uppercase bg-purple-200 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 px-2 py-0.5 rounded-full">
+                        BBVA
+                      </span>
+                    </div>
+                    <div className="text-[11px] font-mono bg-white dark:bg-gray-900 p-2.5 rounded-xl border border-purple-100 dark:border-purple-900/40 text-gray-800 dark:text-gray-200 flex justify-between items-center">
+                      <span>CLABE: <strong>012 650 0152 4892 3120</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard?.writeText('012650015248923120');
+                          soundManager.play('click');
+                        }}
+                        className="text-[9px] font-bold text-purple-600 hover:text-purple-700 bg-purple-50 dark:bg-purple-950 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-800 cursor-pointer"
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-purple-700/90 dark:text-purple-300/90 leading-tight">
+                      ℹ️ Al confirmar el pedido, adjunta tu comprobante de pago en el chat de WhatsApp.
+                    </p>
+                  </div>
+                )}
+
+                {selectedPaymentMethod === 'credito' && loggedCustomer.creditEnabled && (() => {
+                  const creditLimit = Number(loggedCustomer.creditLimit || 0);
+                  const creditBalance = Number(loggedCustomer.creditBalance || 0);
+                  const availableCredit = Math.max(0, creditLimit - creditBalance);
+                  const hasEnoughCredit = availableCredit >= cartTotal;
+
+                  return (
+                    <div className={`p-4 rounded-2xl border space-y-3 text-left animate-in slide-in-from-top-1 duration-200 ${
+                      hasEnoughCredit
+                        ? 'bg-amber-50/80 dark:bg-amber-950/20 border-amber-200 dark:border-amber-900/50'
+                        : 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/50'
+                    }`}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-tight text-gray-900 dark:text-white flex items-center gap-1.5">
+                          <Landmark className="w-4 h-4 text-amber-500" />
+                          Cuenta Abierta Autorizada
+                        </span>
+                        <span className="text-[10px] font-black text-amber-700 dark:text-amber-300">
+                          {((creditBalance / (creditLimit || 1)) * 100).toFixed(0)}% Usado
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-white/80 dark:bg-gray-900/80 p-2 rounded-xl">
+                          <p className="text-[8px] font-black uppercase text-gray-400">Límite</p>
+                          <p className="text-xs font-black text-gray-800 dark:text-gray-200">${creditLimit.toFixed(2)}</p>
+                        </div>
+                        <div className="bg-white/80 dark:bg-gray-900/80 p-2 rounded-xl">
+                          <p className="text-[8px] font-black uppercase text-gray-400">Deuda Actual</p>
+                          <p className="text-xs font-black text-amber-600 dark:text-amber-400">${creditBalance.toFixed(2)}</p>
+                        </div>
+                        <div className="bg-white/80 dark:bg-gray-900/80 p-2 rounded-xl">
+                          <p className="text-[8px] font-black uppercase text-gray-400">Disponible</p>
+                          <p className={`text-xs font-black ${hasEnoughCredit ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                            ${availableCredit.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {hasEnoughCredit ? (
+                        <p className="text-[10px] font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1">
+                          <Check className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          Se cargará a tu cuenta. Saldo posterior al pedido: ${(creditBalance + cartTotal).toFixed(2)}
+                        </p>
+                      ) : (
+                        <div className="flex items-start gap-2 p-2.5 bg-red-100/60 dark:bg-red-900/40 rounded-xl text-red-700 dark:text-red-300 text-[10px] font-bold">
+                          <AlertTriangle className="w-4 h-4 shrink-0 text-red-500 mt-0.5" />
+                          <span>Crédito disponible insuficiente para este pedido. Tu disponible es de ${availableCredit.toFixed(2)}. Selecciona otra forma de pago o abona a tu cuenta.</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
-
-
 
             <div className="p-8 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
               <button
-                disabled={!deliveryMethod || (deliveryMethod === 'table' && !tableNumber) || (deliveryMethod === 'delivery' && !selectedAddress)}
+                disabled={
+                  !deliveryMethod ||
+                  (deliveryMethod === 'table' && !tableNumber) ||
+                  (deliveryMethod === 'delivery' && !selectedAddress) ||
+                  (selectedPaymentMethod === 'credito' &&
+                    Math.max(0, (loggedCustomer.creditLimit || 0) - (loggedCustomer.creditBalance || 0)) < cartTotal)
+                }
                 onClick={() => {
                   sendWhatsAppOrder(loggedCustomer);
                   setIsDeliverySelectionOpen(false);
                 }}
                 className={`w-full py-5 rounded-[28px] font-black uppercase text-sm tracking-[0.2em] transition-all shadow-xl flex items-center justify-center gap-3
-                  ${(!deliveryMethod || (deliveryMethod === 'table' && !tableNumber) || (deliveryMethod === 'delivery' && !selectedAddress))
+                  ${(!deliveryMethod ||
+                    (deliveryMethod === 'table' && !tableNumber) ||
+                    (deliveryMethod === 'delivery' && !selectedAddress) ||
+                    (selectedPaymentMethod === 'credito' &&
+                      Math.max(0, (loggedCustomer.creditLimit || 0) - (loggedCustomer.creditBalance || 0)) < cartTotal))
                     ? 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-600 cursor-not-allowed shadow-none'
                     : 'bg-emerald-500 text-white hover:scale-[1.02] active:scale-[0.98] shadow-emerald-500/20 cursor-pointer'
                   }`}

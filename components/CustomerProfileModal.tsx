@@ -24,7 +24,9 @@ import {
   RotateCw,
   Sparkles,
   Eye,
-  EyeOff
+  EyeOff,
+  Landmark,
+  CreditCard
 } from 'lucide-react';
 import { Customer, Order, OrderStatus } from '../types';
 import { soundManager } from '../utils/soundManager';
@@ -480,6 +482,77 @@ export const CustomerProfileModal: React.FC<CustomerProfileModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Authorized Credit Card if Enabled */}
+              {customer.creditEnabled && (() => {
+                const limit = Number(customer.creditLimit || 0);
+                const balance = Number(customer.creditBalance || 0);
+                const available = Math.max(0, limit - balance);
+                const pct = Math.min(100, Math.round((balance / (limit || 1)) * 100));
+
+                return (
+                  <div className="p-5 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent rounded-3xl border border-amber-500/30 space-y-4 text-left">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                          <Landmark className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-black uppercase tracking-wider text-gray-900 dark:text-white">Crédito de Tienda Autorizado</p>
+                          <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold">Cuenta Abierta Activa</p>
+                        </div>
+                      </div>
+                      <span className="text-[10px] font-black uppercase bg-amber-500/20 text-amber-700 dark:text-amber-300 px-2.5 py-1 rounded-full border border-amber-500/30">
+                        {pct}% En Uso
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2.5 text-center">
+                      <div className="p-3 bg-white dark:bg-gray-800 rounded-2xl shadow-xs">
+                        <p className="text-[8px] font-black uppercase text-gray-400">Límite</p>
+                        <p className="text-sm font-black text-gray-900 dark:text-white">${limit.toFixed(2)}</p>
+                      </div>
+                      <div className="p-3 bg-white dark:bg-gray-800 rounded-2xl shadow-xs">
+                        <p className="text-[8px] font-black uppercase text-gray-400">Saldo Deudor</p>
+                        <p className="text-sm font-black text-amber-600 dark:text-amber-400">${balance.toFixed(2)}</p>
+                      </div>
+                      <div className="p-3 bg-white dark:bg-gray-800 rounded-2xl shadow-xs">
+                        <p className="text-[8px] font-black uppercase text-gray-400">Disponible</p>
+                        <p className="text-sm font-black text-emerald-600 dark:text-emerald-400">${available.toFixed(2)}</p>
+                      </div>
+                    </div>
+
+                    {/* Progress bar */}
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 h-2 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-500 ${pct > 85 ? 'bg-red-500' : pct > 50 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+
+                    {customer.creditHistory && customer.creditHistory.length > 0 && (
+                      <div className="pt-2">
+                        <p className="text-[9px] font-black uppercase tracking-wider text-gray-400 mb-2">Últimos Movimientos</p>
+                        <div className="space-y-1.5 max-h-32 overflow-y-auto custom-scrollbar">
+                          {customer.creditHistory.slice(0, 5).map((mov, i) => (
+                            <div key={i} className="flex justify-between items-center text-[10px] p-2 bg-white/70 dark:bg-gray-800/70 rounded-xl">
+                              <div>
+                                <span className={`font-black uppercase mr-1.5 ${mov.type === 'cargo' ? 'text-red-500' : 'text-emerald-500'}`}>
+                                  {mov.type === 'cargo' ? 'Cargo' : mov.type === 'abono' ? 'Abono' : 'Liquidación'}
+                                </span>
+                                <span className="text-gray-500 dark:text-gray-400">{new Date(mov.date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })}</span>
+                              </div>
+                              <span className={`font-black ${mov.type === 'cargo' ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                                {mov.type === 'cargo' ? `+$${mov.amount.toFixed(2)}` : `-$${mov.amount.toFixed(2)}`}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Saved Delivery Addresses */}
               <div className="space-y-3">

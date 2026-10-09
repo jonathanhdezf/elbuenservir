@@ -23,9 +23,20 @@ export interface Category {
 export type TabId = string;
 
 export type OrderStatus = 'pending' | 'kitchen' | 'ready' | 'delivery' | 'delivered' | 'cancelled';
-export type PaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia';
+export type PaymentMethod = 'efectivo' | 'tarjeta' | 'transferencia' | 'credito';
 export type PaymentStatus = 'pending' | 'paid';
 export type TransferStatus = 'recibido' | 'pendiente' | 'no_recibido';
+
+export interface CustomerCreditMovement {
+  id: string;
+  orderId?: string;
+  type: 'cargo' | 'abono' | 'liquidacion';
+  amount: number;
+  balanceAfter: number;
+  date: string;
+  notes?: string;
+  registeredBy?: string;
+}
 
 export interface OrderItem {
   id: string;
@@ -74,6 +85,11 @@ export interface Customer {
   addresses: string[];
   password?: string;
   avatarUrl?: string;
+  creditEnabled?: boolean;
+  creditLimit?: number;
+  creditBalance?: number;
+  creditNotes?: string;
+  creditHistory?: CustomerCreditMovement[];
 }
 
 export type VehicleType = 'moto' | 'bici' | 'auto' | 'walking';

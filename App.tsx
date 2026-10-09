@@ -11,7 +11,7 @@ import ControlPanelView from './views/ControlPanelView';
 import RepartidorView from './views/RepartidorView';
 import { ControlPanelAuthModal } from './components/ControlPanelAuthModal';
 import { DigitalTicketModal } from './components/DigitalTicketModal';
-import { databaseService, mapOrderFromDb, mapMenuItemFromDb, mapCategoryFromDb } from './services/databaseService';
+import { databaseService, mapOrderFromDb, mapMenuItemFromDb, mapCategoryFromDb, mapCustomerFromDb } from './services/databaseService';
 import { notificationService } from './services/notificationService';
 
 const INITIAL_CATEGORIES: Category[] = [
@@ -615,6 +615,17 @@ export default function App() {
         } else if (payload.eventType === 'DELETE') {
           setCategories(prev => prev.filter(c => c.id !== payload.old?.id));
         }
+      },
+      onCustomerChange: (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newCust = mapCustomerFromDb(payload.new);
+          setCustomers(prev => [...prev.filter(c => c.id !== newCust.id), newCust]);
+        } else if (payload.eventType === 'UPDATE') {
+          const updatedCust = mapCustomerFromDb(payload.new);
+          setCustomers(prev => prev.map(c => c.id === updatedCust.id ? updatedCust : c));
+        } else if (payload.eventType === 'DELETE') {
+          setCustomers(prev => prev.filter(c => c.id !== payload.old?.id));
+        }
       }
     });
 
@@ -681,6 +692,10 @@ export default function App() {
         return !oldCust || JSON.stringify(oldCust) !== JSON.stringify(nextCust);
       });
       changed.forEach(cust => databaseService.upsertCustomer(cust));
+
+      const deleted = prev.filter(p => !next.some(n => n.id === p.id));
+      deleted.forEach(cust => databaseService.deleteCustomer(cust.id));
+
       return next;
     });
   };

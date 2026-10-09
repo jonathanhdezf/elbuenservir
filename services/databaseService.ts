@@ -110,7 +110,12 @@ export const mapCustomerFromDb = (row: any): Customer => ({
   lastOrderDate: row.last_order_date || undefined,
   addresses: Array.isArray(row.addresses) ? row.addresses : [],
   password: row.password || undefined,
-  avatarUrl: row.avatar_url || undefined
+  avatarUrl: row.avatar_url || undefined,
+  creditEnabled: Boolean(row.credit_enabled),
+  creditLimit: parseFloat(row.credit_limit) || 0,
+  creditBalance: parseFloat(row.credit_balance) || 0,
+  creditNotes: row.credit_notes || undefined,
+  creditHistory: Array.isArray(row.credit_history) ? row.credit_history : []
 });
 
 // Convert Customer to DB row
@@ -124,7 +129,12 @@ export const mapCustomerToDb = (cust: Customer) => ({
   last_order_date: cust.lastOrderDate || null,
   addresses: cust.addresses || [],
   password: cust.password || null,
-  avatar_url: cust.avatarUrl || null
+  avatar_url: cust.avatarUrl || null,
+  credit_enabled: cust.creditEnabled ?? false,
+  credit_limit: cust.creditLimit ?? 0,
+  credit_balance: cust.creditBalance ?? 0,
+  credit_notes: cust.creditNotes || null,
+  credit_history: cust.creditHistory || []
 });
 
 // Convert DB row to DeliveryDriver
@@ -281,6 +291,7 @@ export const databaseService = {
     onOrderChange?: (payload: any) => void;
     onMenuItemChange?: (payload: any) => void;
     onCategoryChange?: (payload: any) => void;
+    onCustomerChange?: (payload: any) => void;
   }) {
     const channel = supabase.channel('el-buen-servir-realtime');
 
@@ -305,6 +316,14 @@ export const databaseService = {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'categories' },
         (payload) => callbacks.onCategoryChange?.(payload)
+      );
+    }
+
+    if (callbacks.onCustomerChange) {
+      channel.on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'customers' },
+        (payload) => callbacks.onCustomerChange?.(payload)
       );
     }
 
@@ -358,6 +377,11 @@ export const databaseService = {
     const row = mapCustomerToDb(cust);
     const { error } = await supabase.from('customers').upsert(row);
     if (error) console.error('[Database] Error upserting customer:', error);
+  },
+
+  async deleteCustomer(custId: string) {
+    const { error } = await supabase.from('customers').delete().eq('id', custId);
+    if (error) console.error('[Database] Error deleting customer:', error);
   },
 
   // 7. Drivers Mutations
