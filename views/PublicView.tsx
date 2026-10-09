@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, Minus, Trash2, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap, Mic, Download, Smartphone, Sparkles, User, CreditCard, Banknote, Building2, Landmark, Wallet, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Category, MenuItem, Customer, Order, PaymentMethod, CustomerCreditMovement } from '../types';
 import { soundManager } from '../utils/soundManager';
@@ -260,8 +259,49 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   const [selectedAddress, setSelectedAddress] = useState('');
   const [tableNumber, setTableNumber] = useState('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('efectivo');
-  const [cashAmountPaid, setCashAmountPaid] = useState<string>('');
   const [isDeliverySelectionOpen, setIsDeliverySelectionOpen] = useState(false);
+
+  // Refs for smooth navigation between delivery steps
+  const deliveryModalContentRef = useRef<HTMLDivElement>(null);
+  const addressSectionRef = useRef<HTMLDivElement>(null);
+  const tableSectionRef = useRef<HTMLDivElement>(null);
+  const paymentSectionRef = useRef<HTMLDivElement>(null);
+
+  const scrollToAddressSection = () => {
+    setTimeout(() => {
+      if (addressSectionRef.current && deliveryModalContentRef.current) {
+        const container = deliveryModalContentRef.current;
+        const cRect = container.getBoundingClientRect();
+        const tRect = addressSectionRef.current.getBoundingClientRect();
+        const topPos = tRect.top - cRect.top + container.scrollTop - 16;
+        container.scrollTo({ top: Math.max(0, topPos), behavior: 'smooth' });
+      }
+    }, 80);
+  };
+
+  const scrollToTableSection = () => {
+    setTimeout(() => {
+      if (tableSectionRef.current && deliveryModalContentRef.current) {
+        const container = deliveryModalContentRef.current;
+        const cRect = container.getBoundingClientRect();
+        const tRect = tableSectionRef.current.getBoundingClientRect();
+        const topPos = tRect.top - cRect.top + container.scrollTop - 16;
+        container.scrollTo({ top: Math.max(0, topPos), behavior: 'smooth' });
+      }
+    }, 80);
+  };
+
+  const scrollToPaymentSection = () => {
+    setTimeout(() => {
+      if (paymentSectionRef.current && deliveryModalContentRef.current) {
+        const container = deliveryModalContentRef.current;
+        const cRect = container.getBoundingClientRect();
+        const tRect = paymentSectionRef.current.getBoundingClientRect();
+        const topPos = tRect.top - cRect.top + container.scrollTop - 16;
+        container.scrollTo({ top: Math.max(0, topPos), behavior: 'smooth' });
+      }
+    }, 80);
+  };
 
   // Keep loggedCustomer in sync with real-time updates from database / admin changes
   useEffect(() => {
@@ -1932,11 +1972,16 @@ export default function PublicView({ categories, menuItems, customers, orders = 
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
+            <div ref={deliveryModalContentRef} className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar scroll-smooth">
               <div className="grid grid-cols-1 gap-4">
                 <button
-                  onClick={() => setDeliveryMethod('pickup')}
-                  className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${deliveryMethod === 'pickup' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-lg' : 'border-gray-100 dark:border-gray-800 hover:border-gray-200'}`}
+                  type="button"
+                  onClick={() => {
+                    setDeliveryMethod('pickup');
+                    soundManager.play('click');
+                    scrollToPaymentSection();
+                  }}
+                  className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all cursor-pointer ${deliveryMethod === 'pickup' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-lg ring-2 ring-primary-500/20' : 'border-gray-100 dark:border-gray-800 hover:border-gray-200'}`}
                 >
                   <div className={`p-3 rounded-xl transition-colors ${deliveryMethod === 'pickup' ? 'bg-primary-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
                     <Store className="w-6 h-6" />
@@ -1948,8 +1993,13 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                 </button>
 
                 <button
-                  onClick={() => setDeliveryMethod('table')}
-                  className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${deliveryMethod === 'table' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-lg' : 'border-gray-100 dark:border-gray-800 hover:border-gray-200'}`}
+                  type="button"
+                  onClick={() => {
+                    setDeliveryMethod('table');
+                    soundManager.play('click');
+                    scrollToTableSection();
+                  }}
+                  className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all cursor-pointer ${deliveryMethod === 'table' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-lg ring-2 ring-primary-500/20' : 'border-gray-100 dark:border-gray-800 hover:border-gray-200'}`}
                 >
                   <div className={`p-3 rounded-xl transition-colors ${deliveryMethod === 'table' ? 'bg-primary-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
                     <Utensils className="w-6 h-6" />
@@ -1961,8 +2011,13 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                 </button>
 
                 <button
-                  onClick={() => setDeliveryMethod('delivery')}
-                  className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all ${deliveryMethod === 'delivery' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-lg' : 'border-gray-100 dark:border-gray-800 hover:border-gray-200'}`}
+                  type="button"
+                  onClick={() => {
+                    setDeliveryMethod('delivery');
+                    soundManager.play('click');
+                    scrollToAddressSection();
+                  }}
+                  className={`p-5 rounded-2xl border-2 flex items-center gap-4 transition-all cursor-pointer ${deliveryMethod === 'delivery' ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 shadow-lg ring-2 ring-primary-500/20' : 'border-gray-100 dark:border-gray-800 hover:border-gray-200'}`}
                 >
                   <div className={`p-3 rounded-xl transition-colors ${deliveryMethod === 'delivery' ? 'bg-primary-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
                     <Truck className="w-6 h-6" />
@@ -1975,47 +2030,105 @@ export default function PublicView({ categories, menuItems, customers, orders = 
               </div>
 
               {deliveryMethod === 'table' && (
-                <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                <div ref={tableSectionRef} className="space-y-2 animate-in slide-in-from-top-2 duration-300">
                   <label className="text-[10px] font-black text-gray-500 dark:text-gray-300 uppercase tracking-widest ml-1">¿Qué mesa ocupas?</label>
                   <input
                     type="number"
                     value={tableNumber}
                     onChange={(e) => setTableNumber(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        scrollToPaymentSection();
+                      }
+                    }}
                     className="w-full px-5 py-4 bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl outline-none transition-all dark:text-white font-black text-xl text-center"
-                    placeholder="Escribe el número"
+                    placeholder="Escribe el número y presiona Enter"
                   />
                 </div>
               )}
 
               {deliveryMethod === 'delivery' && (
-                <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                  <label className="text-[10px] font-black text-gray-500 dark:text-gray-300 uppercase tracking-widest ml-1">Dirección de entrega</label>
-                  <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar p-1">
-                    {loggedCustomer.addresses?.map((addr, i) => (
-                      <button
-                        key={i}
-                        onClick={() => setSelectedAddress(addr)}
-                        className={`w-full p-4 rounded-xl border-2 text-left transition-all ${selectedAddress === addr ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 shadow-sm' : 'border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-700'}`}
-                      >
-                        <p className="text-xs font-bold truncate tracking-tight">{addr}</p>
-                      </button>
-                    ))}
+                <div ref={addressSectionRef} className="space-y-3 animate-in slide-in-from-top-2 duration-300">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black text-gray-500 dark:text-gray-300 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-primary-500" />
+                      Selecciona Domicilio Guardado
+                    </label>
+                    {selectedAddress && (
+                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                        <Check className="w-3 h-3" /> Seleccionado
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-2 max-h-52 overflow-y-auto custom-scrollbar p-1">
+                    {loggedCustomer.addresses && loggedCustomer.addresses.length > 0 ? (
+                      loggedCustomer.addresses.map((addr, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() => {
+                            setSelectedAddress(addr);
+                            soundManager.play('click');
+                            scrollToPaymentSection();
+                          }}
+                          className={`w-full p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                            selectedAddress === addr
+                              ? 'border-primary-500 bg-primary-50/90 dark:bg-primary-950/30 text-primary-900 dark:text-white shadow-sm ring-2 ring-primary-500/20'
+                              : 'border-gray-100 dark:border-gray-800 text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 overflow-hidden">
+                            <div className={`p-2 rounded-xl shrink-0 ${
+                              selectedAddress === addr
+                                ? 'bg-primary-500 text-white'
+                                : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
+                            }`}>
+                              <MapPin className="w-4 h-4" />
+                            </div>
+                            <p className="text-xs font-bold truncate tracking-tight">{addr}</p>
+                          </div>
+                          {selectedAddress === addr && (
+                            <div className="w-6 h-6 rounded-full bg-primary-500 text-white flex items-center justify-center shrink-0">
+                              <Check className="w-3.5 h-3.5" />
+                            </div>
+                          )}
+                        </button>
+                      ))
+                    ) : (
+                      <div className="p-3 text-center bg-gray-50 dark:bg-gray-800/80 rounded-xl text-gray-500 text-xs font-medium">
+                        No tienes domicilios guardados todavía. Agrega uno abajo:
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => {
-                        const newAddr = prompt("Nueva dirección:");
-                        if (newAddr) setSelectedAddress(newAddr);
+                        const newAddr = prompt("Ingresa tu dirección completa de entrega (calle, número, colonia, referencias):");
+                        if (newAddr && newAddr.trim()) {
+                          const cleanAddr = newAddr.trim();
+                          setSelectedAddress(cleanAddr);
+                          if (loggedCustomer && !loggedCustomer.addresses?.includes(cleanAddr)) {
+                            const updatedCust: Customer = {
+                              ...loggedCustomer,
+                              addresses: [...(loggedCustomer.addresses || []), cleanAddr]
+                            };
+                            onUpdateCustomer?.(updatedCust);
+                          }
+                          soundManager.play('click');
+                          scrollToPaymentSection();
+                        }
                       }}
-                      className="w-full p-4 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700 text-center text-gray-500 dark:text-gray-400 hover:border-primary-300 dark:hover:border-primary-500 hover:text-primary-500 dark:hover:text-primary-400 transition-all font-bold text-[10px] uppercase tracking-widest cursor-pointer"
+                      className="w-full p-4 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 text-center text-gray-500 dark:text-gray-400 hover:border-primary-400 dark:hover:border-primary-500 hover:text-primary-500 dark:hover:text-primary-400 transition-all font-bold text-[11px] uppercase tracking-widest cursor-pointer flex items-center justify-center gap-2"
                     >
-                      + Agregar Nueva Dirección
+                      <Plus className="w-4 h-4" />
+                      <span>+ Agregar Nueva Dirección</span>
                     </button>
                   </div>
                 </div>
               )}
 
               {/* Sección 2: Forma de Pago */}
-              <div className="pt-6 border-t border-gray-100 dark:border-gray-800 space-y-4 text-left">
+              <div ref={paymentSectionRef} className="pt-6 border-t border-gray-100 dark:border-gray-800 space-y-4 text-left">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-black text-gray-500 dark:text-gray-300 uppercase tracking-widest flex items-center gap-1.5">
                     <CreditCard className="w-3.5 h-3.5 text-primary-500" />
