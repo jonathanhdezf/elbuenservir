@@ -738,9 +738,9 @@ export default function App() {
 
     handleSetCustomers(prev => {
       const customerIndex = prev.findIndex(c => {
-        const cPhone = c.phone.replace(/\D/g, '').slice(-10);
-        const oPhone = customerPhone.replace(/\D/g, '').slice(-10);
-        return cPhone === oPhone;
+        const cPhone = (c.phone || '').replace(/\D/g, '').slice(-10);
+        const oPhone = (customerPhone || '').replace(/\D/g, '').slice(-10);
+        return cPhone && oPhone && cPhone === oPhone;
       });
       
       if (customerIndex === -1) {

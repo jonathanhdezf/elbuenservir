@@ -259,6 +259,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   const [selectedAddress, setSelectedAddress] = useState('');
   const [tableNumber, setTableNumber] = useState('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('efectivo');
+  const [cashAmountPaid, setCashAmountPaid] = useState<string>('');
   const [isDeliverySelectionOpen, setIsDeliverySelectionOpen] = useState(false);
 
   // Refs for smooth navigation between delivery steps
@@ -668,7 +669,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   />
                   <div className="hidden sm:flex flex-col text-left">
                     <span className="text-xs font-black truncate max-w-[100px] leading-tight">
-                      {loggedCustomer.name.split(' ')[0]}
+                      {loggedCustomer.name ? loggedCustomer.name.split(' ')[0] : 'Cliente'}
                     </span>
                     <span className="text-[9px] font-bold text-primary-500 dark:text-primary-400 uppercase tracking-wider leading-none">
                       Mi Cuenta
