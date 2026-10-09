@@ -39,6 +39,8 @@ interface CustomerProfileModalProps {
   onLogout: () => void;
   onViewDigitalTicket?: (order: Order) => void;
   onRepeatOrder?: (order: Order) => void;
+  initialTab?: 'profile' | 'orders';
+  showOnboardingHelper?: boolean;
 }
 
 const PRESET_AVATARS = [
@@ -68,9 +70,18 @@ export const CustomerProfileModal: React.FC<CustomerProfileModalProps> = ({
   onUpdateCustomer,
   onLogout,
   onViewDigitalTicket,
-  onRepeatOrder
+  onRepeatOrder,
+  initialTab = 'profile',
+  showOnboardingHelper = false
 }) => {
-  const [activeTab, setActiveTab] = useState<'profile' | 'orders'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'orders'>(initialTab);
+  const [showTabHelp, setShowTabHelp] = useState(true);
+
+  React.useEffect(() => {
+    if (isOpen && initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   // Edit fields
   const [name, setName] = useState(customer.name);
@@ -268,6 +279,39 @@ export const CustomerProfileModal: React.FC<CustomerProfileModalProps> = ({
             </span>
           </button>
         </div>
+
+        {/* Onboarding Guidance for Tabs during first sessions */}
+        {showOnboardingHelper && showTabHelp && (
+          <div className="mx-4 sm:mx-6 mt-3 p-3 sm:p-3.5 bg-gradient-to-r from-primary-500/10 via-amber-500/5 to-transparent border border-primary-500/30 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-primary-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              </div>
+              <p className="text-[11px] sm:text-xs text-gray-700 dark:text-gray-200 leading-snug">
+                {activeTab === 'profile' ? (
+                  <>
+                    <strong className="text-primary-600 dark:text-primary-400 font-black uppercase tracking-wider">Pestaña Mi Perfil:</strong> Aquí personalizas tus datos y direcciones guardadas. Cambia a <strong className="text-primary-600 dark:text-primary-400 font-bold">Historial de Pedidos</strong> para ver compras anteriores.
+                  </>
+                ) : (
+                  <>
+                    <strong className="text-emerald-600 dark:text-emerald-400 font-black uppercase tracking-wider">Pestaña Historial:</strong> Revisa el avance en tiempo real de tus pedidos, tickets digitales y repite órdenes anteriores.
+                  </>
+                )}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                soundManager.play('click');
+                setShowTabHelp(false);
+              }}
+              className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-lg shrink-0 cursor-pointer"
+              title="Entendido"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Modal Body with Scroll */}
         <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-6">

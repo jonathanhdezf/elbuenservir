@@ -11,6 +11,7 @@ import LegalModal, { LegalDocType } from '../components/LegalModal';
 import { CustomerAuthModal } from '../components/CustomerAuthModal';
 import { CustomerProfileModal } from '../components/CustomerProfileModal';
 import { CustomerAvatar } from '../components/CustomerAvatar';
+import { CustomerOnboardingTooltip } from '../components/CustomerOnboardingTooltip';
 
 interface PublicViewProps {
   categories: Category[];
@@ -154,18 +155,103 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   });
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileModalInitialTab, setProfileModalInitialTab] = useState<'profile' | 'orders'>('profile');
   const [showProfileTooltip, setShowProfileTooltip] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authIntent, setAuthIntent] = useState<'order' | 'live' | 'profile'>('profile');
   const [isLiveOrderOpen, setIsLiveOrderOpen] = useState(false);
 
+  // Early sessions onboarding helpers (Show guide during first 3 sessions)
+  const MAX_ONBOARDING_SESSIONS = 3;
+
+  const getCustomerSessionCount = (phone?: string): number => {
+    if (!phone) return 0;
+    try {
+      const clean = phone.replace(/\D/g, '');
+      return parseInt(localStorage.getItem(`ebs_customer_sessions_${clean}`) || '0', 10);
+    } catch {
+      return 0;
+    }
+  };
+
+  const isCustomerGuideDismissed = (phone?: string): boolean => {
+    if (!phone) return false;
+    try {
+      const clean = phone.replace(/\D/g, '');
+      return localStorage.getItem(`ebs_guide_dismissed_${clean}`) === 'true';
+    } catch {
+      return false;
+    }
+  };
+
+  const incrementCustomerSession = (phone?: string): number => {
+    if (!phone) return 1;
+    try {
+      const clean = phone.replace(/\D/g, '');
+      const current = parseInt(localStorage.getItem(`ebs_customer_sessions_${clean}`) || '0', 10) || 0;
+      const next = current + 1;
+      localStorage.setItem(`ebs_customer_sessions_${clean}`, next.toString());
+      return next;
+    } catch {
+      return 1;
+    }
+  };
+
+  const [customerSessionCount, setCustomerSessionCount] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('el_buen_servir_customer');
+      if (saved) {
+        const c = JSON.parse(saved);
+        if (c?.phone) return getCustomerSessionCount(c.phone);
+      }
+    } catch {}
+    return 0;
+  });
+
+  const triggerOnboardingGuide = (customer: Customer) => {
+    const clean = customer.phone.replace(/\D/g, '');
+    sessionStorage.setItem(`ebs_session_counted_${clean}`, 'true');
+    const count = incrementCustomerSession(customer.phone);
+    setCustomerSessionCount(count);
+    if (!isCustomerGuideDismissed(customer.phone) && count <= MAX_ONBOARDING_SESSIONS) {
+      setTimeout(() => {
+        setShowProfileTooltip(true);
+      }, 400);
+    }
+  };
+
+  const handleDismissGuidePermanently = () => {
+    if (loggedCustomer?.phone) {
+      const clean = loggedCustomer.phone.replace(/\D/g, '');
+      try {
+        localStorage.setItem(`ebs_guide_dismissed_${clean}`, 'true');
+      } catch {}
+    }
+    setShowProfileTooltip(false);
+  };
+
+  // Track session on initial load if already authenticated and trigger guide if within early sessions
+  useEffect(() => {
+    if (loggedCustomer?.phone) {
+      const clean = loggedCustomer.phone.replace(/\D/g, '');
+      const sessionMarker = `ebs_session_counted_${clean}`;
+      if (!sessionStorage.getItem(sessionMarker)) {
+        sessionStorage.setItem(sessionMarker, 'true');
+        const count = incrementCustomerSession(loggedCustomer.phone);
+        setCustomerSessionCount(count);
+        if (!isCustomerGuideDismissed(loggedCustomer.phone) && count <= MAX_ONBOARDING_SESSIONS) {
+          const timer = setTimeout(() => {
+            setShowProfileTooltip(true);
+          }, 850);
+          return () => clearTimeout(timer);
+        }
+      }
+    }
+  }, [loggedCustomer?.phone]);
+
   useEffect(() => {
     if (showProfileTooltip) {
       soundManager.play('notification');
-      const timer = setTimeout(() => {
-        setShowProfileTooltip(false);
-      }, 8000);
-      return () => clearTimeout(timer);
     }
   }, [showProfileTooltip]);
 
@@ -209,15 +295,14 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     } else if (authIntent === 'live') {
       setIsLiveOrderOpen(true);
     } else {
-      // Do not open profile modal directly; display informative tooltip on navbar avatar
-      setShowProfileTooltip(true);
+      triggerOnboardingGuide(customer);
     }
   };
 
   const handleRegisterCustomer = (newCustomer: Customer) => {
     onAddCustomer(newCustomer);
     handleSetLoggedCustomer(newCustomer);
-    setShowProfileTooltip(true);
+    triggerOnboardingGuide(newCustomer);
   };
 
   // Mobile Back Button Navigation Logic
@@ -478,50 +563,29 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   </div>
                 </button>
 
-                {/* Interactive Tooltip Guiding the User */}
-                {showProfileTooltip && (
-                  <div
-                    className="absolute top-full mt-3 right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 z-50 w-72 sm:w-80 p-4 bg-white dark:bg-gray-900 border-2 border-primary-500 rounded-3xl shadow-2xl animate-in fade-in zoom-in-95 duration-300 ring-4 ring-primary-500/15 cursor-pointer"
-                    onClick={() => {
-                      soundManager.play('click');
+                {/* Interactive Tooltip Guiding the User in early sessions */}
+                {loggedCustomer && (
+                  <CustomerOnboardingTooltip
+                    isOpen={showProfileTooltip}
+                    onClose={() => setShowProfileTooltip(false)}
+                    onDismissPermanently={handleDismissGuidePermanently}
+                    customerName={loggedCustomer.name}
+                    customerPhone={loggedCustomer.phone}
+                    sessionNumber={customerSessionCount}
+                    maxSessionsForGuide={MAX_ONBOARDING_SESSIONS}
+                    onOpenProfile={(tab) => {
+                      setProfileModalInitialTab(tab);
                       setShowProfileTooltip(false);
                       setIsProfileModalOpen(true);
                     }}
-                  >
-                    {/* Tooltip Arrow pointing up to the avatar */}
-                    <div className="absolute -top-2 right-4 sm:right-auto sm:left-1/2 sm:-translate-x-1/2 w-4 h-4 bg-white dark:bg-gray-900 border-t-2 border-l-2 border-primary-500 transform rotate-45" />
-
-                    <div className="relative flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-2xl bg-primary-500/10 text-primary-600 dark:text-primary-400 flex items-center justify-center shrink-0 mt-0.5">
-                        <Sparkles className="w-5 h-5 animate-spin" />
-                      </div>
-                      <div className="flex-1 text-left">
-                        <div className="flex items-center justify-between">
-                          <p className="text-xs font-black text-gray-900 dark:text-white uppercase tracking-tight">
-                            ¡Sesión Iniciada! 👋
-                          </p>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setShowProfileTooltip(false);
-                            }}
-                            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-white rounded-lg -mr-1 -mt-1 cursor-pointer"
-                            title="Cerrar aviso"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <p className="text-[11px] font-medium text-gray-600 dark:text-gray-300 mt-1 leading-snug">
-                          Puedes modificar tu foto, datos o revisar tu <strong className="font-black text-primary-500">historial de pedidos</strong> tocando aquí.
-                        </p>
-                        <div className="mt-2.5 flex items-center gap-1.5 text-[10px] font-black uppercase text-primary-500 tracking-wider">
-                          <span>Ver mi perfil</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                    onNavigateToMenu={() => {
+                      setShowProfileTooltip(false);
+                      const el = document.getElementById('menu');
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
+                  />
                 )}
               </div>
             ) : (
@@ -1771,6 +1835,8 @@ export default function PublicView({ categories, menuItems, customers, orders = 
             setOrderStep(1);
             setIsOrderModalOpen(true);
           }}
+          initialTab={profileModalInitialTab}
+          showOnboardingHelper={customerSessionCount <= MAX_ONBOARDING_SESSIONS && !isCustomerGuideDismissed(loggedCustomer.phone)}
         />
       )}
 
