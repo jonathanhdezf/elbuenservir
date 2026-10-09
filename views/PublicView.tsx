@@ -73,6 +73,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   const [modalCategoryFilter, setModalCategoryFilter] = useState<string>('all');
   const [pendingDishSides, setPendingDishSides] = useState<Record<string, string[]>>({});
   const [pendingDishVariation, setPendingDishVariation] = useState<Record<string, any>>({});
+  const [selectedVariationsByDish, setSelectedVariationsByDish] = useState<Record<string, any>>({});
   const [pendingDishQty, setPendingDishQty] = useState<Record<string, number>>({});
   const [customerComments, setCustomerComments] = useState('');
   const [quickSearch, setQuickSearch] = useState('');
