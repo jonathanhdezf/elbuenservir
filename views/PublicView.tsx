@@ -11,6 +11,7 @@ import { CustomerAuthModal } from '../components/CustomerAuthModal';
 import { CustomerProfileModal } from '../components/CustomerProfileModal';
 import { CustomerAvatar } from '../components/CustomerAvatar';
 import { CustomerOnboardingTooltip } from '../components/CustomerOnboardingTooltip';
+import { PromoBannerModal, PromoTopBanner, PromoFloatingButton } from '../components/PromoBannerModal';
 
 interface PublicViewProps {
   categories: Category[];
@@ -60,6 +61,27 @@ export default function PublicView({ categories, menuItems, customers, orders = 
       setIsBannerClosing(false);
     }, 350);
   };
+
+  // Promotional WhatsApp Banner & Modal States ("La vida es corta... ¡Whatsappea al Buen Servir!")
+  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
+  const [showPromoTopBanner, setShowPromoTopBanner] = useState(true);
+
+  // Auto-show promotional modal on entry for a few seconds
+  useEffect(() => {
+    if (isPreview) return;
+    const timer = setTimeout(() => {
+      setIsPromoModalOpen(true);
+    }, 1200);
+
+    const bannerTimer = setTimeout(() => {
+      setShowPromoTopBanner(false);
+    }, 25000);
+
+    return () => {
+      clearTimeout(timer);
+      clearTimeout(bannerTimer);
+    };
+  }, [isPreview]);
 
   const [activeCategory, setActiveCategory] = useState<string>(categories[0]?.id || '');
   const [isScrolled, setIsScrolled] = useState(false);
@@ -404,9 +426,11 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   };
 
   // Mobile Back Button Navigation Logic
-  const hasOpenPublicModal = !!(extraModalType || isOrderModalOpen || isAuthModalOpen || isProfileModalOpen || isLiveOrderOpen || isDeliverySelectionOpen || isMobileMenuOpen);
+  const hasOpenPublicModal = !!(isPromoModalOpen || extraModalType || isOrderModalOpen || isAuthModalOpen || isProfileModalOpen || isLiveOrderOpen || isDeliverySelectionOpen || isMobileMenuOpen);
   const handleClosePublicModal = () => {
-    if (extraModalType) {
+    if (isPromoModalOpen) {
+      setIsPromoModalOpen(false);
+    } else if (extraModalType) {
       setExtraModalType(null);
     } else if (isOrderModalOpen) {
       if (orderStep > 1) {
@@ -607,8 +631,14 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950 text-gray-900 dark:text-white font-sans selection:bg-primary-200 transition-colors duration-300">
       {/* Navigation */}
-      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${isScrolled || isPreview ? 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl shadow-lg py-4 border-b border-gray-100 dark:border-gray-800' : 'bg-transparent py-8'}`}>
-        <div className="w-full mx-auto px-6 md:px-12 flex justify-between items-center">
+      <nav className={`fixed top-0 w-full z-50 transition-all duration-500 ${isScrolled || isPreview ? 'bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl shadow-lg border-b border-gray-100 dark:border-gray-800' : 'bg-transparent'}`}>
+        {/* Top Promotional WhatsApp Banner */}
+        <PromoTopBanner
+          isVisible={showPromoTopBanner}
+          onOpenModal={() => setIsPromoModalOpen(true)}
+          onDismiss={() => setShowPromoTopBanner(false)}
+        />
+        <div className={`w-full mx-auto px-6 md:px-12 flex justify-between items-center transition-all duration-300 ${isScrolled || isPreview ? 'py-4' : showPromoTopBanner ? 'py-5' : 'py-8'}`}>
           <div className="flex items-center space-x-3 group cursor-pointer" onClick={() => scrollToSection('inicio')}>
             <img
               src={`${(import.meta as any).env.BASE_URL}assets/logo_nuevo.png`}
@@ -1999,6 +2029,18 @@ export default function PublicView({ categories, menuItems, customers, orders = 
           </div>
         )
       }
+
+      {/* Promotional WhatsApp Banner Modal ("La vida es corta... ¡Whatsappea al Buen Servir!") */}
+      <PromoBannerModal
+        isOpen={isPromoModalOpen}
+        onClose={() => setIsPromoModalOpen(false)}
+        onOpenSofia={() => setIsLiveOrderOpen(true)}
+        onScrollToMenu={() => scrollToSection('menu')}
+        autoCloseSeconds={7}
+      />
+
+      {/* Floating Re-open Promo Button */}
+      <PromoFloatingButton onOpenModal={() => setIsPromoModalOpen(true)} />
 
       {/* Live Order Modal (Sofia AI) */}
       <LiveOrderModal
