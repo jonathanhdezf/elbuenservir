@@ -2893,35 +2893,6 @@ export default function PublicView({ categories, menuItems, customers, orders = 
         </aside>
       )}
 
-      {/* Floating Sofia AI Button */}
-      {!hasOpenPublicModal && (
-        <aside
-          aria-label="Hablar con Sofía Asistente IA"
-          className={`fixed ${cartItems.length > 0 ? 'bottom-24 left-4 sm:bottom-6 sm:left-8' : 'bottom-6 left-4 sm:left-8'} z-40 animate-in slide-in-from-bottom-5 duration-300`}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              soundManager.play('click');
-              setIsLiveOrderOpen(true);
-            }}
-            className="flex items-center gap-3 px-4 sm:px-5 py-3.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 text-white rounded-full shadow-[0_15px_35px_rgba(16,185,129,0.35)] hover:scale-105 active:scale-95 transition-all border border-white/20 cursor-pointer group"
-            title="Pedir con Sofía IA"
-          >
-            <div className="relative">
-              <span className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-sm shadow-inner">
-                👩‍🍳
-              </span>
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full animate-ping" />
-            </div>
-            <div className="text-left hidden sm:block">
-              <p className="text-[10px] font-bold text-emerald-200 uppercase tracking-widest leading-none">Asistente Virtual</p>
-              <p className="text-xs font-black uppercase tracking-tight">Pedir con Sofía</p>
-            </div>
-            <Sparkles className="w-4 h-4 text-amber-300 animate-pulse hidden sm:block" />
-          </button>
-        </aside>
-      )}
 
       {/* Floating PWA Install Notification (Appears at 90% scroll with sound, disappears if already installed) */}
       {!isInstalled && showFloatingBanner && !isPreview && (
