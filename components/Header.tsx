@@ -2,7 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Menu, Eye, Bell, Clock, Calendar,
-  X, CheckCircle2, AlertCircle, Info, Trash2, LayoutDashboard
+  X, CheckCircle2, AlertCircle, Info, Trash2, LayoutDashboard,
+  ArrowLeft, Sun, Moon
 } from 'lucide-react';
 import { notificationService } from '../services/notificationService';
 
@@ -23,6 +24,11 @@ interface HeaderProps {
   onClearNotifications?: () => void;
   onRemoveNotification?: (id: number) => void;
   onBackToPanel?: () => void;
+  hideMenuButton?: boolean;
+  backButtonText?: string;
+  backButtonBadge?: string;
+  isDarkMode?: boolean;
+  toggleDarkMode?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -34,7 +40,12 @@ const Header: React.FC<HeaderProps> = ({
   notifications = [],
   onClearNotifications,
   onRemoveNotification,
-  onBackToPanel
+  onBackToPanel,
+  hideMenuButton = false,
+  backButtonText,
+  backButtonBadge,
+  isDarkMode,
+  toggleDarkMode
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -92,25 +103,51 @@ const Header: React.FC<HeaderProps> = ({
   return (
     <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 h-20 flex items-center justify-between px-4 md:px-8 sticky top-0 z-30 transition-colors">
       <div className="flex items-center gap-2 sm:gap-3">
-        <button
-          title="Abrir menú"
-          onClick={onOpenSidebar}
-          className={`${!isFullScreen ? 'lg:hidden' : ''} p-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors cursor-pointer`}
-        >
-          <Menu className="w-6 h-6" />
-        </button>
-        <h2 className="text-lg md:text-2xl font-extrabold text-gray-800 dark:text-white tracking-tight">{title}</h2>
+        {!hideMenuButton && (
+          <button
+            title="Abrir menú"
+            onClick={onOpenSidebar}
+            className={`${!isFullScreen ? 'lg:hidden' : ''} p-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors cursor-pointer`}
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+        )}
+
         {onBackToPanel && (
           <button
             onClick={onBackToPanel}
-            title="Volver al Panel de Control"
-            className="flex items-center gap-1.5 ml-2 sm:ml-4 px-3 py-1.5 text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 rounded-xl transition-all cursor-pointer shadow-sm active:scale-95"
+            title={backButtonText ? `${backButtonText} (Vista Básica)` : "Volver al Panel de Control"}
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all cursor-pointer shadow-sm active:scale-95 ${
+              hideMenuButton
+                ? 'bg-primary-600 hover:bg-primary-700 text-white font-black shadow-primary-500/25 ring-2 ring-primary-500/30'
+                : 'text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
+            }`}
           >
-            <LayoutDashboard className="w-3.5 h-3.5 text-primary-500" />
-            <span className="hidden sm:inline">Panel de Control</span>
-            <span className="sm:hidden text-[10px]">Panel</span>
+            {hideMenuButton ? (
+              <ArrowLeft className="w-4 h-4 text-white" />
+            ) : (
+              <LayoutDashboard className="w-3.5 h-3.5 text-primary-500" />
+            )}
+            <span className={hideMenuButton ? "text-xs sm:text-sm font-black" : "hidden sm:inline"}>
+              {backButtonText || 'Panel de Control'}
+            </span>
+            {!hideMenuButton && <span className="sm:hidden text-[10px]">Panel</span>}
+            {backButtonBadge && (
+              <span className="hidden sm:inline-block text-[9px] bg-black/25 px-1.5 py-0.5 rounded text-white font-black uppercase tracking-wider">
+                {backButtonBadge}
+              </span>
+            )}
           </button>
         )}
+
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg md:text-2xl font-extrabold text-gray-800 dark:text-white tracking-tight">{title}</h2>
+          {hideMenuButton && (
+            <span className="hidden md:inline-flex items-center px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-[10px] font-black uppercase tracking-wider">
+              Control de Pedidos
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center space-x-3 md:space-x-8">
@@ -127,6 +164,16 @@ const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="flex items-center space-x-3 md:space-x-4">
+          {toggleDarkMode && (
+            <button
+              onClick={toggleDarkMode}
+              className="p-2.5 rounded-xl text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+              title={isDarkMode ? 'Modo Claro' : 'Modo Oscuro'}
+            >
+              {isDarkMode ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5 text-indigo-500" />}
+            </button>
+          )}
+
           {title === "Menu" && (
             <button
               onClick={onPreview}

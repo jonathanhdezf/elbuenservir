@@ -905,7 +905,10 @@ export default function App() {
           updateDriverStats={updateDriverStats}
           isDarkMode={isDarkMode}
           setIsDarkMode={setIsDarkMode}
-          onExit={() => setView('control_panel')}
+          onExit={() => {
+            setPanelMode('basic');
+            setView('control_panel');
+          }}
           onViewDigitalTicket={handleOpenDigitalTicket}
         />
       );

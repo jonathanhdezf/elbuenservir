@@ -8,7 +8,7 @@ import {
   ChevronRight, Filter, MoreHorizontal, Star, Package,
   Edit2, Smartphone, Map, UserPlus, Send,
   ChevronDown, Settings2, Timer, Check, CreditCard,
-  Banknote, Receipt, ArrowRight, Printer, CheckCircle,
+  Banknote, Receipt, ArrowRight, ArrowLeft, Printer, CheckCircle,
   Monitor, Maximize2, Bell, Truck, UserMinus, Navigation, ShieldCheck, Layers,
   History, Wallet, ArrowUpRight, Store, Utensils, Zap, Save, UserCheck, Scan, Shield, Sun, Moon,
   ArrowUp, ArrowDown, Move, MessageCircle, Copy,
@@ -1892,6 +1892,15 @@ export default function AdminView({
               )}
             </div>
             <div className="flex items-center justify-between sm:justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={onExit}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary-50 hover:bg-primary-100 dark:bg-primary-950/40 dark:hover:bg-primary-900/50 text-primary-700 dark:text-primary-300 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 border border-primary-200/50 dark:border-primary-800/40"
+                title="Regresar al Panel de Control (Vista Básica)"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
+                <span>Volver al Panel</span>
+              </button>
               <span className="text-[11px] font-black uppercase tracking-wider text-gray-400 bg-gray-50 dark:bg-gray-900/60 px-3 py-2 rounded-xl">
                 {filteredOrders.length} {filteredOrders.length === 1 ? 'pedido' : 'pedidos'}
               </span>
@@ -4925,18 +4934,20 @@ export default function AdminView({
       {/* WhatsApp Delivery Notifications Panel */}
       {renderWhatsAppNotifications()}
 
-      <Sidebar
-        isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)}
-        isDarkMode={isDarkMode} toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
-        onExitToSite={onExit} activeSection={activeSection}
-        onSectionChange={(s) => {
-          setActiveSection(s);
-          setIsSidebarOpen(false);
-          playUISound('navigation');
-        }}
-        badges={badges}
-        isFullScreen={isFullScreen}
-      />
+      {activeSection !== 'orders' && (
+        <Sidebar
+          isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)}
+          isDarkMode={isDarkMode} toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+          onExitToSite={onExit} activeSection={activeSection}
+          onSectionChange={(s) => {
+            setActiveSection(s);
+            setIsSidebarOpen(false);
+            playUISound('navigation');
+          }}
+          badges={badges}
+          isFullScreen={isFullScreen}
+        />
+      )}
 
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         <Header
@@ -4948,6 +4959,11 @@ export default function AdminView({
           onClearNotifications={() => setNotificationHistory([])}
           onRemoveNotification={(id) => setNotificationHistory(prev => prev.filter(n => n.id !== id))}
           onBackToPanel={onExit}
+          hideMenuButton={activeSection === 'orders'}
+          backButtonText={activeSection === 'orders' ? 'Regresar al Panel' : undefined}
+          backButtonBadge={activeSection === 'orders' ? 'Vista Básica' : undefined}
+          isDarkMode={isDarkMode}
+          toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
           title={
             activeSection === 'menu' ? 'Editor de Menú' :
               activeSection === 'kds' ? 'Comandas' :
