@@ -112,15 +112,33 @@ const updateOrderTool = {
 
 const completeOrderTool = {
   name: "completeOrder",
-  description: "Finaliza y resume la orden del cliente para preparar la entrega y el pago cuando el cliente termina.",
+  description: "Finaliza, registra y genera el pedido del cliente en el sistema cuando ya se tienen los platillos, el método de entrega (mostrador o domicilio) y la forma de pago.",
   parameters: {
     type: Type.OBJECT,
     properties: {
       orderType: { type: Type.STRING, enum: ["pickup", "delivery"], description: "Entrega: mostrador (pickup) o domicilio (delivery)" },
-      deliveryAddress: { type: Type.STRING, description: "Dirección de entrega a domicilio" },
-      paymentMethod: { type: Type.STRING, enum: ["efectivo", "tarjeta", "transferencia", "credito"], description: "Forma de pago" },
-      summary: { type: Type.STRING, description: "Resumen breve del pedido" }
-    }
+      deliveryAddress: { type: Type.STRING, description: "Dirección de entrega a domicilio (si aplica)" },
+      paymentMethod: { type: Type.STRING, enum: ["efectivo", "tarjeta", "transferencia", "credito"], description: "Forma de pago elegida por el cliente" },
+      cashAmount: { type: Type.NUMBER, description: "Monto en efectivo con el que paga el cliente (opcional)" },
+      customerName: { type: Type.STRING, description: "Nombre del cliente (opcional)" },
+      customerPhone: { type: Type.STRING, description: "Teléfono del cliente (opcional)" },
+      summary: { type: Type.STRING, description: "Resumen breve del pedido" },
+      items: {
+        type: Type.ARRAY,
+        description: "Lista de todos los platillos ordenados por el cliente para respaldar el ticket final.",
+        items: {
+          type: Type.OBJECT,
+          properties: {
+            name: { type: Type.STRING, description: "Nombre del platillo" },
+            variation: { type: Type.STRING, description: "Variación o tamaño" },
+            price: { type: Type.NUMBER, description: "Precio unitario" },
+            quantity: { type: Type.NUMBER, description: "Cantidad" }
+          },
+          required: ["name"]
+        }
+      }
+    },
+    required: ["orderType"]
   }
 };
 
@@ -183,6 +201,7 @@ export default function LiveOrderModal({
   const [cashAmountPaid, setCashAmountPaid] = useState<string>('');
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
+  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [customApiKey, setCustomApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
@@ -199,6 +218,21 @@ export default function LiveOrderModal({
   const isSpeakerMutedRef = useRef(isSpeakerMuted);
   const isConnectingRef = useRef(false);
 
+  // Live state refs to avoid stale closures inside WebSocket callbacks
+  const cartRef = useRef<SofiaCartItem[]>([]);
+  const deliveryMethodRef = useRef<'pickup' | 'delivery' | null>(null);
+  const selectedAddressRef = useRef<string>('');
+  const newAddressInputRef = useRef<string>('');
+  const selectedPaymentMethodRef = useRef<PaymentMethod>('efectivo');
+  const cashAmountPaidRef = useRef<string>('');
+  const loggedCustomerRef = useRef<Customer | null>(loggedCustomer);
+  const onAddOrderRef = useRef(onAddOrder);
+  const onUpdateCustomerRef = useRef(onUpdateCustomer);
+  const createdOrderRef = useRef<Order | null>(null);
+  const pendingAutoWhatsAppUrlRef = useRef<string | null>(null);
+  const autoSendTimerRef = useRef<any>(null);
+  const handleToolCallsRef = useRef<(calls: any[]) => void>(() => {});
+
   useEffect(() => {
     isMutedRef.current = isMuted;
   }, [isMuted]);
@@ -207,12 +241,45 @@ export default function LiveOrderModal({
     isSpeakerMutedRef.current = isSpeakerMuted;
   }, [isSpeakerMuted]);
 
-  // Sync customer address
   useEffect(() => {
-    if (loggedCustomer && loggedCustomer.addresses && loggedCustomer.addresses.length > 0 && !selectedAddress) {
+    cartRef.current = cart;
+  }, [cart]);
+
+  useEffect(() => {
+    deliveryMethodRef.current = deliveryMethod;
+  }, [deliveryMethod]);
+
+  useEffect(() => {
+    selectedAddressRef.current = selectedAddress;
+  }, [selectedAddress]);
+
+  useEffect(() => {
+    newAddressInputRef.current = newAddressInput;
+  }, [newAddressInput]);
+
+  useEffect(() => {
+    selectedPaymentMethodRef.current = selectedPaymentMethod;
+  }, [selectedPaymentMethod]);
+
+  useEffect(() => {
+    cashAmountPaidRef.current = cashAmountPaid;
+  }, [cashAmountPaid]);
+
+  useEffect(() => {
+    loggedCustomerRef.current = loggedCustomer;
+    if (loggedCustomer && loggedCustomer.addresses && loggedCustomer.addresses.length > 0 && !selectedAddressRef.current) {
       setSelectedAddress(loggedCustomer.addresses[0]);
+      selectedAddressRef.current = loggedCustomer.addresses[0];
     }
   }, [loggedCustomer]);
+
+  useEffect(() => {
+    onAddOrderRef.current = onAddOrder;
+  }, [onAddOrder]);
+
+  useEffect(() => {
+    onUpdateCustomerRef.current = onUpdateCustomer;
+  }, [onUpdateCustomer]);
 
   // Resolved Gemini API key
   const resolvedApiKey = useMemo(() => {
@@ -236,56 +303,231 @@ export default function LiveOrderModal({
     return cart.reduce((sum, item) => sum + item.quantity, 0);
   }, [cart]);
 
-  // Cart item modifier
+  // Match dish against catalog for accurate dishId, variation label, and price
+  const resolveDishFromCatalog = useCallback((rawItem: { name: string; variation?: string; price?: number; quantity?: number; dishId?: string }) => {
+    const itemName = (rawItem.name || '').trim();
+    const itemVar = (rawItem.variation || 'Platillo').trim();
+    const quantity = rawItem.quantity && rawItem.quantity > 0 ? rawItem.quantity : 1;
+    let finalPrice = rawItem.price || 0;
+    let dishId = rawItem.dishId;
+    let resolvedName = itemName;
+    let resolvedVar = itemVar;
+
+    const catalogMatch = menuItems.find(mi =>
+      mi.name.toLowerCase().includes(itemName.toLowerCase()) ||
+      itemName.toLowerCase().includes(mi.name.toLowerCase())
+    );
+
+    if (catalogMatch) {
+      dishId = catalogMatch.id;
+      resolvedName = catalogMatch.name;
+      const varMatch = catalogMatch.variations.find(v =>
+        v.label.toLowerCase().includes(itemVar.toLowerCase()) ||
+        itemVar.toLowerCase().includes(v.label.toLowerCase())
+      ) || catalogMatch.variations[0];
+
+      if (varMatch) {
+        resolvedVar = varMatch.label;
+        if (!finalPrice || finalPrice <= 0) {
+          finalPrice = varMatch.price;
+        }
+      }
+    }
+
+    return {
+      name: resolvedName,
+      variation: resolvedVar,
+      price: finalPrice,
+      quantity,
+      dishId
+    };
+  }, [menuItems]);
+
+  // Cart item modifier (synchronously updates cartRef.current + React state)
   const updateCartItem = useCallback((action: 'add' | 'remove' | 'update', item: { name: string; variation: string; price: number; quantity?: number; dishId?: string }) => {
-    const itemName = item.name.trim();
-    const itemVar = item.variation.trim();
-    const qty = item.quantity && item.quantity > 0 ? item.quantity : 1;
+    const resolved = resolveDishFromCatalog(item);
+    const itemName = resolved.name;
+    const itemVar = resolved.variation;
+    const qty = resolved.quantity;
     const dishImg = getDishImage(itemName);
 
-    setCart(prev => {
-      const matchIndex = prev.findIndex(i =>
-        i.name.toLowerCase() === itemName.toLowerCase() &&
-        i.variation.toLowerCase() === itemVar.toLowerCase()
-      );
+    const prev = cartRef.current;
+    const matchIndex = prev.findIndex(i =>
+      i.name.toLowerCase() === itemName.toLowerCase() &&
+      i.variation.toLowerCase() === itemVar.toLowerCase()
+    );
 
-      if (action === 'add') {
-        if (matchIndex > -1) {
-          const updated = [...prev];
-          const target = updated[matchIndex];
-          target.quantity += qty;
-          setLastAddedId(target.id);
-          return updated;
-        } else {
-          const newId = `sofia-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-          setLastAddedId(newId);
-          return [...prev, {
-            id: newId,
-            dishId: item.dishId,
-            name: itemName,
-            variation: itemVar,
-            price: item.price,
-            quantity: qty,
-            image: dishImg || undefined
-          }];
-        }
-      } else if (action === 'update') {
-        if (matchIndex > -1) {
-          const updated = [...prev];
-          updated[matchIndex].quantity = qty;
-          if (item.price) updated[matchIndex].price = item.price;
-          setLastAddedId(updated[matchIndex].id);
-          return updated;
-        }
-      } else if (action === 'remove') {
-        setLastAddedId(null);
-        return prev.filter((_, idx) => idx !== matchIndex);
+    let nextCart = prev;
+
+    if (action === 'add') {
+      if (matchIndex > -1) {
+        const target = prev[matchIndex];
+        const updatedItem: SofiaCartItem = {
+          ...target,
+          quantity: target.quantity + qty,
+          price: resolved.price || target.price,
+          dishId: resolved.dishId || target.dishId
+        };
+        nextCart = prev.map((it, idx) => idx === matchIndex ? updatedItem : it);
+        setLastAddedId(target.id);
+      } else {
+        const newId = `sofia-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        setLastAddedId(newId);
+        nextCart = [...prev, {
+          id: newId,
+          dishId: resolved.dishId,
+          name: itemName,
+          variation: itemVar,
+          price: resolved.price,
+          quantity: qty,
+          image: dishImg || undefined
+        }];
       }
-      return prev;
-    });
+    } else if (action === 'update') {
+      if (matchIndex > -1) {
+        const target = prev[matchIndex];
+        nextCart = prev.map((it, idx) => idx === matchIndex ? {
+          ...target,
+          quantity: qty,
+          price: resolved.price || target.price
+        } : it);
+        setLastAddedId(target.id);
+      }
+    } else if (action === 'remove') {
+      setLastAddedId(null);
+      if (matchIndex > -1) {
+        nextCart = prev.filter((_, idx) => idx !== matchIndex);
+      }
+    }
+
+    cartRef.current = nextCart;
+    setCart(nextCart);
 
     try { soundManager.play('confirm_generic'); } catch (e) { }
     setTimeout(() => setLastAddedId(null), 2000);
+  }, [resolveDishFromCatalog]);
+
+  // Build WhatsApp URL and register order in the database (idempotent per order session)
+  const generateAndSaveOrder = useCallback((overrides?: {
+    deliveryMethod?: 'pickup' | 'delivery';
+    address?: string;
+    paymentMethod?: PaymentMethod;
+    cashAmount?: string;
+    customerName?: string;
+    customerPhone?: string;
+    items?: SofiaCartItem[];
+  }): { order: Order; waUrl: string } | null => {
+    const itemsToUse = overrides?.items && overrides.items.length > 0 ? overrides.items : cartRef.current;
+    if (itemsToUse.length === 0) return null;
+
+    const total = itemsToUse.reduce((sum, i) => sum + i.price * i.quantity, 0);
+    const activeCustomer = loggedCustomerRef.current;
+    const customerName = overrides?.customerName || activeCustomer?.name || 'Cliente de Sofía IA';
+    const customerPhone = overrides?.customerPhone || activeCustomer?.phone || 'Sin registrar';
+    const method = overrides?.deliveryMethod || deliveryMethodRef.current || 'pickup';
+    const rawAddr = overrides?.address || selectedAddressRef.current || newAddressInputRef.current.trim() || activeCustomer?.addresses?.[0] || '';
+    const finalAddress = method === 'pickup' ? 'Recoger en mostrador' : (rawAddr || 'Domicilio acordado');
+    const payMethod: PaymentMethod = overrides?.paymentMethod || selectedPaymentMethodRef.current || 'efectivo';
+    const cashStr = overrides?.cashAmount !== undefined ? overrides.cashAmount : cashAmountPaidRef.current;
+    const parsedCash = parseFloat(cashStr);
+
+    const existingOrder = createdOrderRef.current;
+    const orderId = existingOrder?.id || `SOFIA-${Math.random().toString(36).substr(2, 6).toUpperCase()}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
+
+    let deliveryText = '';
+    if (method === 'pickup') {
+      deliveryText = '🏪 *Entrega:* Recoger en Mostrador';
+    } else {
+      deliveryText = `🏠 *Entrega a Domicilio:* ${finalAddress}`;
+    }
+
+    let paymentText = '';
+    if (payMethod === 'efectivo') {
+      const change = !isNaN(parsedCash) && parsedCash >= total ? (parsedCash - total) : 0;
+      paymentText = `💵 *Pago:* Efectivo` + (!isNaN(parsedCash) && parsedCash >= total ? ` (Paga con: $${parsedCash.toFixed(2)}, Cambio: $${change.toFixed(2)})` : ` (Pago exacto)`);
+    } else if (payMethod === 'tarjeta') {
+      paymentText = `💳 *Pago:* Tarjeta (Llevar terminal bancaria al entregar)`;
+    } else if (payMethod === 'transferencia') {
+      paymentText = `🏦 *Pago:* Transferencia Bancaria`;
+    } else if (payMethod === 'credito') {
+      paymentText = `🏷️ *Pago:* Crédito de Tienda (Cuenta de Cliente)`;
+    }
+
+    const itemsText = itemsToUse.map(i => `• ${i.quantity}x ${i.name} (${i.variation}) - $${(i.price * i.quantity).toFixed(2)}`).join('\n');
+
+    const msg =
+      `*🎙️ PEDIDO ASISTIDO POR SOFÍA IA - EL BUEN SERVIR*\n\n` +
+      `🆔 *Orden:* #${orderId}\n` +
+      `👤 *Cliente:* ${customerName}\n` +
+      `📱 *Teléfono:* ${customerPhone}\n` +
+      `${deliveryText}\n` +
+      `${paymentText}\n\n` +
+      `*DETALLE DEL PEDIDO:*\n` +
+      `${itemsText}\n\n` +
+      `💰 *TOTAL A PAGAR: $${total.toFixed(2)}*\n\n` +
+      `✨ _Pedido generado por la Asistente Virtual Sofía_`;
+
+    const waUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+
+    const newOrder: Order = {
+      id: orderId,
+      customerName,
+      customerPhone,
+      address: finalAddress,
+      items: itemsToUse.map(i => ({
+        id: i.dishId || i.id,
+        name: i.name,
+        variationLabel: i.variation,
+        price: i.price,
+        quantity: i.quantity
+      })),
+      total,
+      status: 'pending',
+      paymentMethod: payMethod,
+      paymentStatus: 'pending',
+      cashReceived: payMethod === 'efectivo' && !isNaN(parsedCash) && parsedCash >= total ? parsedCash : undefined,
+      change: payMethod === 'efectivo' && !isNaN(parsedCash) && parsedCash >= total ? (parsedCash - total) : undefined,
+      createdAt: existingOrder?.createdAt || new Date().toISOString(),
+      source: 'online',
+      notes: 'Pedido asistido por Sofía IA'
+    };
+
+    // Only insert into DB/state and charge credit once per order
+    if (!existingOrder) {
+      if (payMethod === 'credito' && activeCustomer && onUpdateCustomerRef.current) {
+        const currentBal = Number(activeCustomer.creditBalance || 0);
+        const newBal = currentBal + total;
+        const creditMovement: CustomerCreditMovement = {
+          id: `cm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          orderId,
+          type: 'cargo',
+          amount: total,
+          balanceAfter: newBal,
+          date: new Date().toISOString(),
+          notes: `Cargo por pedido asistido con Sofía IA #${orderId}`,
+          registeredBy: 'Sofía IA'
+        };
+
+        onUpdateCustomerRef.current({
+          ...activeCustomer,
+          creditBalance: newBal,
+          creditHistory: [creditMovement, ...(activeCustomer.creditHistory || [])]
+        });
+      }
+
+      if (onAddOrderRef.current) {
+        onAddOrderRef.current(newOrder);
+      }
+
+      try { soundManager.play('confirm_tpv'); } catch (e) { }
+    } else if (onAddOrderRef.current && JSON.stringify(existingOrder) !== JSON.stringify(newOrder)) {
+      // Update order if user tweaked delivery/payment after auto-creation
+      onAddOrderRef.current(newOrder);
+    }
+
+    createdOrderRef.current = newOrder;
+    setCreatedOrder(newOrder);
+    return { order: newOrder, waUrl };
   }, []);
 
   // Audio Playback Engine
@@ -331,6 +573,18 @@ export default function LiveOrderModal({
         activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
         if (activeSourcesRef.current.length === 0) {
           setStatus('listening');
+          // If an order was finalized and is waiting for farewell audio to finish, open WhatsApp now
+          if (pendingAutoWhatsAppUrlRef.current) {
+            const url = pendingAutoWhatsAppUrlRef.current;
+            pendingAutoWhatsAppUrlRef.current = null;
+            if (autoSendTimerRef.current) {
+              clearTimeout(autoSendTimerRef.current);
+              autoSendTimerRef.current = null;
+            }
+            setTimeout(() => {
+              try { window.open(url, '_blank'); } catch (e) { }
+            }, 400);
+          }
         }
       };
     } catch (e) {
@@ -362,41 +616,20 @@ export default function LiveOrderModal({
       if (call.name === "updateOrder") {
         const { action, item } = call.args || {};
         if (item && item.name) {
-          let finalPrice = item.price;
-          let dishId = item.dishId;
-          const itemName = item.name.trim();
-          const itemVar = (item.variation || 'Orden').trim();
-          const quantity = item.quantity && item.quantity > 0 ? item.quantity : 1;
-
-          // Catalog match for price and dishId
-          const catalogMatch = menuItems.find(mi =>
-            mi.name.toLowerCase().includes(itemName.toLowerCase()) ||
-            itemName.toLowerCase().includes(mi.name.toLowerCase())
-          );
-
-          if (catalogMatch) {
-            dishId = catalogMatch.id;
-            if (!finalPrice || finalPrice <= 0) {
-              const varMatch = catalogMatch.variations.find(v =>
-                v.label.toLowerCase().includes(itemVar.toLowerCase()) ||
-                itemVar.toLowerCase().includes(v.label.toLowerCase())
-              ) || catalogMatch.variations[0];
-              finalPrice = varMatch.price;
-            }
-          }
-
-          updateCartItem(action, {
-            name: itemName,
-            variation: itemVar,
-            price: finalPrice || 0,
-            quantity: quantity,
-            dishId: dishId
+          const resolved = resolveDishFromCatalog({
+            name: item.name,
+            variation: item.variation,
+            price: item.price,
+            quantity: item.quantity,
+            dishId: item.dishId
           });
 
-          if (action === 'add') {
-            setCurrentSofiaSpeech(`¡Anotado! Agregué ${quantity}x ${itemName} (${itemVar}) a tu orden.`);
+          updateCartItem(action || 'add', resolved);
+
+          if ((action || 'add') === 'add') {
+            setCurrentSofiaSpeech(`¡Anotado! Agregué ${resolved.quantity}x ${resolved.name} (${resolved.variation}) a tu orden.`);
           } else if (action === 'remove') {
-            setCurrentSofiaSpeech(`¡Listo! Quité ${itemName} de tu orden.`);
+            setCurrentSofiaSpeech(`¡Listo! Quité ${resolved.name} de tu orden.`);
           }
         }
 
@@ -406,17 +639,85 @@ export default function LiveOrderModal({
           response: { output: { success: true, message: `Ticket actualizado correctamente con ${item?.name || 'platillo'}` } }
         });
       } else if (call.name === "completeOrder") {
-        const { orderType, deliveryAddress, paymentMethod } = call.args || {};
-        if (orderType) setDeliveryMethod(orderType === 'delivery' ? 'delivery' : 'pickup');
-        if (deliveryAddress) setSelectedAddress(deliveryAddress);
-        if (paymentMethod) setSelectedPaymentMethod(paymentMethod);
+        const { orderType, deliveryAddress, paymentMethod, cashAmount, customerName, customerPhone, items } = call.args || {};
+
+        // If Gemini passed items in completeOrder that weren't in the cart yet, add them so cart is never empty
+        if (Array.isArray(items) && items.length > 0) {
+          for (const rawIt of items) {
+            if (!rawIt?.name) continue;
+            const resolved = resolveDishFromCatalog(rawIt);
+            const alreadyInCart = cartRef.current.some(
+              c => c.name.toLowerCase() === resolved.name.toLowerCase() &&
+                   c.variation.toLowerCase() === resolved.variation.toLowerCase()
+            );
+            if (!alreadyInCart) {
+              updateCartItem('add', resolved);
+            }
+          }
+        }
+
+        const resolvedDelivery: 'pickup' | 'delivery' = orderType === 'delivery' ? 'delivery' : (orderType === 'pickup' ? 'pickup' : (deliveryMethodRef.current || 'pickup'));
+        setDeliveryMethod(resolvedDelivery);
+        deliveryMethodRef.current = resolvedDelivery;
+
+        const resolvedAddr = deliveryAddress
+          ? String(deliveryAddress).trim()
+          : (selectedAddressRef.current || loggedCustomerRef.current?.addresses?.[0] || '');
+        if (resolvedAddr) {
+          setSelectedAddress(resolvedAddr);
+          selectedAddressRef.current = resolvedAddr;
+        }
+
+        const validMethods: PaymentMethod[] = ['efectivo', 'tarjeta', 'transferencia', 'credito'];
+        const resolvedPayment: PaymentMethod = validMethods.includes(paymentMethod as PaymentMethod)
+          ? (paymentMethod as PaymentMethod)
+          : (selectedPaymentMethodRef.current || 'efectivo');
+        setSelectedPaymentMethod(resolvedPayment);
+        selectedPaymentMethodRef.current = resolvedPayment;
+
+        if (cashAmount && Number(cashAmount) > 0) {
+          const cashStr = String(cashAmount);
+          setCashAmountPaid(cashStr);
+          cashAmountPaidRef.current = cashStr;
+        }
+
         setIsOrderTrayExpanded(true);
-        setCurrentSofiaSpeech("¡Excelente! Tu pedido está preparado. ¿Deseas pasar a recogerlo o te lo enviamos a domicilio?");
+
+        // Immediately generate & save the order in the restaurant system!
+        const result = generateAndSaveOrder({
+          deliveryMethod: resolvedDelivery,
+          address: resolvedAddr,
+          paymentMethod: resolvedPayment,
+          cashAmount: cashAmount ? String(cashAmount) : cashAmountPaidRef.current,
+          customerName,
+          customerPhone
+        });
+
+        if (result) {
+          setCurrentSofiaSpeech(`¡Pedido #${result.order.id} generado con éxito! Muchas gracias por tu preferencia en El Buen Servir.`);
+          pendingAutoWhatsAppUrlRef.current = result.waUrl;
+          if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
+          autoSendTimerRef.current = setTimeout(() => {
+            if (pendingAutoWhatsAppUrlRef.current) {
+              const url = pendingAutoWhatsAppUrlRef.current;
+              pendingAutoWhatsAppUrlRef.current = null;
+              try { window.open(url, '_blank'); } catch (e) { }
+            }
+          }, 5000);
+        } else {
+          setCurrentSofiaSpeech("¡Excelente! Revisa y confirma los detalles de tu pedido en pantalla.");
+        }
 
         responses.push({
           id: call.id,
           name: "completeOrder",
-          response: { output: { success: true, message: "Orden finalizada y lista para confirmación final" } }
+          response: {
+            output: {
+              success: true,
+              orderId: result?.order.id || null,
+              message: "Pedido generado y registrado exitosamente en el sistema de El Buen Servir."
+            }
+          }
         });
       }
     }
@@ -428,11 +729,20 @@ export default function LiveOrderModal({
         console.warn("Failed to send tool response:", e);
       }
     }
-  }, [menuItems, updateCartItem]);
+  }, [resolveDishFromCatalog, updateCartItem, generateAndSaveOrder]);
+
+  useEffect(() => {
+    handleToolCallsRef.current = handleToolCalls;
+  }, [handleToolCalls]);
 
   // Clean disconnect
   const disconnect = useCallback(() => {
     isConnectingRef.current = false;
+    if (autoSendTimerRef.current) {
+      clearTimeout(autoSendTimerRef.current);
+      autoSendTimerRef.current = null;
+    }
+    pendingAutoWhatsAppUrlRef.current = null;
     stopAllAudio();
 
     if (processorRef.current) {
@@ -517,15 +827,15 @@ ${customerInfo}
 MENÚ DEL RESTAURANTE:
 ${menuContext}
 
-INSTRUCCIONES CLAVE:
+INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
 1. Saluda al cliente cordialmente con entusiasmo (menciona su nombre si está disponible) y pregúntale qué se le antoja degustar hoy de El Buen Servir.
-2. Cada vez que el cliente mencione o pida un platillo, bebida o postre, USA INMEDIATAMENTE la herramienta 'updateOrder' con action='add', el nombre exacto del platillo, la variación y precio del menú.
-3. Si el cliente pide modificar la cantidad o quitar algo, usa 'updateOrder' con action='update' o 'remove'.
+2. REGLA ESTRICTA: Cada vez que el cliente mencione o pida un platillo, bebida o postre, EJECUTA INMEDIATAMENTE la herramienta 'updateOrder' con action='add', el nombre del platillo, su variación y precio del menú. No esperes al final para agregar platillos.
+3. Si el cliente pide modificar la cantidad o quitar algo, ejecuta 'updateOrder' con action='update' o 'remove'.
 4. Si el cliente pide recomendaciones, sugiere los platillos estrella: Chilaquiles con asada de pollo ($120), Enchiladas Suizas gratinadas ($90), Chilpozo de Res ($95) o Tampiqueña.
-5. Cuando el cliente diga "es todo", "sería todo", "la cuenta" o termine, pregúntale amablemente si prefiere recoger en mostrador o entrega a domicilio.
+5. Cuando el cliente diga "es todo", "sería todo", "la cuenta" o termine de elegir platillos, pregúntale amablemente si prefiere recoger en mostrador (pickup) o entrega a domicilio (delivery).
 6. Si elige entrega a domicilio, sugiere su dirección registrada o pregúntale a qué dirección enviarlo.
-7. Pregúntale su método de pago (Efectivo, Tarjeta, Transferencia o Crédito).
-8. Cuando tengas método de entrega y dirección, usa la herramienta 'completeOrder' y despídete amablemente agradeciendo la preferencia en El Buen Servir.
+7. Pregúntale su método de pago (efectivo, tarjeta, transferencia o credito).
+8. REGLA CRÍTICA DE CIERRE: En cuanto tengas el método de entrega (y dirección si es domicilio) y la forma de pago, DEBES EJECUTAR OBLIGATORIAMENTE la herramienta 'completeOrder' incluyendo orderType, deliveryAddress, paymentMethod y la lista completa de 'items' del pedido, y despídete amablemente agradeciendo su preferencia en El Buen Servir.
 9. Mantén tus intervenciones habladas breves, fluidas y directas (1 a 2 oraciones), para que la conversación sea rápida y amena como una llamada telefónica real.`;
 
       let sessionInstance: any = null;
@@ -534,6 +844,7 @@ INSTRUCCIONES CLAVE:
         model: LIVE_MODEL,
         config: {
           responseModalities: [Modality.AUDIO],
+          tools: [{ functionDeclarations: [updateOrderTool, completeOrderTool] }],
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: {
@@ -591,11 +902,15 @@ INSTRUCCIONES CLAVE:
             }
           },
           onmessage: (msg: LiveServerMessage) => {
-            // Audio streams from Gemini
+            // Audio & text streams from Gemini
+            const inlineFunctionCalls: any[] = [];
             if (msg.serverContent?.modelTurn?.parts) {
-              msg.serverContent.modelTurn.parts.forEach(part => {
+              msg.serverContent.modelTurn.parts.forEach((part: any) => {
                 if (part.inlineData?.data) {
                   playAudioChunk(part.inlineData.data);
+                }
+                if (part.functionCall) {
+                  inlineFunctionCalls.push(part.functionCall);
                 }
                 if (part.text && !part.text.includes('**Initiating') && !part.text.includes("I've decided to")) {
                   const clean = part.text.trim();
@@ -618,9 +933,11 @@ INSTRUCCIONES CLAVE:
               }
             }
 
-            // Function calling execution
-            if (msg.toolCall?.functionCalls) {
-              handleToolCalls(msg.toolCall.functionCalls);
+            // Function calling execution (both top-level toolCall and inline parts)
+            const topLevelCalls = msg.toolCall?.functionCalls || [];
+            const allCalls = [...topLevelCalls, ...inlineFunctionCalls];
+            if (allCalls.length > 0) {
+              handleToolCallsRef.current(allCalls);
             }
           },
           onerror: (err: any) => {
@@ -644,11 +961,18 @@ INSTRUCCIONES CLAVE:
       setStatus('error');
       setConnectionError(err.message || "No se pudo iniciar la sesión de voz con Sofía.");
     }
-  }, [hasApiKey, resolvedApiKey, menuItems, categories, loggedCustomer, playAudioChunk, stopAllAudio, handleToolCalls]);
+  }, [hasApiKey, resolvedApiKey, menuItems, categories, loggedCustomer, playAudioChunk, stopAllAudio]);
 
-  // Connect automatically when modal opens
+  // Connect automatically when modal opens, and reset completed state on fresh open
   useEffect(() => {
     if (isOpen) {
+      if (createdOrderRef.current) {
+        createdOrderRef.current = null;
+        setCreatedOrder(null);
+        cartRef.current = [];
+        setCart([]);
+        setIsOrderTrayExpanded(false);
+      }
       const timer = setTimeout(() => {
         connect();
       }, 300);
@@ -662,12 +986,41 @@ INSTRUCCIONES CLAVE:
   const runLocalHospitalityEngine = (userInput: string): string => {
     const input = userInput.toLowerCase().trim();
 
-    if (['es todo', 'seria todo', 'sería todo', 'la cuenta', 'ya es todo', 'finalizar', 'pagar'].some(t => input.includes(t))) {
-      if (cart.length === 0) {
+    if (['es todo', 'seria todo', 'sería todo', 'la cuenta', 'ya es todo', 'finalizar', 'pagar', 'confirmar'].some(t => input.includes(t))) {
+      if (cartRef.current.length === 0) {
         return "¡Con gusto! Pero aún no tienes platillos en tu orden. ¿Qué te gustaría pedir? Tenemos chilaquiles deliciosos, caldos y guisados caseros.";
       }
       setIsOrderTrayExpanded(true);
-      return `¡Perfecto! Llevas ${cartItemsCount} ${cartItemsCount === 1 ? 'platillo' : 'platillos'} con un total de $${cartTotal.toFixed(2)}. ¿Prefieres pasar a recogerlo en mostrador o te lo enviamos a domicilio?`;
+      const count = cartRef.current.reduce((s, i) => s + i.quantity, 0);
+      const total = cartRef.current.reduce((s, i) => s + i.price * i.quantity, 0);
+      return `¡Perfecto! Llevas ${count} ${count === 1 ? 'platillo' : 'platillos'} con un total de $${total.toFixed(2)}. ¿Prefieres pasar a recogerlo en mostrador o te lo enviamos a domicilio?`;
+    }
+
+    if (input.includes('mostrador') || input.includes('recoger') || input.includes('paso por')) {
+      setDeliveryMethod('pickup');
+      deliveryMethodRef.current = 'pickup';
+      if (cartRef.current.length > 0) {
+        const res = generateAndSaveOrder({ deliveryMethod: 'pickup' });
+        setIsOrderTrayExpanded(true);
+        if (res) {
+          return `¡Listo! Tu pedido #${res.order.id} para recoger en mostrador ha sido generado por $${res.order.total.toFixed(2)}.`;
+        }
+      }
+      return "Perfecto, anotado para recoger en mostrador. ¿Qué platillos deseas ordenar?";
+    }
+
+    if (input.includes('domicilio') || input.includes('enviar') || input.includes('casa')) {
+      setDeliveryMethod('delivery');
+      deliveryMethodRef.current = 'delivery';
+      if (cartRef.current.length > 0 && (selectedAddressRef.current || loggedCustomerRef.current?.addresses?.[0])) {
+        const res = generateAndSaveOrder({ deliveryMethod: 'delivery' });
+        setIsOrderTrayExpanded(true);
+        if (res) {
+          return `¡Listo! Tu pedido #${res.order.id} a domicilio ha sido generado por $${res.order.total.toFixed(2)}.`;
+        }
+      }
+      setIsOrderTrayExpanded(true);
+      return "Perfecto, envío a domicilio. Por favor confirma tu dirección y forma de pago en pantalla.";
     }
 
     if (input.includes('recomiend') || input.includes('especialidad') || input.includes('favorito') || input.includes('sugier') || input.includes('mas vendido')) {
@@ -756,101 +1109,30 @@ INSTRUCCIONES CLAVE:
     setCurrentSofiaSpeech(`¡Anotado! Te agregué ${dish.name} (${defaultVar.label}). ¿Gustas alguna bebida o postre para acompañar?`);
   };
 
-  // WhatsApp order submission
+  // WhatsApp order submission & manual confirmation
   const handleSendToWhatsApp = () => {
-    if (cart.length === 0 || isSending) return;
+    if (cartRef.current.length === 0 || isSending) return;
     setIsSending(true);
 
-    const orderId = `SOFIA-${Math.random().toString(36).substr(2, 6).toUpperCase()}-${Date.now().toString(36).slice(-4).toUpperCase()}`;
-    const customerName = loggedCustomer?.name || 'Cliente de Sofía IA';
-    const customerPhone = loggedCustomer?.phone || 'Sin registrar';
-
-    let deliveryText = '';
-    if (deliveryMethod === 'pickup') {
-      deliveryText = '🏪 *Entrega:* Recoger en Mostrador';
-    } else {
-      deliveryText = `🏠 *Entrega a Domicilio:* ${selectedAddress || 'Dirección acordada'}`;
+    // If user typed a new address without pressing 'Guardar', apply it automatically
+    let effectiveAddress = selectedAddress;
+    if (deliveryMethod === 'delivery' && !effectiveAddress && newAddressInput.trim()) {
+      effectiveAddress = newAddressInput.trim();
+      setSelectedAddress(effectiveAddress);
+      selectedAddressRef.current = effectiveAddress;
     }
 
-    let paymentText = '';
-    const parsedCash = parseFloat(cashAmountPaid);
-    if (selectedPaymentMethod === 'efectivo') {
-      const change = !isNaN(parsedCash) && parsedCash >= cartTotal ? (parsedCash - cartTotal) : 0;
-      paymentText = `💵 *Pago:* Efectivo` + (!isNaN(parsedCash) && parsedCash >= cartTotal ? ` (Paga con: $${parsedCash.toFixed(2)}, Cambio: $${change.toFixed(2)})` : ` (Pago exacto)`);
-    } else if (selectedPaymentMethod === 'tarjeta') {
-      paymentText = `💳 *Pago:* Tarjeta (Llevar terminal bancaria al entregar)`;
-    } else if (selectedPaymentMethod === 'transferencia') {
-      paymentText = `🏦 *Pago:* Transferencia Bancaria`;
-    } else if (selectedPaymentMethod === 'credito') {
-      paymentText = `🏷️ *Pago:* Crédito de Tienda (Cuenta de Cliente)`;
+    const result = generateAndSaveOrder({
+      deliveryMethod: deliveryMethod || 'pickup',
+      address: effectiveAddress,
+      paymentMethod: selectedPaymentMethod,
+      cashAmount: cashAmountPaid
+    });
+
+    if (result) {
+      window.open(result.waUrl, '_blank');
     }
 
-    const itemsText = cart.map(i => `• ${i.quantity}x ${i.name} (${i.variation}) - $${(i.price * i.quantity).toFixed(2)}`).join('\n');
-
-    const msg =
-      `*🎙️ PEDIDO ASISTIDO POR SOFÍA IA - EL BUEN SERVIR*\n\n` +
-      `🆔 *Orden:* #${orderId}\n` +
-      `👤 *Cliente:* ${customerName}\n` +
-      `📱 *Teléfono:* ${customerPhone}\n` +
-      `${deliveryText}\n` +
-      `${paymentText}\n\n` +
-      `*DETALLE DEL PEDIDO:*\n` +
-      `${itemsText}\n\n` +
-      `💰 *TOTAL A PAGAR: $${cartTotal.toFixed(2)}*\n\n` +
-      `✨ _Pedido generado por la Asistente Virtual Sofía_`;
-
-    const waUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
-
-    // Credit movement
-    if (selectedPaymentMethod === 'credito' && loggedCustomer && onUpdateCustomer) {
-      const currentBal = Number(loggedCustomer.creditBalance || 0);
-      const newBal = currentBal + cartTotal;
-      const creditMovement: CustomerCreditMovement = {
-        id: `cm-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-        orderId: orderId,
-        type: 'cargo',
-        amount: cartTotal,
-        balanceAfter: newBal,
-        date: new Date().toISOString(),
-        notes: `Cargo por pedido asistido con Sofía IA #${orderId}`,
-        registeredBy: 'Sofía IA'
-      };
-
-      onUpdateCustomer({
-        ...loggedCustomer,
-        creditBalance: newBal,
-        creditHistory: [creditMovement, ...(loggedCustomer.creditHistory || [])]
-      });
-    }
-
-    // Add order to DB
-    if (onAddOrder) {
-      const newOrder: Order = {
-        id: orderId,
-        customerName: customerName,
-        customerPhone: customerPhone,
-        address: deliveryMethod === 'pickup' ? 'Recoger en mostrador' : selectedAddress,
-        items: cart.map(i => ({
-          id: i.dishId || i.id,
-          name: i.name,
-          variationLabel: i.variation,
-          price: i.price,
-          quantity: i.quantity
-        })),
-        total: cartTotal,
-        status: 'pending',
-        paymentMethod: selectedPaymentMethod,
-        paymentStatus: 'pending',
-        cashReceived: !isNaN(parsedCash) && parsedCash >= cartTotal ? parsedCash : undefined,
-        change: !isNaN(parsedCash) && parsedCash >= cartTotal ? (parsedCash - cartTotal) : undefined,
-        createdAt: new Date().toISOString(),
-        source: 'online',
-        notes: 'Pedido asistido por Sofía IA'
-      };
-      onAddOrder(newOrder);
-    }
-
-    window.open(waUrl, '_blank');
     setIsSending(false);
     disconnect();
     onClose();
@@ -878,8 +1160,10 @@ INSTRUCCIONES CLAVE:
     if (!newAddressInput.trim()) return;
     const addr = newAddressInput.trim();
     setSelectedAddress(addr);
+    selectedAddressRef.current = addr;
     setIsAddingNewAddress(false);
     setNewAddressInput('');
+    newAddressInputRef.current = '';
 
     if (loggedCustomer && onUpdateCustomer) {
       const existing = loggedCustomer.addresses || [];
@@ -1351,6 +1635,22 @@ INSTRUCCIONES CLAVE:
 
             {/* Drawer Content */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar">
+              {createdOrder && (
+                <div className="p-4 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 flex items-start gap-3 animate-in fade-in duration-300">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 mt-0.5">
+                    <Check className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-300">
+                      ¡Pedido #{createdOrder.id} Registrado!
+                    </p>
+                    <p className="text-[11px] text-gray-300 mt-0.5">
+                      Sofía ya generó tu orden en el sistema del restaurante. Puedes enviar el comprobante por WhatsApp aquí abajo.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {cart.map((item) => (
                 <div
                   key={item.id}
@@ -1594,10 +1894,10 @@ INSTRUCCIONES CLAVE:
 
                 <button
                   type="button"
-                  disabled={!deliveryMethod || (deliveryMethod === 'delivery' && !selectedAddress) || isSending}
+                  disabled={!deliveryMethod || (deliveryMethod === 'delivery' && !selectedAddress && !newAddressInput.trim()) || isSending}
                   onClick={handleSendToWhatsApp}
                   className={`w-full py-4 rounded-2xl font-black uppercase text-sm tracking-wider flex items-center justify-center gap-3 transition-all shadow-xl ${
-                    !deliveryMethod || (deliveryMethod === 'delivery' && !selectedAddress) || isSending
+                    !deliveryMethod || (deliveryMethod === 'delivery' && !selectedAddress && !newAddressInput.trim()) || isSending
                       ? 'bg-gray-800 text-gray-600 cursor-not-allowed opacity-50'
                       : 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-emerald-500/30 active:scale-95'
                   }`}
@@ -1610,7 +1910,7 @@ INSTRUCCIONES CLAVE:
                   ) : (
                     <>
                       <MessageCircle className="w-5 h-5" />
-                      <span>Confirmar Pedido WhatsApp</span>
+                      <span>{createdOrder ? 'Enviar Resumen por WhatsApp' : 'Confirmar Pedido WhatsApp'}</span>
                     </>
                   )}
                 </button>
