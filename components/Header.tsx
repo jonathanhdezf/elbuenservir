@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Menu, Eye, Bell, Clock, Calendar,
   X, CheckCircle2, AlertCircle, Info, Trash2, LayoutDashboard,
-  ArrowLeft, Sun, Moon
+  ArrowLeft, Sun, Moon, Globe
 } from 'lucide-react';
 import { notificationService } from '../services/notificationService';
 
@@ -29,6 +29,7 @@ interface HeaderProps {
   backButtonBadge?: string;
   isDarkMode?: boolean;
   toggleDarkMode?: () => void;
+  onGoToSite?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -45,7 +46,8 @@ const Header: React.FC<HeaderProps> = ({
   backButtonText,
   backButtonBadge,
   isDarkMode,
-  toggleDarkMode
+  toggleDarkMode,
+  onGoToSite
 }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -164,6 +166,19 @@ const Header: React.FC<HeaderProps> = ({
         </div>
 
         <div className="flex items-center space-x-3 md:space-x-4">
+          {onGoToSite && (
+            <button
+              onClick={onGoToSite}
+              className="p-2.5 rounded-xl text-gray-400 hover:text-emerald-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer group relative"
+              title="Ir al Sitio Web / Menú Público"
+            >
+              <Globe className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              <div className="absolute top-full mt-1.5 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 text-white text-[10px] font-bold rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                Sitio Web
+              </div>
+            </button>
+          )}
+
           {toggleDarkMode && (
             <button
               onClick={toggleDarkMode}

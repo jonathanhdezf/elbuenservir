@@ -50,6 +50,7 @@ interface AdminViewProps {
   onExit: () => void;
   initialSection?: AdminSection;
   onViewDigitalTicket?: (order: Order) => void;
+  onGoToPublicSite?: () => void;
 }
 
 interface Notification {
@@ -87,7 +88,8 @@ export default function AdminView({
   setIsDarkMode,
   onExit,
   initialSection = 'dashboard',
-  onViewDigitalTicket
+  onViewDigitalTicket,
+  onGoToPublicSite
 }: AdminViewProps) {
   const STATUS_CONFIG: Record<OrderStatus, { label: string, color: string, icon: any }> = {
     pending: { label: 'Pendiente', color: 'bg-gray-100 text-gray-700', icon: Clock },
@@ -4970,6 +4972,7 @@ export default function AdminView({
           backButtonBadge={activeSection === 'orders' ? 'Vista Básica' : undefined}
           isDarkMode={isDarkMode}
           toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+          onGoToSite={onGoToPublicSite}
           title={
             activeSection === 'menu' ? 'Editor de Menú' :
               activeSection === 'kds' ? 'Comandas' :

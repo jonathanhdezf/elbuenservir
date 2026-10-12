@@ -19,7 +19,8 @@ import {
     ArrowRight,
     Download,
     ShieldCheck,
-    ShoppingBasket
+    ShoppingBasket,
+    Globe
 } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
 import { useMobileBack } from '../hooks/useMobileBack';
@@ -67,22 +68,7 @@ export default function ControlPanelView({
         }
     };
 
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setShowWelcome(true);
-            soundManager.play('alert');
-        }, 2000);
-        return () => clearTimeout(timer);
-    }, []);
-
-    useEffect(() => {
-        if (showWelcome) {
-            const hideTimer = setTimeout(() => {
-                setShowWelcome(false);
-            }, 5000);
-            return () => clearTimeout(hideTimer);
-        }
-    }, [showWelcome]);
+    // Welcome message is now shown cleanly via tooltip on the notification bell without auto-popping alerts
 
     useMobileBack({
         hasOpenModal: isSettingsOpen,
@@ -352,7 +338,26 @@ export default function ControlPanelView({
                     <span className="hidden md:inline text-[10px] font-bold uppercase tracking-[0.3em]">v2.4.0 Premium</span>
                 </div>
 
-                <div className="flex items-center gap-3 sm:gap-6">
+                <div className="flex items-center gap-2.5 sm:gap-4">
+                    {/* Botón de acceso directo al sitio web público / index */}
+                    <button
+                        type="button"
+                        title="Ver Sitio Web / Menú Público"
+                        onClick={() => {
+                            soundManager.play('click');
+                            onExit();
+                        }}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 text-white/70 hover:text-white transition-all cursor-pointer rounded-xl hover:bg-white/10 group relative border border-white/10 hover:border-emerald-400/40 bg-white/5 active:scale-95 shadow-sm"
+                    >
+                        <Globe className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+                        <span className="hidden sm:inline text-[11px] font-bold text-white/80 group-hover:text-white">Sitio Web</span>
+                        
+                        {/* Tooltip */}
+                        <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 px-2.5 py-1 bg-gray-900/95 text-white text-[10px] font-bold rounded-lg shadow-xl border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-[220]">
+                            Ir al Sitio Web / Menú Público
+                        </div>
+                    </button>
+
                     {!isInstalled && (
                         <button
                             type="button"
@@ -367,62 +372,79 @@ export default function ControlPanelView({
                             <span className="hidden sm:inline">Instalar App</span>
                         </button>
                     )}
-                    <div className="relative">
+
+                    {/* Campana de Notificaciones con Tooltip */}
+                    <div className="relative group">
                         <button
+                            type="button"
                             title="Notificaciones"
                             onClick={() => {
                                 setShowWelcome(!showWelcome);
                                 soundManager.play('click');
                             }}
-                            className={`p-1 transition-colors cursor-pointer ${showWelcome ? 'text-primary-400' : 'text-white/50 hover:text-white'}`}
+                            className={`p-1.5 transition-colors cursor-pointer rounded-xl hover:bg-white/10 relative ${
+                                showWelcome ? 'text-primary-400' : 'text-white/60 hover:text-white'
+                            }`}
                         >
-                            <Bell className={`w-4 h-4 ${showWelcome ? 'animate-bounce' : ''}`} />
-                            <div className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full border border-gray-900"></div>
+                            <Bell className="w-4 h-4" />
+                            <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-gray-900"></div>
                         </button>
 
-                        {showWelcome && (
-                            <div className="absolute right-0 mt-4 w-72 sm:w-80 bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-gray-100 dark:border-gray-800 p-5 animate-in slide-in-from-top-2 fade-in duration-300 z-[210]">
-                                <div className="flex gap-4">
-                                    <div className="w-10 h-10 rounded-2xl bg-primary-500 flex items-center justify-center text-white shadow-lg shadow-primary-500/20 shrink-0">
-                                        <Bell className="w-5 h-5 animate-swing" />
+                        {/* Tooltip con el mensaje */}
+                        <div className={`absolute right-0 top-full mt-2 w-72 sm:w-80 p-3.5 bg-gray-900/95 dark:bg-black/95 text-white rounded-2xl shadow-2xl border border-white/15 backdrop-blur-xl z-[220] transition-all duration-200 ${
+                            showWelcome
+                                ? 'opacity-100 scale-100 visible pointer-events-auto'
+                                : 'opacity-0 scale-95 invisible pointer-events-none group-hover:opacity-100 group-hover:scale-100 group-hover:visible'
+                        }`}>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-1.5">
+                                    <div className="w-5 h-5 rounded-md bg-primary-500/20 flex items-center justify-center text-primary-400">
+                                        <Bell className="w-3 h-3" />
                                     </div>
-                                    <div className="flex-1">
-                                        <div className="flex justify-between items-start mb-1">
-                                            <p className="text-[10px] font-black text-primary-500 uppercase tracking-widest">
-                                                {panelMode === 'basic' ? 'Vista Básica Activa' : 'Sistemas Listos'}
-                                            </p>
-                                            <button title="Cerrar notificación" aria-label="Cerrar notificación" onClick={() => setShowWelcome(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer">
-                                                <X className="w-3 h-3" />
-                                            </button>
-                                        </div>
-                                        <p className="text-sm font-bold text-gray-800 dark:text-white leading-tight">
-                                            {panelMode === 'basic'
-                                                ? 'Estás en la vista básica con acceso a Administración (Pedidos) y Editor de Menú. Puedes cambiar a la vista avanzada para ver todos los sistemas.'
-                                                : 'Bienvenido Miguel 👋 los sistemas están listos, es un gusto trabajar contigo. :)'
-                                            }
-                                        </p>
-                                    </div>
+                                    <span className="text-[10px] font-black text-primary-400 uppercase tracking-widest">
+                                        {panelMode === 'basic' ? 'Vista Básica Activa' : 'Sistemas Listos'}
+                                    </span>
                                 </div>
-                                <div className="absolute -top-2 right-4 w-4 h-4 bg-white dark:bg-gray-900 border-t border-l border-gray-100 dark:border-gray-800 rotate-45"></div>
+                                {showWelcome && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setShowWelcome(false);
+                                        }}
+                                        className="text-white/40 hover:text-white p-0.5 cursor-pointer"
+                                        title="Cerrar tooltip"
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </button>
+                                )}
                             </div>
-                        )}
+                            <p className="text-xs font-medium text-white/80 leading-relaxed">
+                                {panelMode === 'basic'
+                                    ? 'Estás en la vista básica con acceso a Administración (Pedidos) y Editor de Menú. Puedes cambiar a la vista avanzada para ver todos los sistemas.'
+                                    : 'Bienvenido Miguel 👋 los sistemas están listos, es un gusto trabajar contigo. :)'
+                                }
+                            </p>
+                            <div className="absolute -top-1.5 right-3 w-3 h-3 bg-gray-900/95 dark:bg-black/95 border-t border-l border-white/15 rotate-45"></div>
+                        </div>
                     </div>
+
                     <button
                         title="Buscar"
                         onClick={() => soundManager.play('click')}
-                        className="p-1 text-white/50 hover:text-white transition-colors cursor-pointer"
+                        className="p-1.5 text-white/60 hover:text-white transition-colors cursor-pointer rounded-xl hover:bg-white/10"
                     >
                         <Search className="w-4 h-4" />
                     </button>
                     <button
                         title="Configuración de Sistema"
                         onClick={() => { setIsSettingsOpen(true); soundManager.play('click'); }}
-                        className={`p-1 transition-all cursor-pointer ${isSettingsOpen ? 'rotate-90 text-primary-400' : 'text-white/50 hover:text-white'}`}
+                        className={`p-1.5 transition-all cursor-pointer rounded-xl hover:bg-white/10 ${isSettingsOpen ? 'rotate-90 text-primary-400' : 'text-white/60 hover:text-white'}`}
                     >
                         <Settings className="w-4 h-4" />
                     </button>
                     <div className="w-px h-4 bg-white/10"></div>
-                    <span className="text-xs md:text-sm font-bold">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <span className="text-xs md:text-sm font-bold text-white/90">{new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
             </div>
 

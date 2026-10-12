@@ -910,6 +910,7 @@ export default function App() {
             setView('control_panel');
           }}
           onViewDigitalTicket={handleOpenDigitalTicket}
+          onGoToPublicSite={() => setView('public')}
         />
       );
     }
