@@ -27,6 +27,7 @@ interface HeaderProps {
   hideMenuButton?: boolean;
   backButtonText?: string;
   backButtonBadge?: string;
+  sectionBadge?: string;
   isDarkMode?: boolean;
   toggleDarkMode?: () => void;
   onGoToSite?: () => void;
@@ -45,6 +46,7 @@ const Header: React.FC<HeaderProps> = ({
   hideMenuButton = false,
   backButtonText,
   backButtonBadge,
+  sectionBadge,
   isDarkMode,
   toggleDarkMode,
   onGoToSite
@@ -146,7 +148,7 @@ const Header: React.FC<HeaderProps> = ({
           <h2 className="text-lg md:text-2xl font-extrabold text-gray-800 dark:text-white tracking-tight">{title}</h2>
           {hideMenuButton && (
             <span className="hidden md:inline-flex items-center px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-[10px] font-black uppercase tracking-wider">
-              Control de Pedidos
+              {sectionBadge || (title === 'Editor de Menú' ? 'Catálogo & Precios' : 'Control de Pedidos')}
             </span>
           )}
         </div>
@@ -189,10 +191,10 @@ const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {title === "Menu" && (
+          {(title === "Menu" || title === "Editor de Menú") && (
             <button
               onClick={onPreview}
-              className="hidden md:flex items-center px-5 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm active:scale-95"
+              className="hidden md:flex items-center px-5 py-2.5 text-sm font-semibold text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm active:scale-95 cursor-pointer"
             >
               <Eye className="w-4 h-4 mr-2 text-gray-400" />
               Previsualizar

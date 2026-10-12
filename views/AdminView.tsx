@@ -316,7 +316,7 @@ export default function AdminView({
   }, [badges, playUISound]);
 
   // Mobile Back Button Navigation Logic
-  const hasOpenAdminModal = !!(viewingOrderId || editingDriver || assigningOrderId || isConfirmingPayment || orderToDelete || customerToDelete || verifyingDispatchOrderId || isSidebarOpen || showPreview || viewingOrdersCustomer);
+  const hasOpenAdminModal = !!(viewingOrderId || editingDriver || assigningOrderId || isConfirmingPayment || orderToDelete || customerToDelete || verifyingDispatchOrderId || isSidebarOpen || showPreview || viewingOrdersCustomer || isReordering);
   const handleCloseAdminModal = () => {
     if (viewingOrdersCustomer) setViewingOrdersCustomer(null);
     if (viewingOrderId) setViewingOrderId(null);
@@ -328,14 +328,15 @@ export default function AdminView({
     if (verifyingDispatchOrderId) setVerifyingDispatchOrderId(null);
     if (isSidebarOpen) setIsSidebarOpen(false);
     if (showPreview) setShowPreview(false);
+    if (isReordering) setIsReordering(false);
   };
 
   useMobileBack({
     hasOpenModal: hasOpenAdminModal,
     onCloseModal: handleCloseAdminModal,
-    hasSubSection: activeSection !== 'dashboard' && activeSection !== 'orders',
+    hasSubSection: activeSection !== 'dashboard' && activeSection !== 'orders' && activeSection !== 'menu',
     onBackSubSection: () => {
-      if (activeSection === 'orders') {
+      if (activeSection === 'orders' || activeSection === 'menu') {
         onExit();
       } else {
         setActiveSection('dashboard');
@@ -4944,7 +4945,7 @@ export default function AdminView({
       {/* WhatsApp Delivery Notifications Panel */}
       {renderWhatsAppNotifications()}
 
-      {activeSection !== 'orders' && (
+      {activeSection !== 'orders' && activeSection !== 'menu' && (
         <Sidebar
           isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)}
           isDarkMode={isDarkMode} toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
@@ -4970,9 +4971,13 @@ export default function AdminView({
           onClearNotifications={() => setNotificationHistory([])}
           onRemoveNotification={(id) => setNotificationHistory(prev => prev.filter(n => n.id !== id))}
           onBackToPanel={onExit}
-          hideMenuButton={activeSection === 'orders'}
-          backButtonText={activeSection === 'orders' ? 'Regresar al Panel' : undefined}
-          backButtonBadge={activeSection === 'orders' ? 'Vista Básica' : undefined}
+          hideMenuButton={activeSection === 'orders' || activeSection === 'menu'}
+          backButtonText={(activeSection === 'orders' || activeSection === 'menu') ? 'Regresar al Panel' : undefined}
+          backButtonBadge={(activeSection === 'orders' || activeSection === 'menu') ? 'Vista Básica' : undefined}
+          sectionBadge={
+            activeSection === 'orders' ? 'Control de Pedidos' :
+            activeSection === 'menu' ? 'Catálogo & Precios' : undefined
+          }
           isDarkMode={isDarkMode}
           toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
           onGoToSite={onGoToPublicSite}
@@ -5041,10 +5046,20 @@ export default function AdminView({
             {renderCustomerOrdersModal()}
             {activeSection === 'menu' && (
               <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex justify-end mb-4">
+                <div className="flex items-center justify-between mb-4 gap-2">
+                  <button
+                    type="button"
+                    onClick={onExit}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary-50 hover:bg-primary-100 dark:bg-primary-950/40 dark:hover:bg-primary-900/50 text-primary-700 dark:text-primary-300 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 border border-primary-200/50 dark:border-primary-800/40"
+                    title="Regresar al Panel de Control (Vista Básica)"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
+                    <span>Volver al Panel</span>
+                  </button>
+
                   <button
                     onClick={() => { setIsReordering(!isReordering); playUISound(isReordering ? 'click' : 'navigation'); }}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold uppercase text-[10px] tracking-widest transition-all ${isReordering ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30 ring-2 ring-offset-2 ring-primary-500' : 'bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-100 hover:text-primary-500'}`}
+                    className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-full font-bold uppercase text-[10px] tracking-widest transition-all cursor-pointer ${isReordering ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30 ring-2 ring-offset-2 ring-primary-500' : 'bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-100 hover:text-primary-500'}`}
                   >
                     <Move className="w-4 h-4" />
                     {isReordering ? 'Terminar Orden' : 'Organizar Menú'}
