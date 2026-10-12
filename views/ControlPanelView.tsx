@@ -18,7 +18,8 @@ import {
     UtensilsCrossed,
     ArrowRight,
     Download,
-    ShieldCheck
+    ShieldCheck,
+    ShoppingBasket
 } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
 import { useMobileBack } from '../hooks/useMobileBack';
@@ -396,7 +397,7 @@ export default function ControlPanelView({
                                         </div>
                                         <p className="text-sm font-bold text-gray-800 dark:text-white leading-tight">
                                             {panelMode === 'basic'
-                                                ? 'Estás en la vista básica con acceso al Editor de Menú. Puedes cambiar a la vista avanzada para ver todos los sistemas.'
+                                                ? 'Estás en la vista básica con acceso a Administración (Pedidos) y Editor de Menú. Puedes cambiar a la vista avanzada para ver todos los sistemas.'
                                                 : 'Bienvenido Miguel 👋 los sistemas están listos, es un gusto trabajar contigo. :)'
                                             }
                                         </p>
@@ -432,7 +433,7 @@ export default function ControlPanelView({
                     <div className="text-center mb-6 md:mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
                         <div className="relative inline-block mb-3 md:mb-5">
                             <div className={`absolute -inset-4 rounded-full blur-2xl opacity-30 animate-pulse ${
-                                panelMode === 'basic' ? 'bg-gradient-to-tr from-amber-500 to-orange-500' : 'bg-gradient-to-tr from-blue-500 to-emerald-500'
+                                panelMode === 'basic' ? 'bg-gradient-to-tr from-blue-500 to-amber-500' : 'bg-gradient-to-tr from-blue-500 to-emerald-500'
                             }`}></div>
                             <img
                                 src={`${(import.meta as any).env.BASE_URL}logo.png`}
@@ -443,12 +444,12 @@ export default function ControlPanelView({
                         <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tighter uppercase mb-2">
                             Panel de <span className={`text-transparent bg-clip-text ${
                                 panelMode === 'basic' 
-                                    ? 'bg-gradient-to-r from-amber-400 to-orange-400'
+                                    ? 'bg-gradient-to-r from-blue-400 via-indigo-300 to-amber-400'
                                     : 'bg-gradient-to-r from-blue-400 to-emerald-400'
                             }`}>Control</span>
                         </h1>
                         <p className="text-white/40 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] md:tracking-[0.4em]">
-                            {panelMode === 'basic' ? 'Vista Básica • Editor de Menú' : 'Vista Avanzada • Sistema Operativo "El Buen Servir"'}
+                            {panelMode === 'basic' ? 'Vista Básica • Administración y Menú' : 'Vista Avanzada • Sistema Operativo "El Buen Servir"'}
                         </p>
                     </div>
 
@@ -459,7 +460,7 @@ export default function ControlPanelView({
                             onClick={() => changePanelMode('basic')}
                             className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300 cursor-pointer ${
                                 panelMode === 'basic'
-                                    ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/30 scale-[1.02]'
+                                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/30 scale-[1.02]'
                                     : 'text-white/60 hover:text-white hover:bg-white/5'
                             }`}
                         >
@@ -482,36 +483,68 @@ export default function ControlPanelView({
                         </button>
                     </div>
 
-                    {/* Basic View: Only Menu Editor Option */}
+                    {/* Basic View: Administración (Acceso Directo a Pedidos) + Editor de Menú */}
                     {panelMode === 'basic' ? (
-                        <div className="flex flex-col items-center w-full max-w-xl mx-auto animate-in fade-in zoom-in-95 duration-500">
-                            <button
-                                onClick={() => handleAppClick('admin', 'menu')}
-                                title="Abrir Editor de Menú"
-                                className="group relative w-full flex flex-col sm:flex-row items-center gap-6 p-6 sm:p-8 rounded-[36px] bg-white/5 backdrop-blur-xl border border-white/15 hover:border-amber-500/50 hover:bg-white/10 transition-all duration-300 shadow-2xl hover:shadow-amber-500/20 hover:-translate-y-1.5 text-left cursor-pointer"
-                            >
-                                <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-[28px] bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center shrink-0 shadow-xl shadow-amber-500/25 group-hover:scale-105 transition-transform duration-300">
-                                    <UtensilsCrossed className="w-12 h-12 text-white" />
-                                    <div className="absolute -inset-1 bg-amber-400 rounded-[30px] blur opacity-30 group-hover:opacity-60 transition-opacity"></div>
-                                </div>
-                                
-                                <div className="flex-1 text-center sm:text-left">
-                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[10px] font-black uppercase tracking-widest mb-2">
-                                        <Sparkles className="w-3 h-3" />
-                                        Módulo Principal
+                        <div className="flex flex-col items-center w-full max-w-4xl mx-auto animate-in fade-in zoom-in-95 duration-500">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6 w-full">
+                                {/* Módulo Administración: Acceso Directo a Pedidos Únicamente */}
+                                <button
+                                    onClick={() => handleAppClick('admin', 'orders')}
+                                    title="Abrir Administración con Acceso Directo a Pedidos"
+                                    className="group relative w-full flex flex-col sm:flex-row items-center gap-5 p-6 sm:p-7 rounded-[32px] bg-white/5 backdrop-blur-xl border border-white/15 hover:border-blue-500/50 hover:bg-white/10 transition-all duration-300 shadow-2xl hover:shadow-blue-500/20 hover:-translate-y-1.5 text-left cursor-pointer"
+                                >
+                                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-[26px] bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-xl shadow-blue-500/25 group-hover:scale-105 transition-transform duration-300">
+                                        <ShoppingBasket className="w-10 h-10 sm:w-11 sm:h-11 text-white" />
+                                        <div className="absolute -inset-1 bg-blue-400 rounded-[28px] blur opacity-30 group-hover:opacity-60 transition-opacity"></div>
                                     </div>
-                                    <h2 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight group-hover:text-amber-400 transition-colors">
-                                        Editor de Menú
-                                    </h2>
-                                    <p className="text-white/60 text-xs sm:text-sm font-medium mt-1 leading-relaxed">
-                                        Gestiona platillos, actualiza precios, organiza categorías y controla la disponibilidad en el restaurante.
-                                    </p>
-                                    <div className="mt-4 inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-400 group-hover:translate-x-1 transition-transform">
-                                        <span>Abrir Editor de Menú</span>
-                                        <ArrowRight className="w-4 h-4" />
+                                    
+                                    <div className="flex-1 text-center sm:text-left min-w-0">
+                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 border border-blue-500/30 text-blue-300 text-[10px] font-black uppercase tracking-widest mb-1.5">
+                                            <ShieldCheck className="w-3 h-3" />
+                                            Acceso a Pedidos
+                                        </div>
+                                        <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight group-hover:text-blue-400 transition-colors">
+                                            Administración
+                                        </h2>
+                                        <p className="text-white/60 text-xs sm:text-sm font-medium mt-1 leading-relaxed">
+                                            Acceso directo a la supervisión y gestión de pedidos, comandas en curso y entregas.
+                                        </p>
+                                        <div className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-blue-400 group-hover:translate-x-1 transition-transform">
+                                            <span>Ver Pedidos</span>
+                                            <ArrowRight className="w-4 h-4" />
+                                        </div>
                                     </div>
-                                </div>
-                            </button>
+                                </button>
+
+                                {/* Módulo Editor de Menú */}
+                                <button
+                                    onClick={() => handleAppClick('admin', 'menu')}
+                                    title="Abrir Editor de Menú"
+                                    className="group relative w-full flex flex-col sm:flex-row items-center gap-5 p-6 sm:p-7 rounded-[32px] bg-white/5 backdrop-blur-xl border border-white/15 hover:border-amber-500/50 hover:bg-white/10 transition-all duration-300 shadow-2xl hover:shadow-amber-500/20 hover:-translate-y-1.5 text-left cursor-pointer"
+                                >
+                                    <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-[26px] bg-gradient-to-tr from-amber-500 to-orange-500 flex items-center justify-center shrink-0 shadow-xl shadow-amber-500/25 group-hover:scale-105 transition-transform duration-300">
+                                        <UtensilsCrossed className="w-10 h-10 sm:w-11 sm:h-11 text-white" />
+                                        <div className="absolute -inset-1 bg-amber-400 rounded-[28px] blur opacity-30 group-hover:opacity-60 transition-opacity"></div>
+                                    </div>
+                                    
+                                    <div className="flex-1 text-center sm:text-left min-w-0">
+                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[10px] font-black uppercase tracking-widest mb-1.5">
+                                            <Sparkles className="w-3 h-3" />
+                                            Catálogo & Precios
+                                        </div>
+                                        <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight group-hover:text-amber-400 transition-colors">
+                                            Editor de Menú
+                                        </h2>
+                                        <p className="text-white/60 text-xs sm:text-sm font-medium mt-1 leading-relaxed">
+                                            Gestiona platillos, actualiza precios, organiza categorías y disponibilidad.
+                                        </p>
+                                        <div className="mt-3 inline-flex items-center gap-2 text-xs font-black uppercase tracking-wider text-amber-400 group-hover:translate-x-1 transition-transform">
+                                            <span>Abrir Editor de Menú</span>
+                                            <ArrowRight className="w-4 h-4" />
+                                        </div>
+                                    </div>
+                                </button>
+                            </div>
 
                             {/* Helpful Banner to Switch to Advanced View */}
                             <div className="mt-8 p-4 sm:p-5 w-full rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-4">
