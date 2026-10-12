@@ -608,6 +608,38 @@ export default function LiveOrderModal({
     }
   }, [status]);
 
+  // Helper to check if current cart has drinks or desserts
+  const checkCartExtras = useCallback((itemsToCheck: SofiaCartItem[]) => {
+    let hasDrink = false;
+    let hasDessert = false;
+
+    for (const ci of itemsToCheck) {
+      const n = ci.name.toLowerCase();
+      const matchedMenu = menuItems.find(m => m.id === ci.dishId || m.name.toLowerCase() === n);
+      const catId = (matchedMenu?.categoryId || '').toLowerCase();
+
+      if (
+        catId === 'cat-2' ||
+        catId.includes('bebida') ||
+        ['jugo', 'ponche', 'coca', 'refresco', 'agua', 'cafe', 'café'].some(k => n.includes(k))
+      ) {
+        hasDrink = true;
+      }
+
+      if (
+        catId === 'cat-1' ||
+        catId.includes('postre') ||
+        ['fresas', 'postre', 'crema'].some(k => n.includes(k))
+      ) {
+        hasDessert = true;
+      }
+    }
+
+    return { hasDrink, hasDessert };
+  }, [menuItems]);
+
+  const hasOfferedExtrasRef = useRef<boolean>(false);
+
   // Function Calling Tool Handler
   const handleToolCalls = useCallback((functionCalls: any[]) => {
     const responses: any[] = [];
@@ -633,10 +665,28 @@ export default function LiveOrderModal({
           }
         }
 
+        const { hasDrink, hasDessert } = checkCartExtras(cartRef.current);
+        let nextStepGuidance = "Pregúntale si desea algo más o si procedemos con el método de entrega.";
+        if (!hasDrink && !hasDessert) {
+          nextStepGuidance = "El cliente aún NO lleva bebida ni postre. Sugiérele amablemente acompañar su platillo con una bebida (Jugo de naranja recién exprimido, Ponche de fruta calientito o Coca Cola) o un postre (Fresas con crema especiales de la casa) antes de finalizar la orden.";
+        } else if (hasDrink && !hasDessert) {
+          nextStepGuidance = "El cliente ya lleva bebida pero aún NO lleva postre. Ofrécele amablemente unas deliciosas Fresas con crema de postre (vaso chico $40 o grande $80) antes de pasar a la entrega.";
+        } else if (!hasDrink && hasDessert) {
+          nextStepGuidance = "El cliente ya lleva postre pero aún NO lleva bebida. Ofrécele amablemente una bebida para acompañar (Jugo de naranja natural, Ponche de fruta o Coca Cola) antes de pasar a la entrega.";
+        }
+
         responses.push({
           id: call.id,
           name: "updateOrder",
-          response: { output: { success: true, message: `Ticket actualizado correctamente con ${item?.name || 'platillo'}` } }
+          response: {
+            output: {
+              success: true,
+              hasDrink,
+              hasDessert,
+              message: `Ticket actualizado correctamente con ${item?.name || 'platillo'}.`,
+              sugerenciaParaSofia: nextStepGuidance
+            }
+          }
         });
       } else if (call.name === "completeOrder") {
         const { orderType, deliveryAddress, paymentMethod, cashAmount, customerName, customerPhone, items } = call.args || {};
@@ -729,7 +779,7 @@ export default function LiveOrderModal({
         console.warn("Failed to send tool response:", e);
       }
     }
-  }, [resolveDishFromCatalog, updateCartItem, generateAndSaveOrder]);
+  }, [resolveDishFromCatalog, updateCartItem, generateAndSaveOrder, checkCartExtras]);
 
   useEffect(() => {
     handleToolCallsRef.current = handleToolCalls;
@@ -832,11 +882,16 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
 2. REGLA ESTRICTA: Cada vez que el cliente mencione o pida un platillo, bebida o postre, EJECUTA INMEDIATAMENTE la herramienta 'updateOrder' con action='add', el nombre del platillo, su variación y precio del menú. No esperes al final para agregar platillos.
 3. Si el cliente pide modificar la cantidad o quitar algo, ejecuta 'updateOrder' con action='update' o 'remove'.
 4. Si el cliente pide recomendaciones, sugiere los platillos estrella: Chilaquiles con asada de pollo ($120), Enchiladas Suizas gratinadas ($90), Chilpozo de Res ($95) o Tampiqueña.
-5. Cuando el cliente diga "es todo", "sería todo", "la cuenta" o termine de elegir platillos, pregúntale amablemente si prefiere recoger en mostrador (pickup) o entrega a domicilio (delivery).
-6. Si elige entrega a domicilio, sugiere su dirección registrada o pregúntale a qué dirección enviarlo.
-7. Pregúntale su método de pago (efectivo, tarjeta, transferencia o credito).
-8. REGLA CRÍTICA DE CIERRE: En cuanto tengas el método de entrega (y dirección si es domicilio) y la forma de pago, DEBES EJECUTAR OBLIGATORIAMENTE la herramienta 'completeOrder' incluyendo orderType, deliveryAddress, paymentMethod y la lista completa de 'items' del pedido, y despídete amablemente agradeciendo su preferencia en El Buen Servir.
-9. Mantén tus intervenciones habladas breves, fluidas y directas (1 a 2 oraciones), para que la conversación sea rápida y amena como una llamada telefónica real.`;
+5. PASO OBLIGATORIO ANTES DE CERRAR LA ORDEN (OFRECER BEBIDAS Y POSTRES):
+   - Después de anotar los platillos fuertes, o cuando el cliente diga "es todo" / "sería todo" y aún NO haya pedido bebidas o postres, SIEMPRE ofrécele amablemente acompañar su orden con una bebida o un postre antes de pasar a la entrega:
+   - Bebidas para sugerir: Jugo de naranja 100% natural recién exprimido (medio litro $30 o litro $60), Ponche de fruta calientito (chico $25, medio $30, litro $70) o Coca Cola bien fría ($15 a $30).
+   - Postre estrella para sugerir: Fresas con crema especiales de la casa (vaso chico $40 o vaso grande $80).
+   - Si el cliente acepta alguna bebida o postre, agrégalo de inmediato con 'updateOrder'. Si dice "no gracias, así está bien", continúa de inmediato al paso 6.
+6. Una vez ofrecidos las bebidas y postres, pregúntale amablemente si prefiere recoger en mostrador (pickup) o entrega a domicilio (delivery).
+7. Si elige entrega a domicilio, sugiere su dirección registrada o pregúntale a qué dirección enviarlo.
+8. Pregúntale su método de pago (efectivo, tarjeta, transferencia o credito).
+9. REGLA CRÍTICA DE CIERRE: En cuanto tengas el método de entrega (y dirección si es domicilio) y la forma de pago, DEBES EJECUTAR OBLIGATORIAMENTE la herramienta 'completeOrder' incluyendo orderType, deliveryAddress, paymentMethod y la lista completa de 'items' del pedido, y despídete amablemente agradeciendo su preferencia en El Buen Servir.
+10. Mantén tus intervenciones habladas breves, fluidas y directas (1 a 2 oraciones), para que la conversación sea rápida y amena como una llamada telefónica real.`;
 
       let sessionInstance: any = null;
 
@@ -966,6 +1021,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
   // Connect automatically when modal opens, and reset completed state on fresh open
   useEffect(() => {
     if (isOpen) {
+      hasOfferedExtrasRef.current = false;
       if (createdOrderRef.current) {
         createdOrderRef.current = null;
         setCreatedOrder(null);
@@ -986,10 +1042,33 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
   const runLocalHospitalityEngine = (userInput: string): string => {
     const input = userInput.toLowerCase().trim();
 
+    if (['no gracias', 'así está bien', 'asi esta bien', 'sin bebida', 'sin postre', 'nada mas', 'nada más'].some(t => input.includes(t))) {
+      if (cartRef.current.length > 0) {
+        hasOfferedExtrasRef.current = true;
+        setIsOrderTrayExpanded(true);
+        const count = cartRef.current.reduce((s, i) => s + i.quantity, 0);
+        const total = cartRef.current.reduce((s, i) => s + i.price * i.quantity, 0);
+        return `¡Excelente! Llevas ${count} ${count === 1 ? 'platillo' : 'platillos'} con un total de $${total.toFixed(2)}. ¿Prefieres pasar a recogerlo en mostrador o te lo enviamos a domicilio?`;
+      }
+    }
+
     if (['es todo', 'seria todo', 'sería todo', 'la cuenta', 'ya es todo', 'finalizar', 'pagar', 'confirmar'].some(t => input.includes(t))) {
       if (cartRef.current.length === 0) {
         return "¡Con gusto! Pero aún no tienes platillos en tu orden. ¿Qué te gustaría pedir? Tenemos chilaquiles deliciosos, caldos y guisados caseros.";
       }
+
+      const { hasDrink, hasDessert } = checkCartExtras(cartRef.current);
+      if ((!hasDrink || !hasDessert) && !hasOfferedExtrasRef.current) {
+        hasOfferedExtrasRef.current = true;
+        if (!hasDrink && !hasDessert) {
+          return "¡Con mucho gusto! Antes de cerrar tu orden, ¿te gustaría acompañarla con una bebida como Jugo de naranja recién exprimido ($30), Ponche de fruta calientito ($25) o una Coca Cola, o bien unas deliciosas Fresas con crema de postre ($40)?";
+        } else if (!hasDrink) {
+          return "¡Excelente! Antes de cerrar tu orden, ¿se te antoja agregar una bebida como nuestro Jugo de naranja natural ($30), Ponche de fruta ($25) o una Coca Cola bien fría?";
+        } else {
+          return "¡Muy bien! Antes de cerrar tu orden, ¿se te antojan unas deliciosas Fresas con crema especiales de la casa ($40 chico / $80 grande) como postre?";
+        }
+      }
+
       setIsOrderTrayExpanded(true);
       const count = cartRef.current.reduce((s, i) => s + i.quantity, 0);
       const total = cartRef.current.reduce((s, i) => s + i.price * i.quantity, 0);
@@ -1024,7 +1103,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
     }
 
     if (input.includes('recomiend') || input.includes('especialidad') || input.includes('favorito') || input.includes('sugier') || input.includes('mas vendido')) {
-      return "Te súper recomiendo nuestros Chilaquiles Especiales con asada de pollo ($120) o las Enchiladas Suizas gratinadas ($90). Si tienes antojo de algo calientito, el Chilpozo de Res ($95) es una delicia.";
+      return "Te súper recomiendo nuestros Chilaquiles Especiales con asada de pollo ($120) o las Enchiladas Suizas gratinadas ($90). Y para acompañar, un Jugo de naranja recién exprimido ($30) y unas Fresas con crema ($40).";
     }
 
     // Dish matching
@@ -1038,7 +1117,15 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
           quantity: 1,
           dishId: item.id
         });
-        return `¡Anotado! Agregué ${item.name} (${v.label}) por $${v.price}. ¿Gustas alguna bebida o postre?`;
+        const { hasDrink, hasDessert } = checkCartExtras(cartRef.current);
+        if (!hasDrink && !hasDessert) {
+          return `¡Anotado! Agregué ${item.name} (${v.label}) por $${v.price}. ¿Te gustaría acompañarlo con un Jugo de naranja natural, un Ponche calientito o unas Fresas con crema de postre?`;
+        } else if (!hasDessert) {
+          return `¡Anotado! Agregué ${item.name} (${v.label}) por $${v.price}. ¿Se te antojan unas Fresas con crema de postre o algo más?`;
+        } else if (!hasDrink) {
+          return `¡Anotado! Agregué ${item.name} (${v.label}) por $${v.price}. ¿Gustas alguna bebida como Jugo de naranja o Coca Cola para acompañar?`;
+        }
+        return `¡Anotado! Agregué ${item.name} (${v.label}) por $${v.price}. ¿Deseas agregar algo más o cerramos tu orden?`;
       }
     }
 
