@@ -158,7 +158,11 @@ function buildMenuContext(menuItems: MenuItem[], categories: Category[]): string
     lines.push(`\n[${cat.name.toUpperCase()}]:`);
     items.forEach(item => {
       const vars = item.variations.map(v => `${v.label}: $${v.price}`).join(' | ');
-      lines.push(`• ${item.name} (${vars})`);
+      const flags: string[] = [];
+      if (item.allowAccompaniments === false) flags.push('sin notas/acompañamientos');
+      if (item.allowSides === false) flags.push('sin guarnición');
+      const flagText = flags.length > 0 ? ` [${flags.join(', ')}]` : '';
+      lines.push(`• ${item.name} (${vars})${flagText}`);
     });
   });
 

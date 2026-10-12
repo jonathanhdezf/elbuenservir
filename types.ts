@@ -12,7 +12,10 @@ export interface MenuItem {
   description: string;
   isActive: boolean;
   variations: PricingVariation[];
+  allowAccompaniments?: boolean;
+  allowSides?: boolean;
 }
+
 
 export interface Category {
   id: string;

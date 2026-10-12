@@ -161,6 +161,31 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   const availableSides = menuItems.filter(item => isSideCategory(item.categoryId) && item.isActive);
   const mainDishCategories = categories.filter(c => isMainDishCategory(c.id));
 
+  const isDishAccompanimentEnabled = (item: MenuItem): boolean => {
+    if (item.allowAccompaniments !== undefined) {
+      return item.allowAccompaniments;
+    }
+    const name = item.name.toLowerCase();
+    return item.categoryId === 'cat-caldos' || name.includes('pozole') || name.includes('pancita') || name.includes('caldo') || name.includes('chilpozo');
+  };
+
+  const isDishSidesEnabled = (item: MenuItem): boolean => {
+    if (item.allowSides !== undefined) {
+      return item.allowSides;
+    }
+    if (isSideCategory(item.categoryId) || isDrinkCategory(item.categoryId) || isDessertCategory(item.categoryId) || item.categoryId === 'cat-caldos') {
+      return false;
+    }
+    if (item.description && item.description.toLowerCase().includes('sin guarnición')) {
+      return false;
+    }
+    const name = item.name.toLowerCase();
+    if (name.includes('pozole') || name.includes('pancita') || name.includes('caldo') || name.includes('chilpozo')) {
+      return false;
+    }
+    return true;
+  };
+
   const toggleDishCommentChip = (dishId: string, chipLabel: string) => {
     setPendingDishComments(prev => {
       const current = prev[dishId] || '';
@@ -211,8 +236,10 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   ) => {
     const chosenVar = variationOverride || pendingDishVariation[item.id] || item.variations[0];
     const qty = qtyOverride || pendingDishQty[item.id] || 1;
-    const sides = sidesOverride !== undefined ? sidesOverride : (pendingDishSides[item.id] || []);
-    const comments = commentsOverride !== undefined ? commentsOverride : (pendingDishComments[item.id] || '');
+    const sidesAllowed = isDishSidesEnabled(item);
+    const commentsAllowed = isDishAccompanimentEnabled(item);
+    const sides = sidesAllowed ? (sidesOverride !== undefined ? sidesOverride : (pendingDishSides[item.id] || [])) : [];
+    const comments = commentsAllowed ? (commentsOverride !== undefined ? commentsOverride : (pendingDishComments[item.id] || '')) : '';
 
     setCartItems(prev => {
       const existingIdx = prev.findIndex(ci =>
@@ -1853,7 +1880,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                               </div>
 
                               {/* Free Sides */}
-                              {availableSides.length > 0 && (
+                              {availableSides.length > 0 && isDishSidesEnabled(item) && (
                                 <div className="space-y-1.5 pt-2 border-t border-gray-200/60 dark:border-gray-700/60">
                                   <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                                     <span>Guarniciones incluidas (sin costo extra):</span>
@@ -1890,60 +1917,62 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                               )}
 
                               {/* Acompañamientos & Notas de Preparación (Pozole, Pancita, Caldos, etc.) */}
-                              <div className="space-y-2 pt-2 border-t border-gray-200/60 dark:border-gray-700/60">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
-                                    <span>Acompañamientos / Especificaciones:</span>
-                                    {(item.name.toLowerCase().includes('pozole') || item.name.toLowerCase().includes('pancita') || item.name.toLowerCase().includes('caldo')) && (
-                                      <span className="text-[9px] bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25 px-2 py-0.5 rounded-full font-black">
-                                        ¿Sin cebolla, rábano o aguacate?
-                                      </span>
-                                    )}
-                                  </span>
-                                </div>
+                              {isDishAccompanimentEnabled(item) && (
+                                <div className="space-y-2 pt-2 border-t border-gray-200/60 dark:border-gray-700/60">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                                      <span>Acompañamientos / Especificaciones:</span>
+                                      {(item.name.toLowerCase().includes('pozole') || item.name.toLowerCase().includes('pancita') || item.name.toLowerCase().includes('caldo')) && (
+                                        <span className="text-[9px] bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25 px-2 py-0.5 rounded-full font-black">
+                                          ¿Sin cebolla, rábano o aguacate?
+                                        </span>
+                                      )}
+                                    </span>
+                                  </div>
 
-                                <div className="flex flex-wrap gap-1.5">
-                                  {getAccompanimentOptions(item).map(chip => {
-                                    const isSelected = (pendingDishComments[item.id] || '').toLowerCase().includes(chip.label.toLowerCase());
-                                    return (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {getAccompanimentOptions(item).map(chip => {
+                                      const isSelected = (pendingDishComments[item.id] || '').toLowerCase().includes(chip.label.toLowerCase());
+                                      return (
+                                        <button
+                                          key={chip.id}
+                                          type="button"
+                                          onClick={() => toggleDishCommentChip(item.id, chip.label)}
+                                          className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all border cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                                            isSelected
+                                              ? 'bg-amber-500 text-white border-amber-500 shadow-sm ring-1 ring-amber-500/30'
+                                              : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-amber-400'
+                                          }`}
+                                        >
+                                          <span>{chip.icon}</span>
+                                          <span>{chip.label}</span>
+                                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      value={pendingDishComments[item.id] || ''}
+                                      onChange={e => setPendingDishComments(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                      placeholder="Instrucción especial (ej. sin cebolla, sin rábanos, sin aguacate...)"
+                                      className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2 text-xs font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all pr-8"
+                                    />
+                                    {pendingDishComments[item.id] && (
                                       <button
-                                        key={chip.id}
                                         type="button"
-                                        onClick={() => toggleDishCommentChip(item.id, chip.label)}
-                                        className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all border cursor-pointer flex items-center gap-1.5 active:scale-95 ${
-                                          isSelected
-                                            ? 'bg-amber-500 text-white border-amber-500 shadow-sm ring-1 ring-amber-500/30'
-                                            : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-amber-400'
-                                        }`}
+                                        onClick={() => setPendingDishComments(prev => ({ ...prev, [item.id]: '' }))}
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+                                        title="Limpiar comentario"
                                       >
-                                        <span>{chip.icon}</span>
-                                        <span>{chip.label}</span>
-                                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                        <X className="w-3.5 h-3.5" />
                                       </button>
-                                    );
-                                  })}
+                                    )}
+                                  </div>
                                 </div>
-
-                                <div className="relative">
-                                  <input
-                                    type="text"
-                                    value={pendingDishComments[item.id] || ''}
-                                    onChange={e => setPendingDishComments(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                    placeholder="Instrucción especial (ej. sin cebolla, sin rábanos, sin aguacate...)"
-                                    className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2 text-xs font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all pr-8"
-                                  />
-                                  {pendingDishComments[item.id] && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setPendingDishComments(prev => ({ ...prev, [item.id]: '' }))}
-                                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
-                                      title="Limpiar comentario"
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
+                              )}
 
                               {/* Quantity & Add button */}
                               <div className="flex items-center justify-between gap-3 pt-2">

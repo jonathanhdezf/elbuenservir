@@ -27,7 +27,7 @@ const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-desayunos', name: 'Desayunos' },
 ];
 
-const INITIAL_ITEMS: MenuItem[] = [
+const RAW_INITIAL_ITEMS: MenuItem[] = [
   // MENÚ DEL DÍA
   {
     id: 'm1', categoryId: 'cat-1', name: 'Fresas con crema',
@@ -277,6 +277,18 @@ const INITIAL_ITEMS: MenuItem[] = [
     ]
   }
 ];
+
+const INITIAL_ITEMS: MenuItem[] = RAW_INITIAL_ITEMS.map(item => {
+  const isCaldos = item.categoryId === 'cat-caldos' || item.name.toLowerCase().includes('pozole') || item.name.toLowerCase().includes('pancita') || item.name.toLowerCase().includes('chilpozo');
+  const isWithoutSides = item.description?.toLowerCase().includes('sin guarnición');
+  const isSideOrDrinkOrDessert = item.categoryId === 'cat-5' || item.categoryId === 'cat-2' || item.categoryId === 'cat-1';
+
+  return {
+    ...item,
+    allowAccompaniments: item.allowAccompaniments !== undefined ? item.allowAccompaniments : (isCaldos || item.id === 'm23' || item.id === 'm24'),
+    allowSides: item.allowSides !== undefined ? item.allowSides : (!isSideOrDrinkOrDessert && !isWithoutSides && !isCaldos)
+  };
+});
 
 const INITIAL_ORDERS: Order[] = [
   { id: 'ORD-101', customerName: 'Juan Pérez', customerPhone: '555-0101', address: 'Mostrador: General', items: [{ id: 'i1', name: 'Platanos Fritos', variationLabel: 'Sencillo', price: 35, quantity: 2 }], total: 70, status: 'kitchen', paymentMethod: 'efectivo', paymentStatus: 'pending', createdAt: new Date(Date.now() - 1200000).toISOString(), source: 'tpv' },

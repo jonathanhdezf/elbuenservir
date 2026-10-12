@@ -30,7 +30,9 @@ export const mapMenuItemFromDb = (row: any): MenuItem => ({
   name: row.name,
   description: row.description || '',
   isActive: row.is_active ?? true,
-  variations: Array.isArray(row.variations) ? row.variations : []
+  variations: Array.isArray(row.variations) ? row.variations : [],
+  allowAccompaniments: row.allow_accompaniments !== null && row.allow_accompaniments !== undefined ? Boolean(row.allow_accompaniments) : undefined,
+  allowSides: row.allow_sides !== null && row.allow_sides !== undefined ? Boolean(row.allow_sides) : undefined
 });
 
 // Convert MenuItem to DB row
@@ -40,7 +42,9 @@ export const mapMenuItemToDb = (item: MenuItem) => ({
   name: item.name,
   description: item.description,
   is_active: item.isActive,
-  variations: item.variations
+  variations: item.variations,
+  allow_accompaniments: item.allowAccompaniments !== undefined ? item.allowAccompaniments : null,
+  allow_sides: item.allowSides !== undefined ? item.allowSides : null
 });
 
 // Convert DB row to Order

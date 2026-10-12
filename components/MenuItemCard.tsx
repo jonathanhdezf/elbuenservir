@@ -45,6 +45,22 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onUpdate, onDelete })
     }
   };
 
+  const isAccompanimentsEnabled = item.allowAccompaniments !== undefined
+    ? item.allowAccompaniments
+    : (item.categoryId === 'cat-caldos' || item.name.toLowerCase().includes('pozole') || item.name.toLowerCase().includes('pancita') || item.name.toLowerCase().includes('caldo') || item.name.toLowerCase().includes('chilpozo'));
+
+  const isSidesEnabled = item.allowSides !== undefined
+    ? item.allowSides
+    : (!item.description?.toLowerCase().includes('sin guarnición') && item.categoryId !== 'cat-1' && item.categoryId !== 'cat-2' && item.categoryId !== 'cat-5' && item.categoryId !== 'cat-caldos' && !item.name.toLowerCase().includes('pozole') && !item.name.toLowerCase().includes('pancita'));
+
+  const toggleAccompaniments = () => {
+    onUpdate({ ...item, allowAccompaniments: !isAccompanimentsEnabled });
+  };
+
+  const toggleSides = () => {
+    onUpdate({ ...item, allowSides: !isSidesEnabled });
+  };
+
   return (
     <div className={`
       bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 
@@ -81,6 +97,76 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({ item, onUpdate, onDelete })
                   onChange={handleDescChange}
                   placeholder="Describe the item ingredients, preparation, etc..."
                 />
+              </div>
+            </div>
+
+            {/* Configuración de Platillo: Acompañamientos y Guarniciones */}
+            <div className="pt-2 border-t border-gray-100 dark:border-gray-700/60 space-y-2">
+              <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-1">
+                Personalización al Ordenar
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Toggle Acompañamientos / Especificaciones */}
+                <button
+                  type="button"
+                  onClick={toggleAccompaniments}
+                  className={`p-3 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 cursor-pointer select-none active:scale-[0.98] ${
+                    isAccompanimentsEnabled
+                      ? 'bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-200 shadow-sm'
+                      : 'bg-gray-50/60 dark:bg-gray-900/40 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-gray-300'
+                  }`}
+                  title="Permite que el cliente agregue exclusiones o notas (ej. sin cebolla, sin rábanos)"
+                >
+                  <div className="min-w-0 pr-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base leading-none">🥣</span>
+                      <span className="text-xs font-black uppercase tracking-tight truncate">
+                        Acompañamientos
+                      </span>
+                    </div>
+                    <p className="text-[10px] mt-0.5 opacity-80 truncate font-medium">
+                      {isAccompanimentsEnabled ? 'Activo (sin cebolla, rábano...)' : 'Desactivado'}
+                    </p>
+                  </div>
+                  <div className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 ${
+                    isAccompanimentsEnabled ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition duration-200 shadow-sm ${
+                      isAccompanimentsEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </div>
+                </button>
+
+                {/* Toggle Guarniciones Incluidas */}
+                <button
+                  type="button"
+                  onClick={toggleSides}
+                  className={`p-3 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 cursor-pointer select-none active:scale-[0.98] ${
+                    isSidesEnabled
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-900 dark:text-emerald-200 shadow-sm'
+                      : 'bg-gray-50/60 dark:bg-gray-900/40 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-gray-300'
+                  }`}
+                  title="Permite que el cliente elija guarniciones sin costo (arroz, frijoles, ensalada)"
+                >
+                  <div className="min-w-0 pr-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base leading-none">🥗</span>
+                      <span className="text-xs font-black uppercase tracking-tight truncate">
+                        Guarniciones
+                      </span>
+                    </div>
+                    <p className="text-[10px] mt-0.5 opacity-80 truncate font-medium">
+                      {isSidesEnabled ? 'Activo (arroz, frijoles...)' : 'Sin guarnición'}
+                    </p>
+                  </div>
+                  <div className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 ${
+                    isSidesEnabled ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}>
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition duration-200 shadow-sm ${
+                      isSidesEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`} />
+                  </div>
+                </button>
               </div>
             </div>
           </div>

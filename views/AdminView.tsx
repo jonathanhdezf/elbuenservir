@@ -609,13 +609,18 @@ export default function AdminView({
   };
 
   const addItem = () => {
+    const isSidesCategory = activeTab === 'cat-5' || activeTab === 'cat-acompanar';
+    const isDrinkOrDessert = activeTab === 'cat-1' || activeTab === 'cat-2';
+    const isCaldos = activeTab === 'cat-caldos';
     const newItem: MenuItem = {
       id: `item-${Date.now()}`,
       categoryId: activeTab,
       name: 'Nuevo Platillo',
       description: '',
       isActive: true,
-      variations: [{ id: `v-${Date.now()}`, label: 'Sencillo', price: 0 }]
+      variations: [{ id: `v-${Date.now()}`, label: 'Sencillo', price: 0 }],
+      allowAccompaniments: isCaldos,
+      allowSides: !isSidesCategory && !isDrinkOrDessert && !isCaldos
     };
     setMenuItems(prev => [...prev, newItem]);
     addNotification('Nuevo platillo añadido');
