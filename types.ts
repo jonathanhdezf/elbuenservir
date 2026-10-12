@@ -45,6 +45,7 @@ export interface OrderItem {
   price: number;
   quantity: number;
   isOld?: boolean;
+  notes?: string;
 }
 
 export interface Order {

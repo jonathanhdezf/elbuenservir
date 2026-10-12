@@ -1099,6 +1099,11 @@ export default function AdminView({
                         <div className="flex-1">
                           <p className="font-black text-xs uppercase dark:text-white">{item.name}</p>
                           <p className="text-[9px] font-bold text-gray-400 uppercase">{item.variationLabel}</p>
+                          {item.notes && (
+                            <p className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/40 rounded-lg px-2 py-0.5 mt-1 inline-block">
+                              📝 Prep: {item.notes}
+                            </p>
+                          )}
                         </div>
                         <div className="flex items-center gap-4">
                           <span className="text-[10px] font-black text-gray-400">x{item.quantity}</span>
@@ -1421,6 +1426,11 @@ export default function AdminView({
                         <div className="flex-1 pr-4">
                           <h5 className={`text-xl font-black leading-tight uppercase ${it.isOld ? 'line-through text-gray-400' : 'text-gray-900 dark:text-white'}`}>{it.name}</h5>
                           <p className={`text-xs font-bold uppercase tracking-widest mt-1 ${it.isOld ? 'text-gray-300' : 'text-gray-400'}`}>{it.variationLabel} {it.isOld && '(YA PREPARADO)'}</p>
+                          {it.notes && (
+                            <p className="text-xs font-black text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700/60 rounded-lg px-2 py-0.5 mt-1 inline-block">
+                              ⚠️ {it.notes}
+                            </p>
+                          )}
                         </div>
                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black ${it.isOld ? 'bg-gray-100 text-gray-300' : 'bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white'}`}>{it.quantity}</div>
                       </div>

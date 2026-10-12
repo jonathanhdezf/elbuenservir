@@ -279,6 +279,11 @@ export const DigitalTicketModal: React.FC<DigitalTicketModalProps> = ({
                               ({item.variationLabel})
                             </p>
                           )}
+                          {item.notes && (
+                            <p className="text-[10px] text-amber-700 font-bold font-sans">
+                              Nota: {item.notes}
+                            </p>
+                          )}
                           <p className="text-[10px] text-gray-400 font-sans">
                             ${item.price.toFixed(2)} c/u
                           </p>

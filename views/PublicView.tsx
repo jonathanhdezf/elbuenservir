@@ -41,6 +41,53 @@ export interface PublicCartItem {
   isExtra?: boolean;
 }
 
+export const getAccompanimentOptions = (item: { name: string; categoryId?: string }) => {
+  const n = (item.name || '').toLowerCase();
+  const c = (item.categoryId || '').toLowerCase();
+  const isPozole = n.includes('pozole');
+  const isPancita = n.includes('pancita') || n.includes('menudo');
+  const isCaldo = isPozole || isPancita || n.includes('chilpozo') || n.includes('caldo') || c.includes('caldo');
+
+  if (isPozole) {
+    return [
+      { id: 'sin-cebolla', label: 'Sin cebolla', icon: '🧅' },
+      { id: 'sin-rabanos', label: 'Sin rábanos', icon: '🔴' },
+      { id: 'sin-aguacate', label: 'Sin aguacate', icon: '🥑' },
+      { id: 'sin-oregano', label: 'Sin orégano', icon: '🌿' },
+      { id: 'sin-chile', label: 'Sin picante', icon: '🌶️' },
+      { id: 'limon-aparte', label: 'Limón aparte', icon: '🍋' }
+    ];
+  }
+
+  if (isPancita) {
+    return [
+      { id: 'sin-cebolla', label: 'Sin cebolla', icon: '🧅' },
+      { id: 'sin-rabanos', label: 'Sin rábanos', icon: '🔴' },
+      { id: 'sin-aguacate', label: 'Sin aguacate', icon: '🥑' },
+      { id: 'sin-oregano', label: 'Sin orégano', icon: '🌿' },
+      { id: 'sin-chile', label: 'Sin chile picado', icon: '🌶️' },
+      { id: 'limon-aparte', label: 'Limón aparte', icon: '🍋' }
+    ];
+  }
+
+  if (isCaldo) {
+    return [
+      { id: 'sin-cebolla', label: 'Sin cebolla', icon: '🧅' },
+      { id: 'sin-aguacate', label: 'Sin aguacate', icon: '🥑' },
+      { id: 'sin-rabanos', label: 'Sin rábanos', icon: '🔴' },
+      { id: 'sin-picante', label: 'Sin picante', icon: '🌶️' },
+      { id: 'limon-aparte', label: 'Limón aparte', icon: '🍋' }
+    ];
+  }
+
+  return [
+    { id: 'sin-cebolla', label: 'Sin cebolla', icon: '🧅' },
+    { id: 'sin-aguacate', label: 'Sin aguacate', icon: '🥑' },
+    { id: 'sin-picante', label: 'Sin picante', icon: '🌶️' },
+    { id: 'salsa-aparte', label: 'Salsa aparte', icon: '🥣' }
+  ];
+};
+
 export default function PublicView({ categories, menuItems, customers, orders = [], onAddCustomer, onUpdateCustomer, onAddOrder, onEnterControlPanel, onViewDigitalTicket, isPreview, isDarkMode, setIsDarkMode }: PublicViewProps) {
   const { isInstalled, isIos, showInstructions, setShowInstructions, installApp } = usePwaInstall();
   const [showFloatingBanner, setShowFloatingBanner] = useState(false);
@@ -97,6 +144,8 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   const [pendingDishVariation, setPendingDishVariation] = useState<Record<string, any>>({});
   const [selectedVariationsByDish, setSelectedVariationsByDish] = useState<Record<string, any>>({});
   const [pendingDishQty, setPendingDishQty] = useState<Record<string, number>>({});
+  const [pendingDishComments, setPendingDishComments] = useState<Record<string, string>>({});
+  const [editingCartItemId, setEditingCartItemId] = useState<string | null>(null);
   const [customerComments, setCustomerComments] = useState('');
   const [quickSearch, setQuickSearch] = useState('');
   const [extraModalType, setExtraModalType] = useState<string | null>(null);
@@ -112,15 +161,64 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   const availableSides = menuItems.filter(item => isSideCategory(item.categoryId) && item.isActive);
   const mainDishCategories = categories.filter(c => isMainDishCategory(c.id));
 
-  const handleAddDishToCart = (item: MenuItem, variationOverride?: any, sidesOverride?: string[], qtyOverride?: number) => {
+  const toggleDishCommentChip = (dishId: string, chipLabel: string) => {
+    setPendingDishComments(prev => {
+      const current = prev[dishId] || '';
+      const parts = current.split(',').map(p => p.trim()).filter(Boolean);
+      const exists = parts.some(p => p.toLowerCase() === chipLabel.toLowerCase());
+      const nextParts = exists
+        ? parts.filter(p => p.toLowerCase() !== chipLabel.toLowerCase())
+        : [...parts, chipLabel];
+      return {
+        ...prev,
+        [dishId]: nextParts.join(', ')
+      };
+    });
+  };
+
+  const toggleCartItemCommentChip = (cartItemId: string, chipLabel: string) => {
+    setCartItems(prev => prev.map(ci => {
+      if (ci.id !== cartItemId) return ci;
+      const current = ci.comments || '';
+      const parts = current.split(',').map(p => p.trim()).filter(Boolean);
+      const exists = parts.some(p => p.toLowerCase() === chipLabel.toLowerCase());
+      const nextParts = exists
+        ? parts.filter(p => p.toLowerCase() !== chipLabel.toLowerCase())
+        : [...parts, chipLabel];
+      return {
+        ...ci,
+        comments: nextParts.length > 0 ? nextParts.join(', ') : undefined
+      };
+    }));
+  };
+
+  const updateCartItemComment = (cartItemId: string, comment: string) => {
+    setCartItems(prev => prev.map(ci => {
+      if (ci.id !== cartItemId) return ci;
+      return {
+        ...ci,
+        comments: comment.trim() ? comment.trim() : undefined
+      };
+    }));
+  };
+
+  const handleAddDishToCart = (
+    item: MenuItem,
+    variationOverride?: any,
+    sidesOverride?: string[],
+    qtyOverride?: number,
+    commentsOverride?: string
+  ) => {
     const chosenVar = variationOverride || pendingDishVariation[item.id] || item.variations[0];
     const qty = qtyOverride || pendingDishQty[item.id] || 1;
     const sides = sidesOverride !== undefined ? sidesOverride : (pendingDishSides[item.id] || []);
+    const comments = commentsOverride !== undefined ? commentsOverride : (pendingDishComments[item.id] || '');
 
     setCartItems(prev => {
       const existingIdx = prev.findIndex(ci =>
         ci.dishId === item.id &&
         ci.variationLabel === chosenVar.label &&
+        (ci.comments || '') === (comments.trim() || '') &&
         JSON.stringify([...(ci.sides || [])].sort()) === JSON.stringify([...sides].sort())
       );
 
@@ -138,6 +236,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
         price: chosenVar.price,
         quantity: qty,
         sides: [...sides],
+        comments: comments.trim() ? comments.trim() : undefined,
         categoryId: item.categoryId,
         isExtra: isDrinkCategory(item.categoryId) || isDessertCategory(item.categoryId)
       };
@@ -146,6 +245,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     });
 
     setPendingDishQty(prev => ({ ...prev, [item.id]: 1 }));
+    setPendingDishComments(prev => ({ ...prev, [item.id]: '' }));
     soundManager.play('click');
   };
 
@@ -396,11 +496,15 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     }
   };
 
-  const handleTransferFromSofia = (items: { dishId: string; name: string; variationLabel: string; price: number; quantity: number }[]) => {
+  const handleTransferFromSofia = (items: { dishId: string; name: string; variationLabel: string; price: number; quantity: number; comments?: string }[]) => {
     setCartItems(prev => {
       const updated = [...prev];
       for (const item of items) {
-        const existingIdx = updated.findIndex(ci => ci.name.toLowerCase() === item.name.toLowerCase() && ci.variationLabel.toLowerCase() === item.variationLabel.toLowerCase());
+        const existingIdx = updated.findIndex(ci =>
+          ci.name.toLowerCase() === item.name.toLowerCase() &&
+          ci.variationLabel.toLowerCase() === item.variationLabel.toLowerCase() &&
+          (ci.comments || '') === (item.comments || '')
+        );
         if (existingIdx > -1) {
           updated[existingIdx] = {
             ...updated[existingIdx],
@@ -414,7 +518,8 @@ export default function PublicView({ categories, menuItems, customers, orders = 
             variationLabel: item.variationLabel,
             price: item.price,
             quantity: item.quantity,
-            sides: []
+            sides: [],
+            comments: item.comments
           });
         }
       }
@@ -490,7 +595,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
 
     const itemsSummary = cartItems.map(item => {
       const sidesText = item.sides && item.sides.length > 0 ? `\n   ↳ Guarnición: ${item.sides.join(', ')}` : '';
-      const notesText = item.comments ? `\n   ↳ Nota: ${item.comments}` : '';
+      const notesText = item.comments ? `\n   ↳ 📝 Prep / Acompañamientos: ${item.comments}` : '';
       return `• ${item.quantity}x ${item.name} (${item.variationLabel}) - $${(item.price * item.quantity).toFixed(2)}${sidesText}${notesText}`;
     }).join('\n');
 
@@ -551,7 +656,8 @@ export default function PublicView({ categories, menuItems, customers, orders = 
           name: item.name,
           variationLabel: item.variationLabel + (item.sides && item.sides.length > 0 ? ` [${item.sides.join(', ')}]` : ''),
           price: item.price,
-          quantity: item.quantity
+          quantity: item.quantity,
+          notes: item.comments || undefined
         })),
         total: parseFloat(total),
         status: 'pending',
@@ -1539,43 +1645,102 @@ export default function PublicView({ categories, menuItems, customers, orders = 
 
                         <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
                           {cartItems.map((cartItem) => (
-                            <div key={cartItem.id} className="p-3 bg-white dark:bg-gray-800 rounded-2xl flex items-center justify-between gap-3 shadow-sm border border-gray-100 dark:border-gray-700 text-xs">
-                              <div className="min-w-0 flex-1">
-                                <p className="font-black text-gray-900 dark:text-white uppercase truncate">{cartItem.name}</p>
-                                <p className="text-[10px] font-bold text-primary-500 uppercase">{cartItem.variationLabel} • ${(cartItem.price * cartItem.quantity).toFixed(2)}</p>
-                                {cartItem.sides && cartItem.sides.length > 0 && (
-                                  <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold truncate">Guarnición: {cartItem.sides.join(', ')}</p>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-2 shrink-0">
-                                <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
+                            <div key={cartItem.id} className="p-3 bg-white dark:bg-gray-800 rounded-2xl flex flex-col gap-2 shadow-sm border border-gray-100 dark:border-gray-700 text-xs">
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-black text-gray-900 dark:text-white uppercase truncate">{cartItem.name}</p>
+                                  <p className="text-[10px] font-bold text-primary-500 uppercase">{cartItem.variationLabel} • ${(cartItem.price * cartItem.quantity).toFixed(2)}</p>
+                                  {cartItem.sides && cartItem.sides.length > 0 && (
+                                    <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-bold truncate">Guarnición: {cartItem.sides.join(', ')}</p>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateCartQuantity(cartItem.id, -1)}
+                                      className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300 cursor-pointer"
+                                      title="Disminuir"
+                                    >
+                                      <Minus className="w-3 h-3" />
+                                    </button>
+                                    <span className="w-6 text-center font-black text-xs text-gray-900 dark:text-white">{cartItem.quantity}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUpdateCartQuantity(cartItem.id, 1)}
+                                      className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300 cursor-pointer"
+                                      title="Aumentar"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </button>
+                                  </div>
                                   <button
                                     type="button"
-                                    onClick={() => handleUpdateCartQuantity(cartItem.id, -1)}
-                                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300 cursor-pointer"
-                                    title="Disminuir"
+                                    onClick={() => handleRemoveFromCart(cartItem.id)}
+                                    className="p-1.5 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                                    title="Eliminar"
                                   >
-                                    <Minus className="w-3 h-3" />
-                                  </button>
-                                  <span className="w-6 text-center font-black text-xs text-gray-900 dark:text-white">{cartItem.quantity}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleUpdateCartQuantity(cartItem.id, 1)}
-                                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg text-gray-600 dark:text-gray-300 cursor-pointer"
-                                    title="Aumentar"
-                                  >
-                                    <Plus className="w-3 h-3" />
+                                    <Trash2 className="w-4 h-4" />
                                   </button>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveFromCart(cartItem.id)}
-                                  className="p-1.5 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
-                                  title="Eliminar"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
                               </div>
+
+                              {/* Acompañamientos / Notas de preparación */}
+                              <div className="pt-1.5 border-t border-gray-100 dark:border-gray-700/60 flex flex-wrap items-center justify-between gap-1">
+                                {cartItem.comments ? (
+                                  <div className="flex items-center gap-1.5 text-[10px] font-black text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 rounded-lg px-2 py-0.5 max-w-full">
+                                    <span className="truncate">📝 {cartItem.comments}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingCartItemId(editingCartItemId === cartItem.id ? null : cartItem.id)}
+                                      className="text-amber-800 dark:text-amber-200 hover:underline shrink-0 font-bold ml-1 cursor-pointer"
+                                    >
+                                      {editingCartItemId === cartItem.id ? 'Cerrar' : 'Editar'}
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingCartItemId(editingCartItemId === cartItem.id ? null : cartItem.id)}
+                                    className="text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <span>+ Acompañamientos (ej. sin cebolla / rábano)</span>
+                                  </button>
+                                )}
+                              </div>
+
+                              {editingCartItemId === cartItem.id && (
+                                <div className="p-2.5 bg-gray-50 dark:bg-gray-900/90 rounded-xl space-y-2 border border-gray-200/80 dark:border-gray-700 animate-in fade-in duration-200">
+                                  <div className="flex flex-wrap gap-1">
+                                    {getAccompanimentOptions({ name: cartItem.name, categoryId: cartItem.categoryId }).map(chip => {
+                                      const isSelected = (cartItem.comments || '').toLowerCase().includes(chip.label.toLowerCase());
+                                      return (
+                                        <button
+                                          key={chip.id}
+                                          type="button"
+                                          onClick={() => toggleCartItemCommentChip(cartItem.id, chip.label)}
+                                          className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border cursor-pointer flex items-center gap-1 ${
+                                            isSelected
+                                              ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-amber-400'
+                                          }`}
+                                        >
+                                          <span>{chip.icon}</span>
+                                          <span>{chip.label}</span>
+                                          {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={cartItem.comments || ''}
+                                    onChange={e => updateCartItemComment(cartItem.id, e.target.value)}
+                                    placeholder="Especificación (ej. sin cebolla, sin rábanos, etc.)"
+                                    className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1 text-xs text-gray-800 dark:text-white outline-none focus:border-amber-500"
+                                  />
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -1723,6 +1888,62 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                   </div>
                                 </div>
                               )}
+
+                              {/* Acompañamientos & Notas de Preparación (Pozole, Pancita, Caldos, etc.) */}
+                              <div className="space-y-2 pt-2 border-t border-gray-200/60 dark:border-gray-700/60">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                                    <span>Acompañamientos / Especificaciones:</span>
+                                    {(item.name.toLowerCase().includes('pozole') || item.name.toLowerCase().includes('pancita') || item.name.toLowerCase().includes('caldo')) && (
+                                      <span className="text-[9px] bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25 px-2 py-0.5 rounded-full font-black">
+                                        ¿Sin cebolla, rábano o aguacate?
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5">
+                                  {getAccompanimentOptions(item).map(chip => {
+                                    const isSelected = (pendingDishComments[item.id] || '').toLowerCase().includes(chip.label.toLowerCase());
+                                    return (
+                                      <button
+                                        key={chip.id}
+                                        type="button"
+                                        onClick={() => toggleDishCommentChip(item.id, chip.label)}
+                                        className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all border cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                                          isSelected
+                                            ? 'bg-amber-500 text-white border-amber-500 shadow-sm ring-1 ring-amber-500/30'
+                                            : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-amber-400'
+                                        }`}
+                                      >
+                                        <span>{chip.icon}</span>
+                                        <span>{chip.label}</span>
+                                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+
+                                <div className="relative">
+                                  <input
+                                    type="text"
+                                    value={pendingDishComments[item.id] || ''}
+                                    onChange={e => setPendingDishComments(prev => ({ ...prev, [item.id]: e.target.value }))}
+                                    placeholder="Instrucción especial (ej. sin cebolla, sin rábanos, sin aguacate...)"
+                                    className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2 text-xs font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all pr-8"
+                                  />
+                                  {pendingDishComments[item.id] && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setPendingDishComments(prev => ({ ...prev, [item.id]: '' }))}
+                                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 cursor-pointer"
+                                      title="Limpiar comentario"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
 
                               {/* Quantity & Add button */}
                               <div className="flex items-center justify-between gap-3 pt-2">
@@ -1877,54 +2098,116 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                     <div className="bg-gray-50 dark:bg-gray-800/80 rounded-[32px] overflow-hidden border border-gray-100 dark:border-gray-700">
                       <div className="p-5 sm:p-6 space-y-3">
                         {cartItems.map(item => (
-                          <div key={item.id} className="p-4 bg-white dark:bg-gray-900 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm border border-gray-100 dark:border-gray-700">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-primary-500 font-black text-sm">{item.quantity}x</span>
-                                <span className="font-black text-gray-900 dark:text-white text-sm uppercase truncate">{item.name}</span>
-                                <span className="text-xs font-bold text-gray-400 uppercase">({item.variationLabel})</span>
+                          <div key={item.id} className="p-4 bg-white dark:bg-gray-900 rounded-2xl flex flex-col gap-3 shadow-sm border border-gray-100 dark:border-gray-700">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-primary-500 font-black text-sm">{item.quantity}x</span>
+                                  <span className="font-black text-gray-900 dark:text-white text-sm uppercase truncate">{item.name}</span>
+                                  <span className="text-xs font-bold text-gray-400 uppercase">({item.variationLabel})</span>
+                                </div>
+                                {item.sides && item.sides.length > 0 && (
+                                  <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">
+                                    Guarnición: {item.sides.join(', ')}
+                                  </p>
+                                )}
                               </div>
-                              {item.sides && item.sides.length > 0 && (
-                                <p className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 mt-1">
-                                  Guarnición: {item.sides.join(', ')}
-                                </p>
+
+                              <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                                <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateCartQuantity(item.id, -1)}
+                                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 cursor-pointer"
+                                    title="Disminuir"
+                                  >
+                                    <Minus className="w-3 h-3" />
+                                  </button>
+                                  <span className="w-6 text-center font-black text-xs text-gray-900 dark:text-white">{item.quantity}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUpdateCartQuantity(item.id, 1)}
+                                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 cursor-pointer"
+                                    title="Aumentar"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                </div>
+
+                                <span className="font-mono font-black text-sm text-gray-900 dark:text-white min-w-[70px] text-right">
+                                  ${(item.price * item.quantity).toFixed(2)}
+                                </span>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveFromCart(item.id)}
+                                  className="p-1.5 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Acompañamientos / Notas de preparación */}
+                            <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex flex-wrap items-center justify-between gap-1.5">
+                              {item.comments ? (
+                                <div className="flex items-center gap-1.5 text-xs font-black text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 rounded-xl px-2.5 py-1 max-w-full">
+                                  <span className="truncate">📝 Prep: {item.comments}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditingCartItemId(editingCartItemId === item.id ? null : item.id)}
+                                    className="text-amber-800 dark:text-amber-200 hover:underline shrink-0 font-bold ml-1 cursor-pointer text-[10px]"
+                                  >
+                                    {editingCartItemId === item.id ? 'Cerrar' : 'Editar'}
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingCartItemId(editingCartItemId === item.id ? null : item.id)}
+                                  className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
+                                >
+                                  <span>+ Agregar especificación (ej. sin cebolla / rábano)</span>
+                                </button>
                               )}
                             </div>
 
-                            <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
-                              <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateCartQuantity(item.id, -1)}
-                                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 cursor-pointer"
-                                  title="Disminuir"
-                                >
-                                  <Minus className="w-3 h-3" />
-                                </button>
-                                <span className="w-6 text-center font-black text-xs text-gray-900 dark:text-white">{item.quantity}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateCartQuantity(item.id, 1)}
-                                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 cursor-pointer"
-                                  title="Aumentar"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                </button>
+                            {editingCartItemId === item.id && (
+                              <div className="p-3 bg-gray-50 dark:bg-gray-800/90 rounded-2xl space-y-2.5 border border-gray-200/80 dark:border-gray-700 animate-in fade-in duration-200">
+                                <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block">
+                                  Acompañamientos frecuentes:
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {getAccompanimentOptions({ name: item.name, categoryId: item.categoryId }).map(chip => {
+                                    const isSelected = (item.comments || '').toLowerCase().includes(chip.label.toLowerCase());
+                                    return (
+                                      <button
+                                        key={chip.id}
+                                        type="button"
+                                        onClick={() => toggleCartItemCommentChip(item.id, chip.label)}
+                                        className={`px-2.5 py-1 rounded-xl text-xs font-bold border cursor-pointer flex items-center gap-1 ${
+                                          isSelected
+                                            ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                                            : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-amber-400'
+                                        }`}
+                                      >
+                                        <span>{chip.icon}</span>
+                                        <span>{chip.label}</span>
+                                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                                <input
+                                  type="text"
+                                  value={item.comments || ''}
+                                  onChange={e => updateCartItemComment(item.id, e.target.value)}
+                                  placeholder="Ej. Sin cebolla, sin rábanos, sin aguacate..."
+                                  className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white outline-none focus:border-amber-500"
+                                />
                               </div>
-
-                              <span className="font-mono font-black text-sm text-gray-900 dark:text-white min-w-[70px] text-right">
-                                ${(item.price * item.quantity).toFixed(2)}
-                              </span>
-
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveFromCart(item.id)}
-                                className="p-1.5 text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
-                                title="Eliminar"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
+                            )}
                           </div>
                         ))}
 

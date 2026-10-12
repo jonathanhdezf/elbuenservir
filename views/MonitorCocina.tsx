@@ -207,6 +207,11 @@ export default function MonitorCocina({
                                                     <p className={`text-[9px] font-bold uppercase tracking-widest mt-1 truncate ${it.isOld ? 'text-gray-300' : 'text-gray-400'}`}>
                                                         {it.variationLabel}
                                                     </p>
+                                                    {it.notes && (
+                                                        <p className="text-[10px] md:text-xs font-black text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700/60 rounded-lg px-2 py-0.5 mt-1 inline-block">
+                                                            ⚠️ {it.notes}
+                                                        </p>
+                                                    )}
                                                 </div>
                                                 <div className={`w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl md:rounded-2xl flex items-center justify-center text-lg md:text-xl font-black ${it.isOld ? 'bg-gray-100 text-gray-300' : 'bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-100 dark:border-gray-700'
                                                     }`}>

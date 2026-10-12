@@ -18,6 +18,7 @@ export interface SofiaCartItem {
   price: number;
   quantity: number;
   image?: string;
+  notes?: string;
 }
 
 interface LiveOrderModalProps {
@@ -28,7 +29,7 @@ interface LiveOrderModalProps {
   onAddOrder?: (order: Order) => void;
   loggedCustomer: Customer | null;
   onOpenAuth: () => void;
-  onTransferToCart?: (items: { dishId: string; name: string; variationLabel: string; price: number; quantity: number }[]) => void;
+  onTransferToCart?: (items: { dishId: string; name: string; variationLabel: string; price: number; quantity: number; comments?: string }[]) => void;
   onUpdateCustomer?: (customer: Customer) => void;
 }
 
@@ -101,7 +102,8 @@ const updateOrderTool = {
           name: { type: Type.STRING, description: "Nombre del platillo del menú (ej. Chilaquiles, Chilpozo de res, Enchiladas suizas, Jugo de naranja)" },
           variation: { type: Type.STRING, description: "Variación o tamaño (ej. Chicos, Grandes, Con asada de pollo, Platillo, Medio litro)" },
           price: { type: Type.NUMBER, description: "Precio unitario" },
-          quantity: { type: Type.NUMBER, description: "Cantidad de porciones" }
+          quantity: { type: Type.NUMBER, description: "Cantidad de porciones" },
+          notes: { type: Type.STRING, description: "Acompañamientos o especificaciones especiales del platillo (ej. Sin cebolla, sin rábanos, sin aguacate, orégano aparte)" }
         },
         required: ["name", "variation"]
       }
@@ -132,7 +134,8 @@ const completeOrderTool = {
             name: { type: Type.STRING, description: "Nombre del platillo" },
             variation: { type: Type.STRING, description: "Variación o tamaño" },
             price: { type: Type.NUMBER, description: "Precio unitario" },
-            quantity: { type: Type.NUMBER, description: "Cantidad" }
+            quantity: { type: Type.NUMBER, description: "Cantidad" },
+            notes: { type: Type.STRING, description: "Acompañamientos o especificaciones especiales del platillo (ej. Sin cebolla, sin rábanos, sin aguacate)" }
           },
           required: ["name"]
         }
@@ -304,7 +307,7 @@ export default function LiveOrderModal({
   }, [cart]);
 
   // Match dish against catalog for accurate dishId, variation label, and price
-  const resolveDishFromCatalog = useCallback((rawItem: { name: string; variation?: string; price?: number; quantity?: number; dishId?: string }) => {
+  const resolveDishFromCatalog = useCallback((rawItem: { name: string; variation?: string; price?: number; quantity?: number; dishId?: string; notes?: string }) => {
     const itemName = (rawItem.name || '').trim();
     const itemVar = (rawItem.variation || 'Platillo').trim();
     const quantity = rawItem.quantity && rawItem.quantity > 0 ? rawItem.quantity : 1;
@@ -339,22 +342,25 @@ export default function LiveOrderModal({
       variation: resolvedVar,
       price: finalPrice,
       quantity,
-      dishId
+      dishId,
+      notes: rawItem.notes ? rawItem.notes.trim() : undefined
     };
   }, [menuItems]);
 
   // Cart item modifier (synchronously updates cartRef.current + React state)
-  const updateCartItem = useCallback((action: 'add' | 'remove' | 'update', item: { name: string; variation: string; price: number; quantity?: number; dishId?: string }) => {
+  const updateCartItem = useCallback((action: 'add' | 'remove' | 'update', item: { name: string; variation: string; price: number; quantity?: number; dishId?: string; notes?: string }) => {
     const resolved = resolveDishFromCatalog(item);
     const itemName = resolved.name;
     const itemVar = resolved.variation;
     const qty = resolved.quantity;
+    const notes = resolved.notes;
     const dishImg = getDishImage(itemName);
 
     const prev = cartRef.current;
     const matchIndex = prev.findIndex(i =>
       i.name.toLowerCase() === itemName.toLowerCase() &&
-      i.variation.toLowerCase() === itemVar.toLowerCase()
+      i.variation.toLowerCase() === itemVar.toLowerCase() &&
+      (i.notes || '') === (notes || '')
     );
 
     let nextCart = prev;
@@ -366,7 +372,8 @@ export default function LiveOrderModal({
           ...target,
           quantity: target.quantity + qty,
           price: resolved.price || target.price,
-          dishId: resolved.dishId || target.dishId
+          dishId: resolved.dishId || target.dishId,
+          notes: notes || target.notes
         };
         nextCart = prev.map((it, idx) => idx === matchIndex ? updatedItem : it);
         setLastAddedId(target.id);
@@ -380,7 +387,8 @@ export default function LiveOrderModal({
           variation: itemVar,
           price: resolved.price,
           quantity: qty,
-          image: dishImg || undefined
+          image: dishImg || undefined,
+          notes: notes
         }];
       }
     } else if (action === 'update') {
@@ -389,7 +397,8 @@ export default function LiveOrderModal({
         nextCart = prev.map((it, idx) => idx === matchIndex ? {
           ...target,
           quantity: qty,
-          price: resolved.price || target.price
+          price: resolved.price || target.price,
+          notes: notes !== undefined ? notes : target.notes
         } : it);
         setLastAddedId(target.id);
       }
@@ -453,7 +462,10 @@ export default function LiveOrderModal({
       paymentText = `🏷️ *Pago:* Crédito de Tienda (Cuenta de Cliente)`;
     }
 
-    const itemsText = itemsToUse.map(i => `• ${i.quantity}x ${i.name} (${i.variation}) - $${(i.price * i.quantity).toFixed(2)}`).join('\n');
+    const itemsText = itemsToUse.map(i => {
+      const notesText = i.notes ? `\n   ↳ 📝 Prep / Acompañamiento: ${i.notes}` : '';
+      return `• ${i.quantity}x ${i.name} (${i.variation}) - $${(i.price * i.quantity).toFixed(2)}${notesText}`;
+    }).join('\n');
 
     const msg =
       `*🎙️ PEDIDO ASISTIDO POR SOFÍA IA - EL BUEN SERVIR*\n\n` +
@@ -477,9 +489,10 @@ export default function LiveOrderModal({
       items: itemsToUse.map(i => ({
         id: i.dishId || i.id,
         name: i.name,
-        variationLabel: i.variation,
+        variationLabel: i.variation + (i.notes ? ` [${i.notes}]` : ''),
         price: i.price,
-        quantity: i.quantity
+        quantity: i.quantity,
+        notes: i.notes || undefined
       })),
       total,
       status: 'pending',
@@ -653,13 +666,15 @@ export default function LiveOrderModal({
             variation: item.variation,
             price: item.price,
             quantity: item.quantity,
-            dishId: item.dishId
+            dishId: item.dishId,
+            notes: item.notes
           });
 
           updateCartItem(action || 'add', resolved);
 
           if ((action || 'add') === 'add') {
-            setCurrentSofiaSpeech(`¡Anotado! Agregué ${resolved.quantity}x ${resolved.name} (${resolved.variation}) a tu orden.`);
+            const notesMsg = resolved.notes ? ` (${resolved.notes})` : '';
+            setCurrentSofiaSpeech(`¡Anotado! Agregué ${resolved.quantity}x ${resolved.name} (${resolved.variation})${notesMsg} a tu orden.`);
           } else if (action === 'remove') {
             setCurrentSofiaSpeech(`¡Listo! Quité ${resolved.name} de tu orden.`);
           }
@@ -695,10 +710,17 @@ export default function LiveOrderModal({
         if (Array.isArray(items) && items.length > 0) {
           for (const rawIt of items) {
             if (!rawIt?.name) continue;
-            const resolved = resolveDishFromCatalog(rawIt);
+            const resolved = resolveDishFromCatalog({
+              name: rawIt.name,
+              variation: rawIt.variation,
+              price: rawIt.price,
+              quantity: rawIt.quantity,
+              notes: rawIt.notes
+            });
             const alreadyInCart = cartRef.current.some(
               c => c.name.toLowerCase() === resolved.name.toLowerCase() &&
-                   c.variation.toLowerCase() === resolved.variation.toLowerCase()
+                   c.variation.toLowerCase() === resolved.variation.toLowerCase() &&
+                   (c.notes || '') === (resolved.notes || '')
             );
             if (!alreadyInCart) {
               updateCartItem('add', resolved);
@@ -881,17 +903,18 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
 1. Saluda al cliente cordialmente con entusiasmo (menciona su nombre si está disponible) y pregúntale qué se le antoja degustar hoy de El Buen Servir.
 2. REGLA ESTRICTA: Cada vez que el cliente mencione o pida un platillo, bebida o postre, EJECUTA INMEDIATAMENTE la herramienta 'updateOrder' con action='add', el nombre del platillo, su variación y precio del menú. No esperes al final para agregar platillos.
 3. Si el cliente pide modificar la cantidad o quitar algo, ejecuta 'updateOrder' con action='update' o 'remove'.
-4. Si el cliente pide recomendaciones, sugiere los platillos estrella: Chilaquiles con asada de pollo ($120), Enchiladas Suizas gratinadas ($90), Chilpozo de Res ($95) o Tampiqueña.
-5. PASO OBLIGATORIO ANTES DE CERRAR LA ORDEN (OFRECER BEBIDAS Y POSTRES):
+4. PERSONALIZACIÓN Y ACOMPAÑAMIENTOS: Para platillos como el Pozole, la Pancita, Caldos u otros guisados, si el cliente pide que no le pongan ciertos acompañamientos o complementos tradicionales (por ejemplo: "sin cebolla", "sin rábanos", "sin aguacate", "sin orégano", "limón aparte", etc.), guarda SIEMPRE esa especificación en el parámetro 'notes' al llamar a 'updateOrder' y al listar 'items' en 'completeOrder'.
+5. Si el cliente pide recomendaciones, sugiere los platillos estrella: Chilaquiles con asada de pollo ($120), Enchiladas Suizas gratinadas ($90), Pozole tradicional o Pancita de res en caldo rojo, o Chilpozo de Res ($95).
+6. PASO OBLIGATORIO ANTES DE CERRAR LA ORDEN (OFRECER BEBIDAS Y POSTRES):
    - Después de anotar los platillos fuertes, o cuando el cliente diga "es todo" / "sería todo" y aún NO haya pedido bebidas o postres, SIEMPRE ofrécele amablemente acompañar su orden con una bebida o un postre antes de pasar a la entrega:
    - Bebidas para sugerir: Jugo de naranja 100% natural recién exprimido (medio litro $30 o litro $60), Ponche de fruta calientito (chico $25, medio $30, litro $70) o Coca Cola bien fría ($15 a $30).
    - Postre estrella para sugerir: Fresas con crema especiales de la casa (vaso chico $40 o vaso grande $80).
-   - Si el cliente acepta alguna bebida o postre, agrégalo de inmediato con 'updateOrder'. Si dice "no gracias, así está bien", continúa de inmediato al paso 6.
-6. Una vez ofrecidos las bebidas y postres, pregúntale amablemente si prefiere recoger en mostrador (pickup) o entrega a domicilio (delivery).
-7. Si elige entrega a domicilio, sugiere su dirección registrada o pregúntale a qué dirección enviarlo.
-8. Pregúntale su método de pago (efectivo, tarjeta, transferencia o credito).
-9. REGLA CRÍTICA DE CIERRE: En cuanto tengas el método de entrega (y dirección si es domicilio) y la forma de pago, DEBES EJECUTAR OBLIGATORIAMENTE la herramienta 'completeOrder' incluyendo orderType, deliveryAddress, paymentMethod y la lista completa de 'items' del pedido, y despídete amablemente agradeciendo su preferencia en El Buen Servir.
-10. Mantén tus intervenciones habladas breves, fluidas y directas (1 a 2 oraciones), para que la conversación sea rápida y amena como una llamada telefónica real.`;
+   - Si el cliente acepta alguna bebida o postre, agrégalo de inmediato con 'updateOrder'. Si dice "no gracias, así está bien", continúa de inmediato al siguiente paso.
+7. Una vez ofrecidos las bebidas y postres, pregúntale amablemente si prefiere recoger en mostrador (pickup) o entrega a domicilio (delivery).
+8. Si elige entrega a domicilio, sugiere su dirección registrada o pregúntale a qué dirección enviarlo.
+9. Pregúntale su método de pago (efectivo, tarjeta, transferencia o credito).
+10. REGLA CRÍTICA DE CIERRE: En cuanto tengas el método de entrega (y dirección si es domicilio) y la forma de pago, DEBES EJECUTAR OBLIGATORIAMENTE la herramienta 'completeOrder' incluyendo orderType, deliveryAddress, paymentMethod y la lista completa de 'items' del pedido (con sus 'notes' de preparación si aplican), y despídete amablemente agradeciendo su preferencia en El Buen Servir.
+11. Mantén tus intervenciones habladas breves, fluidas y directas (1 a 2 oraciones), para que la conversación sea rápida y amena como una llamada telefónica real.`;
 
       let sessionInstance: any = null;
 
@@ -1234,7 +1257,8 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
         name: i.name,
         variationLabel: i.variation,
         price: i.price,
-        quantity: i.quantity
+        quantity: i.quantity,
+        comments: i.notes
       })));
     }
     soundManager.play('confirm_generic');
@@ -1750,6 +1774,11 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
                   <div className="min-w-0 flex-1">
                     <p className="text-xs sm:text-sm font-black text-white uppercase truncate">{item.name}</p>
                     <p className="text-[10px] text-gray-400 uppercase">{item.variation}</p>
+                    {item.notes && (
+                      <p className="text-[10px] font-bold text-amber-400 bg-amber-500/20 border border-amber-500/30 rounded-md px-1.5 py-0.5 mt-1 inline-block">
+                        📝 {item.notes}
+                      </p>
+                    )}
                     <p className="text-xs font-black text-emerald-400 mt-1">
                       ${(item.price * item.quantity).toFixed(2)}
                       {item.quantity > 1 && <span className="text-[10px] text-gray-500 ml-1 font-normal">(${item.price} c/u)</span>}

@@ -51,6 +51,7 @@ const getTicketHtml = (order: Order, logoUrl: string, date: string) => {
               <td style="padding: 4px 0; vertical-align: top;">
                 ${item.name}
                 ${item.variationLabel ? `<br><small style="font-size: 10px; color: #666;">(${item.variationLabel})</small>` : ''}
+                ${item.notes ? `<br><small style="font-size: 10px; font-weight: bold; color: #111;">* NOTA: ${item.notes}</small>` : ''}
               </td>
               <td style="padding: 4px 0; vertical-align: top; text-align: right;">$${(item.price * item.quantity).toFixed(2)}</td>
             </tr>
