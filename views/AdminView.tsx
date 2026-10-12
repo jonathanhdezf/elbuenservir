@@ -329,8 +329,14 @@ export default function AdminView({
   useMobileBack({
     hasOpenModal: hasOpenAdminModal,
     onCloseModal: handleCloseAdminModal,
-    hasSubSection: activeSection !== 'dashboard',
-    onBackSubSection: () => setActiveSection('dashboard'),
+    hasSubSection: activeSection !== 'dashboard' && activeSection !== 'orders',
+    onBackSubSection: () => {
+      if (activeSection === 'orders') {
+        onExit();
+      } else {
+        setActiveSection('dashboard');
+      }
+    },
     onExit
   });
 
