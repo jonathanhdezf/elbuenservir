@@ -14,7 +14,7 @@ import {
   ArrowUp, ArrowDown, Move, MessageCircle, Copy,
   Landmark, HandCoins, FileText, BadgePercent
 } from 'lucide-react';
-import { MenuItem, Category, TabId, Order, OrderItem, OrderStatus, Customer, CustomerCreditMovement, AdminSection, DeliveryDriver, VehicleType, PaymentMethod, PaymentStatus, TransferStatus, Staff, StaffRole, SiteLog, PayrollEntry, Loan } from '../types';
+import { MenuItem, Category, TabId, Order, OrderItem, OrderStatus, Customer, CustomerCreditMovement, AdminSection, DeliveryDriver, VehicleType, PaymentMethod, PaymentStatus, TransferStatus, Staff, StaffRole, SiteLog, PayrollEntry, Loan, EnabledModules } from '../types';
 import { soundManager, AudioAction } from '../utils/soundManager';
 import Sidebar from '../components/Sidebar';
 import Header from '../components/Header';
@@ -51,6 +51,7 @@ interface AdminViewProps {
   initialSection?: AdminSection;
   onViewDigitalTicket?: (order: Order) => void;
   onGoToPublicSite?: () => void;
+  enabledModules?: EnabledModules;
 }
 
 interface Notification {
@@ -89,7 +90,8 @@ export default function AdminView({
   onExit,
   initialSection = 'dashboard',
   onViewDigitalTicket,
-  onGoToPublicSite
+  onGoToPublicSite,
+  enabledModules
 }: AdminViewProps) {
   const STATUS_CONFIG: Record<OrderStatus, { label: string, color: string, icon: any }> = {
     pending: { label: 'Pendiente', color: 'bg-gray-100 text-gray-700', icon: Clock },
@@ -4954,6 +4956,7 @@ export default function AdminView({
           }}
           badges={badges}
           isFullScreen={isFullScreen}
+          enabledModules={enabledModules}
         />
       )}
 

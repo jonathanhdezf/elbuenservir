@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { MenuItem, Category, TabId, Order, Customer, DeliveryDriver, Staff, SiteLog, AdminSection } from './types';
+import { MenuItem, Category, TabId, Order, Customer, DeliveryDriver, Staff, SiteLog, AdminSection, EnabledModules, DEFAULT_ENABLED_MODULES } from './types';
 import AdminView from './views/AdminView';
 import PublicView from './views/PublicView';
 import MonitorCocina from './views/MonitorCocina';
@@ -355,6 +355,30 @@ export default function App() {
   const [adminInitialSection, setAdminInitialSection] = useState<AdminSection>('dashboard');
   const [panelMode, setPanelMode] = useState<'basic' | 'advanced'>('basic');
   const [pendingRedirectSection, setPendingRedirectSection] = useState<AdminSection | null>(null);
+
+  const [enabledModules, setEnabledModules] = useState<EnabledModules>(() => {
+    try {
+      const saved = localStorage.getItem('elbuenservir_enabled_modules');
+      if (saved) {
+        return { ...DEFAULT_ENABLED_MODULES, ...JSON.parse(saved) };
+      }
+    } catch (e) {
+      console.error('Error loading enabled modules from localStorage', e);
+    }
+    return DEFAULT_ENABLED_MODULES;
+  });
+
+  const handleSetEnabledModules: React.Dispatch<React.SetStateAction<EnabledModules>> = (valOrUpdater) => {
+    setEnabledModules(prev => {
+      const next = typeof valOrUpdater === 'function' ? valOrUpdater(prev) : valOrUpdater;
+      try {
+        localStorage.setItem('elbuenservir_enabled_modules', JSON.stringify(next));
+      } catch (e) {
+        console.error('Error saving enabled modules to localStorage', e);
+      }
+      return next;
+    });
+  };
 
   const [isPanelAuthenticated, setIsPanelAuthenticated] = useState<boolean>(() => {
     try {
@@ -840,11 +864,17 @@ export default function App() {
           setSystemBgEffect={setSystemBgEffect}
           panelMode={panelMode}
           setPanelMode={setPanelMode}
+          enabledModules={enabledModules}
+          setEnabledModules={handleSetEnabledModules}
         />
       );
     }
 
     if (view === 'driver_portal') {
+      if (!enabledModules.driver_portal) {
+        setView('control_panel');
+        return null;
+      }
       return (
         <RepartidorView
           drivers={drivers}
@@ -861,6 +891,10 @@ export default function App() {
     }
 
     if (view === 'kitchen') {
+      if (!enabledModules.kitchen) {
+        setView('control_panel');
+        return null;
+      }
       return (
         <MonitorCocina
           orders={orders}
@@ -872,6 +906,10 @@ export default function App() {
       );
     }
     if (view === 'logistics') {
+      if (!enabledModules.logistics) {
+        setView('control_panel');
+        return null;
+      }
       return (
         <LogisticaDespachos
           orders={orders}
@@ -911,11 +949,16 @@ export default function App() {
           }}
           onViewDigitalTicket={handleOpenDigitalTicket}
           onGoToPublicSite={() => setView('public')}
+          enabledModules={enabledModules}
         />
       );
     }
 
     if (view === 'tpv') {
+      if (!enabledModules.tpv) {
+        setView('control_panel');
+        return null;
+      }
       return (
         <TPVView
           categories={categories}

@@ -23,7 +23,7 @@ import {
   History,
   Wallet
 } from 'lucide-react';
-import { AdminSection } from '../types';
+import { AdminSection, EnabledModules } from '../types';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -35,6 +35,7 @@ interface SidebarProps {
   onSectionChange: (section: AdminSection) => void;
   badges?: Record<string, number>;
   isFullScreen?: boolean;
+  enabledModules?: EnabledModules;
 }
 
 interface NavGroup {
@@ -53,22 +54,23 @@ const Sidebar: React.FC<SidebarProps> = ({
   activeSection,
   onSectionChange,
   badges = {} as Partial<Record<AdminSection, number>>,
-  isFullScreen = false
+  isFullScreen = false,
+  enabledModules
 }) => {
   const [logisticsOpen, setLogisticsOpen] = useState(true);
   const [managementOpen, setManagementOpen] = useState(true);
 
   const mainItems: { icon: any; label: string; id: AdminSection; badge?: number }[] = [
     { icon: LayoutDashboard, label: 'Dashboard', id: 'dashboard' },
-    { icon: Monitor, label: 'En Directo TPV', id: 'tpv' },
-    { icon: ShoppingBasket, label: 'Pedidos', id: 'orders', badge: badges['orders'] },
+    ...(enabledModules?.tpv !== false ? [{ icon: Monitor, label: 'En Directo TPV', id: 'tpv' as AdminSection }] : []),
+    { icon: ShoppingBasket, label: 'Pedidos', id: 'orders' as AdminSection, badge: badges['orders'] },
   ];
 
   const logisticsItems: { icon: any; label: string; id: AdminSection; badge?: number }[] = [
-    { icon: ChefHat, label: 'Monitor KDS', id: 'kds', badge: badges['kds'] },
-    { icon: Truck, label: 'Repartos', id: 'dds', badge: badges['dds'] },
-    { icon: Store, label: 'Despacho Local', id: 'local_dispatch', badge: badges['local_dispatch'] },
-    { icon: Bike, label: 'Panel Repartidores', id: 'driver_dashboard' },
+    ...(enabledModules?.kitchen !== false ? [{ icon: ChefHat, label: 'Monitor KDS', id: 'kds' as AdminSection, badge: badges['kds'] }] : []),
+    ...(enabledModules?.logistics !== false ? [{ icon: Truck, label: 'Repartos', id: 'dds' as AdminSection, badge: badges['dds'] }] : []),
+    ...(enabledModules?.local_dispatch !== false ? [{ icon: Store, label: 'Despacho Local', id: 'local_dispatch' as AdminSection, badge: badges['local_dispatch'] }] : []),
+    ...(enabledModules?.driver_portal !== false ? [{ icon: Bike, label: 'Panel Repartidores', id: 'driver_dashboard' as AdminSection }] : []),
   ];
 
   const managementItems: { icon: any; label: string; id: AdminSection; badge?: number }[] = [
@@ -138,23 +140,25 @@ const Sidebar: React.FC<SidebarProps> = ({
         {mainItems.map(renderNavItem)}
 
         {/* Logística */}
-        <div className="pt-4">
-          <button
-            onClick={() => setLogisticsOpen(!logisticsOpen)}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all group ${isLogisticsActive ? 'bg-blue-50 dark:bg-blue-950/30' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}
-          >
-            <div className="flex items-center">
-              <Package className={`w-5 h-5 mr-3.5 ${isLogisticsActive ? 'text-blue-500' : 'text-gray-400'}`} />
-              <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${isLogisticsActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>Logística</span>
-            </div>
-            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${logisticsOpen ? 'rotate-180' : ''}`} />
-          </button>
-          <div className={`overflow-hidden transition-all duration-300 ${logisticsOpen ? 'max-h-[500px] opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-            <div className="pl-2 space-y-1">
-              {logisticsItems.map(renderNavItem)}
+        {logisticsItems.length > 0 && (
+          <div className="pt-4">
+            <button
+              onClick={() => setLogisticsOpen(!logisticsOpen)}
+              className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl transition-all group ${isLogisticsActive ? 'bg-blue-50 dark:bg-blue-950/30' : 'hover:bg-gray-50 dark:hover:bg-gray-800/50'}`}
+            >
+              <div className="flex items-center">
+                <Package className={`w-5 h-5 mr-3.5 ${isLogisticsActive ? 'text-blue-500' : 'text-gray-400'}`} />
+                <span className={`text-[9px] font-black uppercase tracking-[0.2em] ${isLogisticsActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-gray-500'}`}>Logística</span>
+              </div>
+              <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${logisticsOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <div className={`overflow-hidden transition-all duration-300 ${logisticsOpen ? 'max-h-[500px] opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+              <div className="pl-2 space-y-1">
+                {logisticsItems.map(renderNavItem)}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Gestión */}
         <div className="pt-4">

@@ -128,6 +128,22 @@ export interface SiteLog {
 
 export type AdminSection = 'dashboard' | 'kitchen' | 'kds' | 'dds' | 'menu' | 'orders' | 'customers' | 'reports' | 'driver_dashboard' | 'tpv' | 'local_dispatch' | 'staff_management' | 'logs' | 'payroll';
 
+export interface EnabledModules {
+  tpv: boolean;
+  kitchen: boolean;
+  local_dispatch: boolean;
+  logistics: boolean;
+  driver_portal: boolean;
+}
+
+export const DEFAULT_ENABLED_MODULES: EnabledModules = {
+  tpv: true,
+  kitchen: true,
+  local_dispatch: true,
+  logistics: true,
+  driver_portal: true,
+};
+
 export type PayrollPeriod = 'semanal' | 'quincenal' | 'mensual';
 export type LoanStatus = 'active' | 'paid' | 'defaulted';
 
