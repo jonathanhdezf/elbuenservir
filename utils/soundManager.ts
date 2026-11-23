@@ -8,28 +8,30 @@ import { AdminSection } from '../types';
 
 export type AudioAction = 'confirm' | 'alert' | 'notification' | 'error' | 'navigation' | 'click' | 'recycle';
 
+const BASE = (import.meta as any).env?.BASE_URL || '/';
+
 const SOUNDS = {
     // Navigation (Stays as is, requested by user)
-    navigation: '/elbuenservir/sonidos/navigation.mp3',
+    navigation: `${BASE}sonidos/navigation.mp3`,
 
     // Section-specific confirmation sounds
-    confirm_kds: '/elbuenservir/sonidos/confirm_kds.mp3', // CAMPANA PERSONALIZADA (Boxing Bell)
-    confirm_dds: '/elbuenservir/sonidos/confirm-dds.mp3', // Engine-like blip
-    confirm_local_dispatch: '/elbuenservir/sonidos/confirm-local.mp3', // High-pitch chime
-    confirm_tpv: '/elbuenservir/sonidos/confirm-tpv.mp3', // Register sound-ish
-    confirm_generic: '/elbuenservir/sonidos/confirm-generic.mp3',
+    confirm_kds: `${BASE}sonidos/confirm_kds.mp3`, // CAMPANA PERSONALIZADA (Boxing Bell)
+    confirm_dds: `${BASE}sonidos/confirm-dds.mp3`, // Engine-like blip
+    confirm_local_dispatch: `${BASE}sonidos/confirm-local.mp3`, // High-pitch chime
+    confirm_tpv: `${BASE}sonidos/confirm-tpv.mp3`, // Register sound-ish
+    confirm_generic: `${BASE}sonidos/confirm-generic.mp3`,
 
     // Alerts for new items
     alert: 'https://assets.mixkit.co/active_storage/sfx/2577/2577-preview.mp3',
-    notification: '/elbuenservir/sonidos/confirm-local.mp3',
+    notification: `${BASE}sonidos/confirm-local.mp3`,
     alert_kds: 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3', // Tech Alert
     alert_dds: 'https://assets.mixkit.co/active_storage/sfx/2580/2580-preview.mp3', // Digital notice
     alert_local: 'https://assets.mixkit.co/active_storage/sfx/2577/2577-preview.mp3', // Notification
 
     // System
-    error: '/elbuenservir/sonidos/error.wav',
-    click: '/elbuenservir/sonidos/click.mp3',
-    recycle: '/elbuenservir/sonidos/confirm-recycle.mp3',
+    error: `${BASE}sonidos/error.wav`,
+    click: `${BASE}sonidos/click.mp3`,
+    recycle: `${BASE}sonidos/confirm-recycle.mp3`,
 };
 
 class SoundManager {

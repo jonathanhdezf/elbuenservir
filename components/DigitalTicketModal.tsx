@@ -54,23 +54,24 @@ export const DigitalTicketModal: React.FC<DigitalTicketModalProps> = ({
     if (orderId && isOpen) {
       setIsLoading(true);
       setFetchError(null);
-      supabase
-        .from('orders')
-        .select('*')
-        .eq('id', orderId)
-        .maybeSingle()
-        .then(({ data, error }) => {
+      (async () => {
+        try {
+          const { data, error } = await supabase
+            .from('orders')
+            .select('*')
+            .eq('id', orderId)
+            .maybeSingle();
           setIsLoading(false);
           if (error || !data) {
             setFetchError('No encontramos el pedido solicitado o ya no está disponible.');
           } else {
             setOrder(mapOrderFromDb(data));
           }
-        })
-        .catch(err => {
+        } catch {
           setIsLoading(false);
           setFetchError('Error de conexión al cargar el ticket digital.');
-        });
+        }
+      })();
     }
   }, [initialOrder, orderId, isOpen]);
 
