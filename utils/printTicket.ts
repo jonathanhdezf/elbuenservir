@@ -77,7 +77,7 @@ const getTicketHtml = (order: Order, logoUrl: string, date: string) => {
         <p style="font-family: 'Libre Barcode 39 Text', cursive; font-size: 42px; margin: 10px 0;">*${order.id}*</p>
         <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${order.id}" style="width: 120px; height: 120px; margin: 0 auto 10px auto; display: block;" alt="QR" />
         <p style="margin: 5px 0; font-size: 11px; font-weight: bold;">¡GRACIAS POR SU PREFERENCIA!</p>
-        <p style="margin: 2px 0; font-size: 10px;">Mercado Filomeno Mata #67</p>
+        <p style="margin: 2px 0; font-size: 10px;">Av. Cuauhtémoc #311 - 313, Col. Centro</p>
         <p style="margin: 2px 0; font-size: 10px;">Teziutlán, Puebla</p>
       </div>
     </div>

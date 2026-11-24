@@ -226,7 +226,7 @@ export const DigitalTicketModal: React.FC<DigitalTicketModalProps> = ({
                     Comida Casera y Tradicional
                   </p>
                   <p className="text-[10px] font-sans text-gray-500 mt-1">
-                    Mercado Filomeno Mata #67 • Teziutlán, Puebla
+                    Av. Cuauhtémoc #311 - 313 • Col. Centro, Teziutlán, Puebla
                   </p>
                   <p className="text-[10px] font-sans text-gray-500">
                     Tel / WhatsApp: +52 231 180 8272

@@ -1460,7 +1460,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   <div className="space-y-6 text-sm">
                     <p className="text-gray-500 dark:text-gray-400 flex items-start">
                       <MapPin className="w-5 h-5 mr-4 text-primary-500 flex-shrink-0" />
-                      <span>Mercado Filomeno Mata Local #67<br />16 de Septiembre<br />73800 Teziutlán Puebla</span>
+                      <span>Av. Cuauhtémoc #311 - 313<br />Col. Centro<br />C.P. 73800 Teziutlán, Puebla</span>
                     </p>
                     <p className="text-gray-500 dark:text-gray-400 flex items-start">
                       <Phone className="w-5 h-5 mr-4 text-primary-500 flex-shrink-0" />
@@ -1472,19 +1472,27 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                 <div>
                   <h5 className="font-black mb-8 text-xs uppercase tracking-[0.3em] text-gray-900 dark:text-white">Horarios</h5>
                   <div className="space-y-4">
-                    <div className="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 space-y-2">
+                    <div className="p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-800 space-y-3">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
                           <Clock className="w-4 h-4 text-primary-500" />
-                          <span>Lunes a Domingo</span>
+                          <span>Horario de Atención</span>
                         </span>
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                           Todos los días
                         </span>
                       </div>
-                      <p className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
-                        9:00 a.m. – 5:30 p.m.
-                      </p>
+                      <div className="space-y-2 pt-1">
+                        <div className="flex items-center justify-between gap-2 text-sm">
+                          <span className="font-bold text-gray-600 dark:text-gray-300">Lunes a Sábado</span>
+                          <span className="font-black text-gray-900 dark:text-white">8:15 a.m. – 7:00 p.m.</span>
+                        </div>
+                        <div className="h-px bg-gray-200/70 dark:bg-gray-700/70" />
+                        <div className="flex items-center justify-between gap-2 text-sm">
+                          <span className="font-bold text-gray-600 dark:text-gray-300">Domingo</span>
+                          <span className="font-black text-gray-900 dark:text-white">8:00 a.m. – 7:00 p.m.</span>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 px-1">

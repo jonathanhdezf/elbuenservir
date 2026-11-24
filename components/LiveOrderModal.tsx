@@ -148,6 +148,8 @@ const completeOrderTool = {
 function buildMenuContext(menuItems: MenuItem[], categories: Category[]): string {
   const lines: string[] = [
     "RESTAURANTE: Tlayoyos 3 Marías - Desayunos tradicionales, caldos y guisados caseros en Teziutlán, Puebla.",
+    "DIRECCIÓN: Av. Cuauhtémoc #311 - 313, Col. Centro, C.P. 73800, Teziutlán, Puebla.",
+    "HORARIO: Lunes a Sábado de 8:15 AM a 7:00 PM | Domingo de 8:00 AM a 7:00 PM.",
     "TELÉFONO: 2311024672.",
     "CATÁLOGO DE PLATILLOS Y PRECIOS:"
   ];

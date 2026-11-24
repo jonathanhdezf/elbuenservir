@@ -152,7 +152,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                   1. Identidad y Domicilio del Responsable
                 </h4>
                 <p>
-                  <strong>Tlayoyos 3 Marías</strong>, con domicilio comercial en Mercado Filomeno Mata Local #67, 16 de Septiembre, C.P. 73800, Teziutlán, Puebla, México, es el responsable del tratamiento y protección de sus datos personales, en estricto cumplimiento con la <em>Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP)</em>.
+                  <strong>Tlayoyos 3 Marías</strong>, con domicilio comercial en Av. Cuauhtémoc #311 - 313, Col. Centro, C.P. 73800, Teziutlán, Puebla, México, es el responsable del tratamiento y protección de sus datos personales, en estricto cumplimiento con la <em>Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP)</em>.
                 </p>
               </section>
 

@@ -66,7 +66,7 @@ const TESTIMONIALS: Testimonial[] = [
     date: 'Hace 1 mes',
     dishHighlight: 'Fresas con Crema y Jugo',
     comment:
-      'El jugo de naranja recién exprimido y las fresas con crema son nuestros favoritos. Un lugar emblemático en el Mercado Filomeno Mata que nunca falla.'
+      'El jugo de naranja recién exprimido y las fresas con crema son nuestros favoritos. Un lugar emblemático en el Centro de Teziutlán que nunca falla.'
   },
   {
     id: 'rev-6',
