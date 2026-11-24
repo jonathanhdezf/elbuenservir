@@ -1087,12 +1087,12 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   <span className="text-xs font-bold uppercase tracking-widest">El sabor que nos distingue</span>
                 </div>
                 <h1 className="text-7xl md:text-[120px] font-black text-white mb-8 tracking-tighter leading-[0.85] drop-shadow-2xl">
-                  Auténtica <br />
-                  <span className="text-primary-500 font-serif italic font-normal">Cocina</span> con <br />
-                  Herencia.
+                  Auténtico <br />
+                  <span className="text-primary-500 font-serif italic font-normal">Sabor</span> con <br />
+                  Herencia
                 </h1>
                 <p className="text-xl text-white/90 dark:text-white/80 mb-6 max-w-xl leading-relaxed font-medium drop-shadow-sm">
-                  Cada plato cuenta una historia. Descubre la fusión perfecta entre técnicas tradicionales y una visión culinaria moderna.
+                  Somos una tradición regional con más de 50 años de experiencia, siendo así pioneros en el Mercado Victoria, ven y comprueba nuestro único y delicioso sabor.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center gap-4">
                   <button
@@ -1168,14 +1168,12 @@ export default function PublicView({ categories, menuItems, customers, orders = 
           </div>
           <div className="space-y-8">
             <h5 className="text-primary-500 font-black uppercase tracking-[0.3em] text-sm italic">Pasión por lo que hacemos</h5>
-            <h2 className="text-5xl md:text-6xl font-black tracking-tighter leading-none dark:text-white">
-              Cocinamos con <br />
-              <span className="text-primary-500 italic font-serif">el corazón</span> para tu paladar.
+            <h2 className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tighter leading-none dark:text-white">
+              Los tradicionales{' '}
+              <span className="text-primary-500 italic font-serif">Tlayoyos</span>{' '}
+              de Teziutlán, Puebla.
             </h2>
             <div className="space-y-4">
-              <p className="text-lg text-gray-600 dark:text-gray-300 leading-relaxed font-medium">
-                Los tradicionales Tlayoyos de Teziutlán, Puebla. Somos una tradición regional con más de 50 años de experiencia, siendo así pioneros en el Mercado Victoria, ven y comprueba nuestro único y delicioso sabor.
-              </p>
               <p className="text-xl font-black text-primary-500 italic tracking-tight">
                 ¡¡¡Donde todo, bien todo rico!!!
               </p>
