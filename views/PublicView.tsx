@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, Minus, Trash2, ShoppingCart, X, ChefHat, Truck, Monitor, LayoutDashboard, Search, Store, Zap, Mic, Download, Smartphone, Sparkles, User, CreditCard, Banknote, Building2, Landmark, Wallet, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, Minus, Trash2, ShoppingCart, X, ChefHat, Truck, Monitor, Search, Store, Zap, Mic, Download, Smartphone, Sparkles, User, CreditCard, Banknote, Building2, Landmark, Wallet, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Category, MenuItem, Customer, Order, PaymentMethod, CustomerCreditMovement } from '../types';
 import { soundManager } from '../utils/soundManager';
 import LiveOrderModal from '../components/LiveOrderModal';
@@ -803,61 +803,8 @@ export default function PublicView({ categories, menuItems, customers, orders = 
             ))}
           </div>
           <div className="flex items-center space-x-4 md:space-x-6">
-            {!isPreview && (
-              <div className="flex items-center gap-2">
-                <button
-                  title="Panel de Control"
-                  onClick={() => {
-                    soundManager.play('click');
-                    if (onEnterControlPanel) onEnterControlPanel();
-                  }}
-                  className={`flex items-center gap-2 px-5 py-2.5 rounded-xl border border-gray-100 dark:border-gray-800 transition-all hover:scale-105 active:scale-95 shadow-sm ${isScrolled ? 'text-gray-900 bg-white dark:bg-gray-900 dark:text-white' : 'text-white bg-white/10 backdrop-blur-md'}`}
-                >
-                  <LayoutDashboard className="w-5 h-5 text-primary-500" />
-                  <span className="text-[10px] font-black uppercase tracking-widest hidden md:block">Panel de Control</span>
-                </button>
-              </div>
-            )}
-
-            {!isInstalled && (
-              <button
-                type="button"
-                onClick={() => {
-                  soundManager.play('click');
-                  installApp();
-                }}
-                title="Instalar aplicación en tu dispositivo"
-                className={`hidden md:flex items-center gap-2 px-5 py-2.5 rounded-xl border border-primary-500/40 transition-all hover:scale-105 active:scale-95 shadow-sm font-black text-xs uppercase tracking-wider cursor-pointer ${
-                  isScrolled || isPreview
-                    ? 'bg-primary-50 dark:bg-primary-950/40 text-primary-600 dark:text-primary-400 hover:bg-primary-500 hover:text-white dark:hover:bg-primary-500 dark:hover:text-white'
-                    : 'bg-white/10 text-white hover:bg-primary-500 backdrop-blur-md'
-                }`}
-              >
-                <Download className="w-4 h-4 text-primary-500" />
-                <span>Instalar App</span>
-              </button>
-            )}
-
-            {/* Sofia AI Button */}
-            <button
-              type="button"
-              onClick={() => {
-                soundManager.play('click');
-                setIsLiveOrderOpen(true);
-              }}
-              title="Hablar con Sofía IA - Asistente de Pedidos"
-              className={`hidden md:flex items-center gap-2 px-4 py-2.5 rounded-xl border border-emerald-500/40 transition-all hover:scale-105 active:scale-95 shadow-sm font-black text-xs uppercase tracking-wider cursor-pointer ${
-                isScrolled || isPreview
-                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500 hover:text-white dark:hover:bg-emerald-500 dark:hover:text-white'
-                  : 'bg-white/10 text-white hover:bg-emerald-500 backdrop-blur-md'
-              }`}
-            >
-              <Sparkles className="w-4 h-4 text-emerald-400 animate-pulse" />
-              <span>Sofía IA</span>
-            </button>
-
-            {/* Customer Profile / Login Button */}
-            {loggedCustomer ? (
+            {/* Customer Profile (when logged in) */}
+            {loggedCustomer && (
               <div className="relative">
                 <button
                   type="button"
@@ -917,25 +864,6 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   />
                 )}
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  soundManager.play('click');
-                  setAuthIntent('profile');
-                  setAuthMode('login');
-                  setIsAuthModalOpen(true);
-                }}
-                title="Iniciar sesión de cliente"
-                className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl border transition-all hover:scale-105 active:scale-95 shadow-sm font-black text-xs uppercase tracking-wider cursor-pointer ${
-                  isScrolled || isPreview
-                    ? 'border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-100 hover:border-primary-500 hover:text-primary-500'
-                    : 'border-white/20 bg-white/10 text-white hover:bg-white/20 backdrop-blur-md'
-                }`}
-              >
-                <User className="w-4 h-4 text-primary-500" />
-                <span className="hidden sm:inline">Entrar</span>
-              </button>
             )}
 
             <button

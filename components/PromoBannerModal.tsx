@@ -87,7 +87,7 @@ export function PromoBannerModal({
   };
 
   const baseUrl = (import.meta as any).env.BASE_URL || '/';
-  const bannerImgSrc = `${baseUrl}banner_promo_whatsapp.png`;
+  const bannerImgSrc = `${baseUrl}assets/aistudio/494373878_1231809338952223_3147762754903625367_n_0b7eeb8e.jpg`;
 
   return (
     <div className="fixed inset-0 z-[600] flex items-center justify-center p-3 sm:p-4 overflow-y-auto font-sans animate-in fade-in duration-300">
@@ -171,17 +171,17 @@ export function PromoBannerModal({
           <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-primary-400/35 shadow-2xl bg-black/40 group aspect-square max-h-[310px] mx-auto flex items-center justify-center">
             <img
               src={bannerImgSrc}
-              alt="La vida es corta... ¡Whatsappea a Tlayoyos 3 Marías!"
+              alt="¿De qué le vamos a dar? - Tlayoyos 3 Marías"
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
             {/* Glossy gradient reflection */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-white/10 pointer-events-none" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-white/5 pointer-events-none" />
 
-            {/* Quick action overlay pill */}
-            <div className="absolute bottom-3 inset-x-3 flex items-center justify-center">
-              <span className="px-3.5 py-1.5 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-xs font-black text-white flex items-center gap-2 shadow-lg">
+            {/* Quick action overlay pill positioned so bottom text & logo stay clear */}
+            <div className="absolute top-3 right-3 flex items-center justify-end">
+              <span className="px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/20 text-[11px] font-black text-white flex items-center gap-1.5 shadow-lg">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span>Atención Rápida en Teziutlán</span>
+                <span>Teziutlán</span>
               </span>
             </div>
           </div>
