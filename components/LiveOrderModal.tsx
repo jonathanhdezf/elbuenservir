@@ -222,6 +222,10 @@ export default function LiveOrderModal({
   const nextStartTimeRef = useRef<number>(0);
   const processorRef = useRef<ScriptProcessorNode | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const micSilentGainRef = useRef<GainNode | null>(null);
+  const outputGainRef = useRef<GainNode | null>(null);
+  const outputCompressorRef = useRef<DynamicsCompressorNode | null>(null);
+  const outputPostGainRef = useRef<GainNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const isMutedRef = useRef(isMuted);
   const isSpeakerMutedRef = useRef(isSpeakerMuted);
@@ -248,6 +252,13 @@ export default function LiveOrderModal({
 
   useEffect(() => {
     isSpeakerMutedRef.current = isSpeakerMuted;
+    if (outputGainRef.current && audioContextRef.current) {
+      outputGainRef.current.gain.setTargetAtTime(
+        isSpeakerMuted ? 0 : 3.0,
+        audioContextRef.current.currentTime,
+        0.015
+      );
+    }
   }, [isSpeakerMuted]);
 
   useEffect(() => {
@@ -574,9 +585,32 @@ export default function LiveOrderModal({
       const buffer = ctx.createBuffer(1, float32.length, SAMPLE_RATE);
       buffer.getChannelData(0).set(float32);
 
+      if (!outputGainRef.current || outputGainRef.current.context !== ctx) {
+        const preGain = ctx.createGain();
+        preGain.gain.setValueAtTime(isSpeakerMutedRef.current ? 0 : 3.0, ctx.currentTime);
+
+        const compressor = ctx.createDynamicsCompressor();
+        compressor.threshold.setValueAtTime(-8, ctx.currentTime);
+        compressor.knee.setValueAtTime(8, ctx.currentTime);
+        compressor.ratio.setValueAtTime(8, ctx.currentTime);
+        compressor.attack.setValueAtTime(0.002, ctx.currentTime);
+        compressor.release.setValueAtTime(0.12, ctx.currentTime);
+
+        const postGain = ctx.createGain();
+        postGain.gain.setValueAtTime(1.35, ctx.currentTime);
+
+        preGain.connect(compressor);
+        compressor.connect(postGain);
+        postGain.connect(ctx.destination);
+
+        outputGainRef.current = preGain;
+        outputCompressorRef.current = compressor;
+        outputPostGainRef.current = postGain;
+      }
+
       const source = ctx.createBufferSource();
       source.buffer = buffer;
-      source.connect(ctx.destination);
+      source.connect(outputGainRef.current);
 
       const currentTime = ctx.currentTime;
       if (nextStartTimeRef.current < currentTime) {
@@ -827,9 +861,25 @@ export default function LiveOrderModal({
       try { processorRef.current.disconnect(); } catch (e) { }
       processorRef.current = null;
     }
+    if (micSilentGainRef.current) {
+      try { micSilentGainRef.current.disconnect(); } catch (e) { }
+      micSilentGainRef.current = null;
+    }
     if (sourceRef.current) {
       try { sourceRef.current.disconnect(); } catch (e) { }
       sourceRef.current = null;
+    }
+    if (outputGainRef.current) {
+      try { outputGainRef.current.disconnect(); } catch (e) { }
+      outputGainRef.current = null;
+    }
+    if (outputCompressorRef.current) {
+      try { outputCompressorRef.current.disconnect(); } catch (e) { }
+      outputCompressorRef.current = null;
+    }
+    if (outputPostGainRef.current) {
+      try { outputPostGainRef.current.disconnect(); } catch (e) { }
+      outputPostGainRef.current = null;
     }
     if (mediaStreamRef.current) {
       try { mediaStreamRef.current.getTracks().forEach(t => t.stop()); } catch (e) { }
@@ -961,12 +1011,16 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
               }
             }, 100);
 
-            // Connect mic streaming
+            // Connect mic streaming (routed to zero-gain sink so mic never feeds speaker output)
             if (audioContextRef.current && sourceRef.current) {
               const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1);
+              const silentGain = audioContextRef.current.createGain();
+              silentGain.gain.setValueAtTime(0, audioContextRef.current.currentTime);
               processorRef.current = processor;
+              micSilentGainRef.current = silentGain;
               sourceRef.current.connect(processor);
-              processor.connect(audioContextRef.current.destination);
+              processor.connect(silentGain);
+              silentGain.connect(audioContextRef.current.destination);
 
               processor.onaudioprocess = (e) => {
                 if (isMutedRef.current || !sessionRef.current) return;
