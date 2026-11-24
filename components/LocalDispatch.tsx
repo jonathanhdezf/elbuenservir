@@ -354,12 +354,12 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
                                                     }
 
                                                     const phone = order.customerPhone.replace(/\D/g, '');
-                                                    const ticketUrl = `https://elbuenservir.vercel.app/?ticket=${order.id}`;
+                                                    const ticketUrl = `${window.location.origin}/?ticket=${order.id}`;
                                                     const message = order.status === 'kitchen'
-                                                        ? `Hola ${order.customerName}, tu pedido ${order.id} de El Buen Servir está siendo preparado en cocina. Te avisaremos cuando esté listo.`
+                                                        ? `Hola ${order.customerName}, tu pedido ${order.id} de Tlayoyos 3 Marías está siendo preparado en cocina. Te avisaremos cuando esté listo.`
                                                         : order.status === 'delivery'
-                                                            ? `Hola ${order.customerName}, tu pedido ${order.id} de El Buen Servir está en camino en reparto. ¡Prepárate para recibirlo!`
-                                                            : `¡Hola ${order.customerName}! ✨\n\nConfirmamos la entrega de tu pedido *${order.id}*. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\n¡Muchas gracias por tu preferencia en *El Buen Servir*! 🍽️`;
+                                                            ? `Hola ${order.customerName}, tu pedido ${order.id} de Tlayoyos 3 Marías está en camino en reparto. ¡Prepárate para recibirlo!`
+                                                            : `¡Hola ${order.customerName}! ✨\n\nConfirmamos la entrega de tu pedido *${order.id}*. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\n¡Muchas gracias por tu preferencia en *Tlayoyos 3 Marías*! 🍽️`;
 
                                                     window.open(`https://wa.me/52${phone}?text=${encodeURIComponent(message)}`, '_blank');
                                                 }}

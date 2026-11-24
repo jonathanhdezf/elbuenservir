@@ -370,7 +370,7 @@ export default function App() {
 
   const [enabledModules, setEnabledModules] = useState<EnabledModules>(() => {
     try {
-      const saved = localStorage.getItem('elbuenservir_enabled_modules');
+      const saved = localStorage.getItem('tlayoyos3marias_enabled_modules');
       if (saved) {
         return { ...DEFAULT_ENABLED_MODULES, ...JSON.parse(saved) };
       }
@@ -384,7 +384,7 @@ export default function App() {
     setEnabledModules(prev => {
       const next = typeof valOrUpdater === 'function' ? valOrUpdater(prev) : valOrUpdater;
       try {
-        localStorage.setItem('elbuenservir_enabled_modules', JSON.stringify(next));
+        localStorage.setItem('tlayoyos3marias_enabled_modules', JSON.stringify(next));
       } catch (e) {
         console.error('Error saving enabled modules to localStorage', e);
       }
@@ -395,8 +395,8 @@ export default function App() {
   const [isPanelAuthenticated, setIsPanelAuthenticated] = useState<boolean>(() => {
     try {
       return (
-        sessionStorage.getItem('el_buen_servir_cp_auth') === 'true' ||
-        localStorage.getItem('el_buen_servir_cp_auth') === 'true'
+        sessionStorage.getItem('tlayoyos_3_marias_cp_auth') === 'true' ||
+        localStorage.getItem('tlayoyos_3_marias_cp_auth') === 'true'
       );
     } catch {
       return false;
@@ -570,7 +570,7 @@ export default function App() {
 
     let channel: BroadcastChannel | null = null;
     try {
-      channel = new BroadcastChannel('el_buen_servir_sw_channel');
+      channel = new BroadcastChannel('tlayoyos_3_marias_sw_channel');
       channel.onmessage = (event) => {
         if (event.data?.type === 'NAVIGATE_TO_ADMIN_ORDERS') {
           handleOpenAdminOrders(event.data.orderId);

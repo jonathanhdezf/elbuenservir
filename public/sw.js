@@ -1,5 +1,5 @@
-// Service Worker for El Buen Servir PWA - v4
-const CACHE_NAME = 'el-buen-servir-v4';
+// Service Worker for Tlayoyos 3 Marías PWA - v4
+const CACHE_NAME = 'tlayoyos-3-marias-v4';
 
 self.addEventListener('install', (event) => {
   // Activate immediately without waiting for other tabs
@@ -70,7 +70,7 @@ self.addEventListener('notificationclick', (event) => {
 
             // Also broadcast through channel for maximum reliability across tabs/workers
             try {
-              const channel = new BroadcastChannel('el_buen_servir_sw_channel');
+              const channel = new BroadcastChannel('tlayoyos_3_marias_sw_channel');
               channel.postMessage({
                 type: 'NAVIGATE_TO_ADMIN_ORDERS',
                 action: 'open_orders',
@@ -114,14 +114,14 @@ self.addEventListener('push', (event) => {
     data = event.data ? event.data.json() : {};
   } catch (e) {
     data = {
-      title: '🔔 ¡Nuevo Pedido en El Buen Servir!',
+      title: '🔔 ¡Nuevo Pedido en Tlayoyos 3 Marías!',
       body: event.data ? event.data.text() : 'Se ha recibido un nuevo pedido en el sistema.'
     };
   }
 
   const orderId = data.orderId || null;
   const targetUrl = data.url || (orderId ? `/?view=admin&section=orders&orderId=${orderId}` : '/?view=admin&section=orders');
-  const title = data.title || (orderId ? `🔔 ¡Nuevo Pedido #${orderId}!` : '🔔 ¡Nuevo Pedido en El Buen Servir!');
+  const title = data.title || (orderId ? `🔔 ¡Nuevo Pedido #${orderId}!` : '🔔 ¡Nuevo Pedido en Tlayoyos 3 Marías!');
 
   const options = {
     body: data.body || 'Toca para abrir el módulo de pedidos en el panel de administración.',

@@ -147,7 +147,7 @@ const completeOrderTool = {
 
 function buildMenuContext(menuItems: MenuItem[], categories: Category[]): string {
   const lines: string[] = [
-    "RESTAURANTE: El Buen Servir - Desayunos tradicionales, caldos y guisados caseros en Teziutlán, Puebla.",
+    "RESTAURANTE: Tlayoyos 3 Marías - Desayunos tradicionales, caldos y guisados caseros en Teziutlán, Puebla.",
     "TELÉFONO: 2311024672.",
     "CATÁLOGO DE PLATILLOS Y PRECIOS:"
   ];
@@ -472,7 +472,7 @@ export default function LiveOrderModal({
     }).join('\n');
 
     const msg =
-      `*🎙️ PEDIDO ASISTIDO POR SOFÍA IA - EL BUEN SERVIR*\n\n` +
+      `*🎙️ PEDIDO ASISTIDO POR SOFÍA IA - TLAYOYOS 3 MARÍAS*\n\n` +
       `🆔 *Orden:* #${orderId}\n` +
       `👤 *Cliente:* ${customerName}\n` +
       `📱 *Teléfono:* ${customerPhone}\n` +
@@ -770,7 +770,7 @@ export default function LiveOrderModal({
         });
 
         if (result) {
-          setCurrentSofiaSpeech(`¡Pedido #${result.order.id} generado con éxito! Muchas gracias por tu preferencia en El Buen Servir.`);
+          setCurrentSofiaSpeech(`¡Pedido #${result.order.id} generado con éxito! Muchas gracias por tu preferencia en Tlayoyos 3 Marías.`);
           pendingAutoWhatsAppUrlRef.current = result.waUrl;
           if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
           autoSendTimerRef.current = setTimeout(() => {
@@ -791,7 +791,7 @@ export default function LiveOrderModal({
             output: {
               success: true,
               orderId: result?.order.id || null,
-              message: "Pedido generado y registrado exitosamente en el sistema de El Buen Servir."
+              message: "Pedido generado y registrado exitosamente en el sistema de Tlayoyos 3 Marías."
             }
           }
         });
@@ -894,7 +894,7 @@ export default function LiveOrderModal({
         ? `Nombre del cliente: ${loggedCustomer.name}, Teléfono: ${loggedCustomer.phone}, Domicilio guardado: ${loggedCustomer.addresses?.[0] || 'Sin domicilio registrado'}.`
         : 'Cliente invitado.';
 
-      const systemInstruction = `Eres "Sofía", la anfitriona y mesera virtual inteligente de "El Buen Servir", restaurante de cocina casera y desayunos en Teziutlán, Puebla.
+      const systemInstruction = `Eres "Sofía", la anfitriona y mesera virtual inteligente de "Tlayoyos 3 Marías", restaurante de cocina casera y desayunos en Teziutlán, Puebla.
 Hablas con voz cálida, alegre, educada, amena y con la hospitalidad mexicana más distinguida.
 
 CLIENTE:
@@ -904,7 +904,7 @@ MENÚ DEL RESTAURANTE:
 ${menuContext}
 
 INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
-1. Saluda al cliente cordialmente con entusiasmo (menciona su nombre si está disponible) y pregúntale qué se le antoja degustar hoy de El Buen Servir.
+1. Saluda al cliente cordialmente con entusiasmo (menciona su nombre si está disponible) y pregúntale qué se le antoja degustar hoy de Tlayoyos 3 Marías.
 2. REGLA ESTRICTA: Cada vez que el cliente mencione o pida un platillo, bebida o postre, EJECUTA INMEDIATAMENTE la herramienta 'updateOrder' con action='add', el nombre del platillo, su variación y precio del menú. No esperes al final para agregar platillos.
 3. Si el cliente pide modificar la cantidad o quitar algo, ejecuta 'updateOrder' con action='update' o 'remove'.
 4. PERSONALIZACIÓN Y ACOMPAÑAMIENTOS: Para platillos como el Pozole, la Pancita, Caldos u otros guisados, si el cliente pide que no le pongan ciertos acompañamientos o complementos tradicionales (por ejemplo: "sin cebolla", "sin rábanos", "sin aguacate", "sin orégano", "limón aparte", etc.), guarda SIEMPRE esa especificación en el parámetro 'notes' al llamar a 'updateOrder' y al listar 'items' en 'completeOrder'.
@@ -917,7 +917,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
 7. Una vez ofrecidos las bebidas y postres, pregúntale amablemente si prefiere recoger en mostrador (pickup) o entrega a domicilio (delivery).
 8. Si elige entrega a domicilio, sugiere su dirección registrada o pregúntale a qué dirección enviarlo.
 9. Pregúntale su método de pago (efectivo, tarjeta, transferencia o credito).
-10. REGLA CRÍTICA DE CIERRE: En cuanto tengas el método de entrega (y dirección si es domicilio) y la forma de pago, DEBES EJECUTAR OBLIGATORIAMENTE la herramienta 'completeOrder' incluyendo orderType, deliveryAddress, paymentMethod y la lista completa de 'items' del pedido (con sus 'notes' de preparación si aplican), y despídete amablemente agradeciendo su preferencia en El Buen Servir.
+10. REGLA CRÍTICA DE CIERRE: En cuanto tengas el método de entrega (y dirección si es domicilio) y la forma de pago, DEBES EJECUTAR OBLIGATORIAMENTE la herramienta 'completeOrder' incluyendo orderType, deliveryAddress, paymentMethod y la lista completa de 'items' del pedido (con sus 'notes' de preparación si aplican), y despídete amablemente agradeciendo su preferencia en Tlayoyos 3 Marías.
 11. Mantén tus intervenciones habladas breves, fluidas y directas (1 a 2 oraciones), para que la conversación sea rápida y amena como una llamada telefónica real.`;
 
       let sessionInstance: any = null;
@@ -945,7 +945,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
 
             const welcomePrompt = loggedCustomer
               ? `¡Hola! Ya entré a la llamada. Salúdame amablemente por mi nombre ${loggedCustomer.name.split(' ')[0]} y pregúntame qué se me antoja ordenar hoy.`
-              : '¡Hola! Ya entré a la llamada. Salúdame amablemente y pregúntame qué se me antoja ordenar hoy en El Buen Servir.';
+              : '¡Hola! Ya entré a la llamada. Salúdame amablemente y pregúntame qué se me antoja ordenar hoy en Tlayoyos 3 Marías.';
 
             // Greet customer via Gemini's live neural audio
             setTimeout(() => {
@@ -1156,7 +1156,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
       }
     }
 
-    return "Te escucho con atención. Dime qué se te antoja ordenar de nuestro menú tradicional de El Buen Servir.";
+    return "Te escucho con atención. Dime qué se te antoja ordenar de nuestro menú tradicional de Tlayoyos 3 Marías.";
   };
 
   // Send text to live session (from keyboard or quick prompt pills)

@@ -193,7 +193,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
         {/* Top Header */}
         <div className="p-4 sm:p-6 pb-3 sm:pb-4 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-black/20 gap-2">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-primary-500/20 shrink-0">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-primary-500 via-rose-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-primary-500/25 shrink-0">
               <User className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
@@ -201,7 +201,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
                 {mode === 'login' ? 'Acceso de Cliente' : 'Crear Cuenta'}
               </h3>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate">
-                El Buen Servir • Restaurante
+                Tlayoyos 3 Marías • Restaurante
               </p>
             </div>
           </div>
@@ -399,7 +399,7 @@ export const CustomerAuthModal: React.FC<CustomerAuthModalProps> = ({
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary-500 to-amber-500 hover:from-primary-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-widest transition-all duration-200 shadow-xl shadow-primary-500/25 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-4 rounded-2xl bg-gradient-to-r from-primary-500 via-rose-500 to-amber-500 hover:from-primary-600 hover:via-rose-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-widest transition-all duration-200 shadow-xl shadow-primary-500/25 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
             >
               <span>{mode === 'login' ? 'Iniciar Sesión' : 'Completar Registro'}</span>
               <ArrowRight className="w-4 h-4" />

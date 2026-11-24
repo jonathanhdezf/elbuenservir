@@ -1,15 +1,15 @@
 {
   "id": "./?source=pwa",
-  "name": "El Buen Servir | Gastronomía con Alma",
-  "short_name": "El Buen Servir",
-  "description": "Menú digital y pedidos en línea de El Buen Servir.",
+  "name": "Tlayoyos 3 Marías | Gastronomía con Alma",
+  "short_name": "Tlayoyos 3 Marías",
+  "description": "Menú digital y pedidos en línea de Tlayoyos 3 Marías.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "portrait",
-  "background_color": "#0f172a",
-  "theme_color": "#f59e0b",
+  "background_color": "#160a12",
+  "theme_color": "#e4007c",
   "categories": ["food", "restaurants", "shopping"],
   "icons": [
     {
@@ -31,7 +31,7 @@
       "purpose": "maskable"
     },
     {
-      "src": "logo.png",
+      "src": "assets/aistudio/Designer__3__462aa070.png",
       "sizes": "1024x1024",
       "type": "image/png",
       "purpose": "any"

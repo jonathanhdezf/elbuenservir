@@ -123,14 +123,14 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <div className="p-8 flex flex-col items-center border-b border-gray-50 dark:border-gray-800">
         <div className="relative group cursor-pointer" onClick={onExitToSite}>
-          <div className="absolute -inset-1 bg-gradient-to-tr from-primary-400 to-amber-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-300"></div>
+          <div className="absolute -inset-1 bg-gradient-to-tr from-primary-500 via-rose-500 to-amber-500 rounded-full blur opacity-30 group-hover:opacity-60 transition duration-300"></div>
           <img
-            alt="El Buen Servir Logo"
-            className="relative w-24 h-24 rounded-full shadow-xl mb-4 object-cover border-4 border-white dark:border-gray-800"
-            src={`${(import.meta as any).env.BASE_URL}logo.png`}
+            alt="Tlayoyos 3 Marías Logo"
+            className="relative w-24 h-24 mb-4 object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-105"
+            src={`${(import.meta as any).env.BASE_URL}assets/aistudio/${isDarkMode ? 'Designer__3__462aa070.png' : 'Designer__4__f4d6f29f.png'}`}
           />
         </div>
-        <h1 className="text-2xl font-bold tracking-tight text-gray-800 dark:text-white">El Buen Servir</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-gray-800 dark:text-white">Tlayoyos 3 Marías</h1>
         <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-2 uppercase tracking-[0.2em] font-bold">Panel de Administrador</p>
       </div>
 
@@ -202,12 +202,12 @@ const Sidebar: React.FC<SidebarProps> = ({
 
       <div className="p-6 bg-gray-50/50 dark:bg-black/20 border-t border-gray-100 dark:border-gray-800">
         <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-400 to-amber-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 via-rose-500 to-amber-500 flex items-center justify-center text-white font-bold text-lg shadow-sm">
             A
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-gray-800 dark:text-white truncate">Admin User</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 truncate">admin@elbuenservir.com</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 truncate">admin@tlayoyos3marias.com</p>
           </div>
           <button title="Cerrar sesión" className="text-gray-400 hover:text-red-500 transition-colors p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/20">
             <LogOut className="w-4 h-4" />

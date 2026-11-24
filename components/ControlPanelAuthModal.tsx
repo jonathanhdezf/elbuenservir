@@ -138,7 +138,7 @@ export const ControlPanelAuthModal: React.FC<ControlPanelAuthModalProps> = ({
           {/* Security Notice */}
           <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-900/40 rounded-xl text-amber-700 dark:text-amber-400 text-xs font-semibold">
             <ShieldCheck className="w-4 h-4 shrink-0" />
-            <span>Área exclusiva para personal autorizado de El Buen Servir.</span>
+            <span>Área exclusiva para personal autorizado de Tlayoyos 3 Marías.</span>
           </div>
 
           {/* Action buttons */}

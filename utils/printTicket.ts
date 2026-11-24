@@ -23,7 +23,7 @@ const getTicketHtml = (order: Order, logoUrl: string, date: string) => {
       
       <div style="text-align: center; margin-bottom: 15px; border-bottom: 1px dashed black; padding-bottom: 10px;">
         <img src="${logoUrl}" alt="LOGO" style="max-width: 90px; height: auto; display: block; margin: 0 auto 8px auto; filter: grayscale(100%);" />
-        <h2 style="margin: 0; font-size: 18px; font-weight: bold;">EL BUEN SERVIR</h2>
+        <h2 style="margin: 0; font-size: 18px; font-weight: bold;">TLAYOYOS 3 MARÍAS</h2>
         <p style="margin: 2px 0;">Comida Casera y Tradicional</p>
         <p style="margin: 2px 0;">Tel: 55-1234-5678</p> 
       </div>
@@ -98,7 +98,7 @@ export const generateTicket = async (order: Order) => {
   });
 
   const base = (import.meta as any).env?.BASE_URL || '/';
-  const logoUrl = `${window.location.origin}${base}logo.png`;
+  const logoUrl = `${window.location.origin}${base}assets/aistudio/Designer__4__f4d6f29f.png`;
 
   // 1. GENERATE DOWNLOADABLE IMAGE
   const offscreenContainer = document.createElement('div');

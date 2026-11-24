@@ -297,7 +297,7 @@ export const databaseService = {
     onCategoryChange?: (payload: any) => void;
     onCustomerChange?: (payload: any) => void;
   }) {
-    const channel = supabase.channel('el-buen-servir-realtime');
+    const channel = supabase.channel('tlayoyos-3-marias-realtime');
 
     if (callbacks.onOrderChange) {
       channel.on(

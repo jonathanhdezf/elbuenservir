@@ -123,7 +123,7 @@ export const CustomerAvatar: React.FC<CustomerAvatarProps> = ({
         {/* Layer 2: Initial Badge (Alternating) */}
         {alternateWithInitial && (
           <div
-            className={`absolute inset-0 w-full h-full rounded-full bg-gradient-to-tr from-primary-500/25 via-amber-500/20 to-primary-600/30 dark:from-primary-950 dark:via-amber-950/40 dark:to-primary-900/50 flex items-center justify-center transition-all duration-700 ease-in-out ${
+            className={`absolute inset-0 w-full h-full rounded-full bg-gradient-to-tr from-primary-500/25 via-rose-500/20 to-amber-500/25 dark:from-primary-950 dark:via-rose-950/40 dark:to-primary-900/50 flex items-center justify-center transition-all duration-700 ease-in-out ${
               showInitial
                 ? 'opacity-100 scale-100 rotate-0'
                 : 'opacity-0 scale-75 -rotate-12 pointer-events-none'

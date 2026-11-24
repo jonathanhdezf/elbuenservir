@@ -49,7 +49,7 @@ export const CustomerOnboardingTooltip: React.FC<CustomerOnboardingTooltipProps>
       description: 'Toca tu avatar en la barra superior para acceder a tu perfil. Desde ahí puedes actualizar tu nombre, cambiar tu foto, editar tu contraseña y guardar tus direcciones de entrega favoritas para ordenar mucho más rápido.',
       actionLabel: 'Abrir Mi Perfil',
       icon: User,
-      colorClass: 'text-amber-500 bg-amber-500/10 border-amber-500/20',
+      colorClass: 'text-primary-500 bg-primary-500/10 border-primary-500/20',
       action: () => {
         soundManager.play('click');
         onOpenProfile('profile');
@@ -116,7 +116,7 @@ export const CustomerOnboardingTooltip: React.FC<CustomerOnboardingTooltipProps>
 
       {/* Floating Guided Tooltip Container */}
       <div
-        className="fixed top-20 left-3 right-3 sm:left-auto sm:right-6 sm:top-20 z-50 sm:w-[400px] bg-white dark:bg-gray-900 border-2 border-primary-500 rounded-[28px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] dark:shadow-[0_25px_60px_-15px_rgba(245,158,11,0.2)] ring-4 ring-primary-500/15 overflow-hidden animate-in fade-in zoom-in-95 duration-300"
+        className="fixed top-20 left-3 right-3 sm:left-auto sm:right-6 sm:top-20 z-50 sm:w-[400px] bg-white dark:bg-gray-900 border-2 border-primary-500 rounded-[28px] shadow-[0_25px_60px_-15px_rgba(0,0,0,0.35)] dark:shadow-[0_25px_60px_-15px_rgba(228,0,124,0.22)] ring-4 ring-primary-500/15 overflow-hidden animate-in fade-in zoom-in-95 duration-300"
         role="dialog"
         aria-modal="true"
         aria-labelledby="onboarding-guide-title"
@@ -125,7 +125,7 @@ export const CustomerOnboardingTooltip: React.FC<CustomerOnboardingTooltipProps>
         <div className="hidden sm:block absolute -top-2 right-12 w-4 h-4 bg-white dark:bg-gray-900 border-t-2 border-l-2 border-primary-500 transform rotate-45 z-10" />
 
         {/* Top Header Badge & Close */}
-        <div className="p-4 pb-2 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-primary-500/10 via-amber-500/5 to-transparent flex items-center justify-between gap-2">
+        <div className="p-4 pb-2 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-primary-500/10 via-rose-500/5 to-transparent flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse shrink-0" />
             <div className="flex items-center gap-1.5 min-w-0">

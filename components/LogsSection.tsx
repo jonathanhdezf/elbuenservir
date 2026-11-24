@@ -61,7 +61,7 @@ const LogsSection: React.FC<LogsSectionProps> = ({ logs, onClearLogs }) => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `logs-elbuenservir-${new Date().toISOString().split('T')[0]}.csv`;
+        a.download = `logs-tlayoyos3marias-${new Date().toISOString().split('T')[0]}.csv`;
         a.click();
     };
 

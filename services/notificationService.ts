@@ -20,8 +20,8 @@ class NotificationService {
     if (typeof window === 'undefined') return false;
     try {
       return (
-        sessionStorage.getItem('el_buen_servir_cp_auth') === 'true' ||
-        localStorage.getItem('el_buen_servir_cp_auth') === 'true'
+        sessionStorage.getItem('tlayoyos_3_marias_cp_auth') === 'true' ||
+        localStorage.getItem('tlayoyos_3_marias_cp_auth') === 'true'
       );
     } catch {
       return false;
@@ -35,11 +35,11 @@ class NotificationService {
     if (typeof window === 'undefined') return;
     try {
       if (authenticated) {
-        sessionStorage.setItem('el_buen_servir_cp_auth', 'true');
-        localStorage.setItem('el_buen_servir_cp_auth', 'true');
+        sessionStorage.setItem('tlayoyos_3_marias_cp_auth', 'true');
+        localStorage.setItem('tlayoyos_3_marias_cp_auth', 'true');
       } else {
-        sessionStorage.removeItem('el_buen_servir_cp_auth');
-        localStorage.removeItem('el_buen_servir_cp_auth');
+        sessionStorage.removeItem('tlayoyos_3_marias_cp_auth');
+        localStorage.removeItem('tlayoyos_3_marias_cp_auth');
       }
     } catch (e) {
       console.warn('Storage error in notificationService:', e);

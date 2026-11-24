@@ -83,7 +83,7 @@ export const DigitalTicketModal: React.FC<DigitalTicketModalProps> = ({
 
   const ticketUrl = typeof window !== 'undefined'
     ? `${window.location.origin}/?ticket=${order?.id || orderId}`
-    : `https://elbuenservir.vercel.app/?ticket=${order?.id || orderId}`;
+    : `https://tlayoyos3marias.vercel.app/?ticket=${order?.id || orderId}`;
 
   const handleCopyLink = () => {
     if (navigator.clipboard) {
@@ -95,7 +95,7 @@ export const DigitalTicketModal: React.FC<DigitalTicketModalProps> = ({
 
   const handleShareWhatsApp = () => {
     if (!order) return;
-    const msg = `🧾 *Ticket Digital de Pedido - El Buen Servir*\n\nFolio: *${order.id}*\nTotal: *$${order.total.toFixed(2)}*\n\nPuedes consultar el detalle de tu ticket aquí:\n${ticketUrl}`;
+    const msg = `🧾 *Ticket Digital de Pedido - Tlayoyos 3 Marías*\n\nFolio: *${order.id}*\nTotal: *$${order.total.toFixed(2)}*\n\nPuedes consultar el detalle de tu ticket aquí:\n${ticketUrl}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
@@ -211,8 +211,8 @@ export const DigitalTicketModal: React.FC<DigitalTicketModalProps> = ({
                 {/* Brand Header */}
                 <div className="text-center pb-5 border-b-2 border-dashed border-gray-300">
                   <img 
-                    src="/logo.png" 
-                    alt="El Buen Servir" 
+                    src={`${(import.meta as any).env.BASE_URL}assets/aistudio/Designer__4__f4d6f29f.png`}
+                    alt="Tlayoyos 3 Marías" 
                     className="w-16 h-16 mx-auto mb-2 object-contain"
                     onError={(e) => {
                       // Fallback if logo not found
@@ -220,7 +220,7 @@ export const DigitalTicketModal: React.FC<DigitalTicketModalProps> = ({
                     }}
                   />
                   <h2 className="text-xl font-black uppercase tracking-tight text-gray-900">
-                    EL BUEN SERVIR
+                    TLAYOYOS 3 MARÍAS
                   </h2>
                   <p className="text-[11px] font-sans font-bold text-gray-500 uppercase tracking-widest mt-0.5">
                     Comida Casera y Tradicional
@@ -375,10 +375,10 @@ export const DigitalTicketModal: React.FC<DigitalTicketModalProps> = ({
                       ¡GRACIAS POR TU PREFERENCIA! 🍽️
                     </p>
                     <p className="text-[10px] font-sans text-gray-500 mt-1">
-                      El Buen Servir • Sabor Casero que te Acompaña
+                      Tlayoyos 3 Marías • Sabor Casero que te Acompaña
                     </p>
                     <p className="text-[9px] font-sans text-gray-400 mt-0.5">
-                      elbuenservir.vercel.app
+                      tlayoyos3marias.vercel.app
                     </p>
                   </div>
                 </div>

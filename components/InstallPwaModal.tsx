@@ -29,7 +29,7 @@ export const InstallPwaModal: React.FC<InstallPwaModalProps> = ({ isOpen, onClos
                 Instalar Aplicación
               </h4>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                El Buen Servir en tu inicio
+                Tlayoyos 3 Marías en tu inicio
               </p>
             </div>
           </div>

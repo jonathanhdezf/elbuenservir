@@ -751,24 +751,24 @@ export default function ControlPanelView({
                     {/* Logo and Header */}
                     <div className="text-center mb-6 md:mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
                         <div className="relative inline-block mb-3 md:mb-5">
-                            <div className={`absolute -inset-4 rounded-full blur-2xl opacity-30 animate-pulse ${
-                                panelMode === 'basic' ? 'bg-gradient-to-tr from-blue-500 to-amber-500' : 'bg-gradient-to-tr from-blue-500 to-emerald-500'
+                            <div className={`absolute -inset-4 rounded-full blur-2xl opacity-35 animate-pulse ${
+                                panelMode === 'basic' ? 'bg-gradient-to-tr from-primary-500 via-rose-500 to-amber-500' : 'bg-gradient-to-tr from-primary-500 to-emerald-500'
                             }`}></div>
                             <img
-                                src={`${(import.meta as any).env.BASE_URL}logo.png`}
-                                alt="System Logo"
-                                className="relative w-16 h-16 md:w-20 md:h-20 rounded-[28px] md:rounded-[32px] shadow-2xl border-2 border-white/20 object-cover"
+                                src={`${(import.meta as any).env.BASE_URL}assets/aistudio/Designer__3__462aa070.png`}
+                                alt="Tlayoyos 3 Marías"
+                                className="relative w-20 h-20 md:w-24 md:h-24 object-contain drop-shadow-[0_4px_16px_rgba(228,0,124,0.35)]"
                             />
                         </div>
                         <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tighter uppercase mb-2">
                             Panel de <span className={`text-transparent bg-clip-text ${
                                 panelMode === 'basic' 
-                                    ? 'bg-gradient-to-r from-blue-400 via-indigo-300 to-amber-400'
-                                    : 'bg-gradient-to-r from-blue-400 to-emerald-400'
+                                    ? 'bg-gradient-to-r from-primary-400 via-rose-300 to-amber-300'
+                                    : 'bg-gradient-to-r from-primary-400 to-emerald-400'
                             }`}>Control</span>
                         </h1>
                         <p className="text-white/40 text-[10px] md:text-xs font-black uppercase tracking-[0.3em] md:tracking-[0.4em]">
-                            {panelMode === 'basic' ? 'Vista Básica • Administración y Menú' : 'Vista Avanzada • Sistema Operativo "El Buen Servir"'}
+                            {panelMode === 'basic' ? 'Vista Básica • Administración y Menú' : 'Vista Avanzada • Sistema Operativo "Tlayoyos 3 Marías"'}
                         </p>
                     </div>
 

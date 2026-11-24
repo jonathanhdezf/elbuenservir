@@ -6,7 +6,7 @@ import {
 import { soundManager } from '../utils/soundManager';
 
 const WHATSAPP_NUMBER = '522311024672';
-const DEFAULT_PRESET_MSG = '¡Hola El Buen Servir! Vi la promoción "La vida es corta... ¡Whatsappea al Buen Servir!" y me gustaría hacer un pedido.';
+const DEFAULT_PRESET_MSG = '¡Hola Tlayoyos 3 Marías! Vi la promoción "La vida es corta... ¡Whatsappea a Tlayoyos 3 Marías!" y me gustaría hacer un pedido.';
 
 interface PromoBannerModalProps {
   isOpen: boolean;
@@ -36,34 +36,30 @@ export function PromoBannerModal({
         soundManager.play('notification');
       } catch (e) { }
     } else {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
     }
   }, [isOpen, autoCloseSeconds]);
 
   // Tick countdown timer
   useEffect(() => {
-    if (!isOpen) return;
-
-    if (isPaused) {
-      if (timerRef.current) clearInterval(timerRef.current);
+    if (!isOpen || isPaused) {
+      if (timerRef.current) clearTimeout(timerRef.current);
       return;
     }
 
-    timerRef.current = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timerRef.current);
-          onClose();
-          return 0;
-        }
-        return prev - 1;
-      });
+    timerRef.current = setTimeout(() => {
+      if (timeLeft <= 1) {
+        setTimeLeft(0);
+        onClose();
+      } else {
+        setTimeLeft((prev) => prev - 1);
+      }
     }, 1000);
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [isOpen, isPaused, onClose]);
+  }, [isOpen, isPaused, timeLeft, onClose]);
 
   if (!isOpen) return null;
 
@@ -109,26 +105,26 @@ export function PromoBannerModal({
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
         onTouchStart={() => setIsPaused(true)}
-        className="relative z-10 w-full max-w-md sm:max-w-lg bg-gradient-to-b from-[#0a2315] via-[#07190f] to-[#040e08] rounded-3xl sm:rounded-[36px] border-2 border-emerald-500/40 shadow-[0_0_50px_rgba(16,185,129,0.35)] overflow-hidden text-white my-auto transform transition-all animate-in zoom-in-95 duration-300"
+        className="relative z-10 w-full max-w-md sm:max-w-lg bg-gradient-to-b from-[#240819] via-[#15060f] to-[#0b0307] rounded-3xl sm:rounded-[36px] border-2 border-primary-500/45 shadow-[0_0_50px_rgba(228,0,124,0.3)] overflow-hidden text-white my-auto transform transition-all animate-in zoom-in-95 duration-300"
       >
         {/* Top Floating Progress Bar */}
         <div className="relative w-full h-1.5 bg-white/10 overflow-hidden">
           <div
             className={`h-full transition-all duration-1000 ease-linear ${
-              isPaused ? 'bg-amber-400' : 'bg-gradient-to-r from-emerald-400 to-teal-300'
+              isPaused ? 'bg-amber-400' : 'bg-gradient-to-r from-primary-400 via-rose-400 to-emerald-400'
             }`}
             style={{ width: `${progressPercent}%` }}
           />
         </div>
 
         {/* Ambient Top Glow */}
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-32 bg-emerald-500/25 blur-3xl pointer-events-none" />
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-72 h-32 bg-primary-500/25 blur-3xl pointer-events-none" />
 
         {/* Header Ribbon & Close */}
         <div className="px-4 sm:px-6 pt-3.5 pb-2 flex items-center justify-between relative z-10">
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 shadow-inner">
-            <Sparkles className="w-3.5 h-3.5 text-emerald-300 animate-pulse" />
-            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-300">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-primary-500/20 border border-primary-400/40 shadow-inner">
+            <Sparkles className="w-3.5 h-3.5 text-primary-300 animate-pulse" />
+            <span className="text-[11px] font-black uppercase tracking-wider text-primary-200">
               Promoción Exclusiva
             </span>
           </div>
@@ -172,10 +168,10 @@ export function PromoBannerModal({
         {/* Modal Body */}
         <div className="px-4 sm:px-6 pt-1 pb-5 space-y-4 relative z-10">
           {/* Main Visual Image Banner */}
-          <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-emerald-400/30 shadow-2xl bg-black/40 group aspect-square max-h-[310px] mx-auto flex items-center justify-center">
+          <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-primary-400/35 shadow-2xl bg-black/40 group aspect-square max-h-[310px] mx-auto flex items-center justify-center">
             <img
               src={bannerImgSrc}
-              alt="La vida es corta... ¡Whatsappea al Buen Servir!"
+              alt="La vida es corta... ¡Whatsappea a Tlayoyos 3 Marías!"
               className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
             {/* Glossy gradient reflection */}
@@ -193,7 +189,7 @@ export function PromoBannerModal({
           {/* Copy description */}
           <div className="text-center space-y-1.5 px-2">
             <h3 className="text-lg sm:text-xl font-black uppercase tracking-tight text-white leading-tight">
-              ¡La vida es corta... <span className="text-emerald-400">Whatsappea</span> al Buen Servir!
+              ¡La vida es corta... <span className="text-primary-300">Whatsappea</span> a Tlayoyos 3 Marías!
             </h3>
             <p className="text-xs sm:text-sm text-gray-300 font-medium leading-snug">
               Desayunos caseros, caldos reconfortantes y chilaquiles calientitos listos para llevar o recibir en tu domicilio.
@@ -209,7 +205,7 @@ export function PromoBannerModal({
               className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white font-black text-sm sm:text-base uppercase tracking-wider flex items-center justify-center gap-3 shadow-xl shadow-emerald-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
             >
               <MessageCircle className="w-6 h-6 fill-current" />
-              <span>¡Whatsappear al Buen Servir!</span>
+              <span>¡Whatsappear a Tlayoyos 3 Marías!</span>
             </button>
 
             {/* Secondary Actions Row */}
@@ -266,7 +262,7 @@ export function PromoTopBanner({ onOpenModal, onDismiss, isVisible }: PromoTopBa
   return (
     <aside
       aria-label="Aviso de promoción"
-      className="w-full bg-gradient-to-r from-emerald-700 via-emerald-600 to-teal-700 text-white text-xs font-bold py-2.5 px-4 sm:px-8 flex items-center justify-between border-b border-emerald-400/30 shadow-md relative z-[45] animate-in slide-in-from-top duration-300"
+      className="w-full bg-gradient-to-r from-primary-700 via-primary-600 to-rose-600 text-white text-xs font-bold py-2.5 px-4 sm:px-8 flex items-center justify-between border-b border-primary-400/30 shadow-md relative z-[45] animate-in slide-in-from-top duration-300"
     >
       <div
         onClick={onOpenModal}
@@ -276,7 +272,7 @@ export function PromoTopBanner({ onOpenModal, onDismiss, isVisible }: PromoTopBa
           🎉 Promo
         </span>
         <p className="truncate text-xs sm:text-sm font-black tracking-wide text-white group-hover:underline">
-          La vida es corta... ¡Whatsappea al Buen Servir!
+          La vida es corta... ¡Whatsappea a Tlayoyos 3 Marías!
         </p>
         <span className="hidden md:inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wider text-emerald-200 group-hover:translate-x-1 transition-transform">
           Ver detalle <ArrowRight className="w-3.5 h-3.5" />
@@ -329,8 +325,8 @@ export function PromoFloatingButton({ onOpenModal }: PromoFloatingButtonProps) {
         try { soundManager.play('click'); } catch (e) { }
         onOpenModal();
       }}
-      title="Ver Promoción: ¡Whatsappea al Buen Servir!"
-      className="fixed bottom-24 right-4 sm:bottom-28 sm:right-6 z-40 px-3.5 py-2.5 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white border-2 border-emerald-400/50 shadow-xl shadow-emerald-600/30 flex items-center gap-2 text-xs font-black uppercase tracking-wider hover:scale-105 active:scale-95 transition-all cursor-pointer group"
+      title="Ver Promoción: ¡Whatsappea a Tlayoyos 3 Marías!"
+      className="fixed bottom-24 right-4 sm:bottom-28 sm:right-6 z-40 px-3.5 py-2.5 rounded-full bg-gradient-to-r from-primary-600 to-rose-600 hover:from-primary-500 hover:to-rose-500 text-white border-2 border-primary-300/50 shadow-xl shadow-primary-600/30 flex items-center gap-2 text-xs font-black uppercase tracking-wider hover:scale-105 active:scale-95 transition-all cursor-pointer group"
     >
       <span className="relative flex h-2.5 w-2.5">
         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />

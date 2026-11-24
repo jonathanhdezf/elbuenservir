@@ -152,7 +152,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                   1. Identidad y Domicilio del Responsable
                 </h4>
                 <p>
-                  <strong>El Buen Servir</strong>, con domicilio comercial en Mercado Filomeno Mata Local #67, 16 de Septiembre, C.P. 73800, Teziutlán, Puebla, México, es el responsable del tratamiento y protección de sus datos personales, en estricto cumplimiento con la <em>Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP)</em>.
+                  <strong>Tlayoyos 3 Marías</strong>, con domicilio comercial en Mercado Filomeno Mata Local #67, 16 de Septiembre, C.P. 73800, Teziutlán, Puebla, México, es el responsable del tratamiento y protección de sus datos personales, en estricto cumplimiento con la <em>Ley Federal de Protección de Datos Personales en Posesión de los Particulares (LFPDPPP)</em>.
                 </p>
               </section>
 
@@ -222,7 +222,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                   1. Aceptación del Servicio
                 </h4>
                 <p>
-                  Al navegar en el menú digital de <strong>El Buen Servir</strong> y utilizar la herramienta de armado de pedidos, el cliente acepta expresamente los presentes Términos y Condiciones. Este servicio tiene como propósito facilitar la consulta de nuestra carta y la generación de órdenes digitales directas.
+                  Al navegar en el menú digital de <strong>Tlayoyos 3 Marías</strong> y utilizar la herramienta de armado de pedidos, el cliente acepta expresamente los presentes Términos y Condiciones. Este servicio tiene como propósito facilitar la consulta de nuestra carta y la generación de órdenes digitales directas.
                 </p>
               </section>
 
@@ -251,7 +251,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
                     <MessageCircle className="w-4 h-4 text-emerald-500" /> Confirmación del Pedido
                   </p>
                   <p>
-                    El pedido se considera confirmado únicamente cuando el equipo de El Buen Servir responde en el chat de WhatsApp validando tiempo estimado de entrega y recepción de la orden en cocina.
+                    El pedido se considera confirmado únicamente cuando el equipo de Tlayoyos 3 Marías responde en el chat de WhatsApp validando tiempo estimado de entrega y recepción de la orden en cocina.
                   </p>
                 </div>
               </section>
@@ -294,7 +294,7 @@ export const LegalModal: React.FC<LegalModalProps> = ({
               <section className="space-y-3">
                 <h4 className="text-base font-black uppercase tracking-wide text-gray-900 dark:text-white flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-primary-500"></span>
-                  2. Tecnologías y Cookies Utilizadas en El Buen Servir
+                  2. Tecnologías y Cookies Utilizadas en Tlayoyos 3 Marías
                 </h4>
                 <div className="space-y-3">
                   <div className="p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/60 border border-gray-100 dark:border-gray-700">

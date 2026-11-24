@@ -1,4 +1,4 @@
-/* El Buen Servir - Global Styles */
+/* Tlayoyos 3 Marías - Global Styles */
 
 *,
 *::before,
@@ -12,7 +12,7 @@ body {
     font-family: 'Outfit', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    background-color: #ffffff;
+    background-color: #fdfbfc;
     color: #111827;
     transition: background-color 0.3s ease, color 0.3s ease;
 }
@@ -22,7 +22,7 @@ html.dark {
 }
 
 html.dark body {
-    background-color: #030712;
+    background-color: #110a10;
     color: #f9fafb;
 }
 

@@ -284,7 +284,7 @@ export const CustomerProfileModal: React.FC<CustomerProfileModalProps> = ({
 
         {/* Onboarding Guidance for Tabs during first sessions */}
         {showOnboardingHelper && showTabHelp && (
-          <div className="mx-4 sm:mx-6 mt-3 p-3 sm:p-3.5 bg-gradient-to-r from-primary-500/10 via-amber-500/5 to-transparent border border-primary-500/30 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="mx-4 sm:mx-6 mt-3 p-3 sm:p-3.5 bg-gradient-to-r from-primary-500/10 via-rose-500/5 to-transparent border border-primary-500/30 rounded-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-primary-500 text-white flex items-center justify-center shrink-0 shadow-xs">
                 <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -627,7 +627,7 @@ export const CustomerProfileModal: React.FC<CustomerProfileModalProps> = ({
                 <div className="ml-auto">
                   <button
                     type="submit"
-                    className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-primary-500 to-amber-500 hover:from-primary-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-widest transition-all duration-200 shadow-xl shadow-primary-500/25 active:scale-95 flex items-center gap-2 cursor-pointer"
+                    className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-primary-500 via-rose-500 to-amber-500 hover:from-primary-600 hover:via-rose-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-widest transition-all duration-200 shadow-xl shadow-primary-500/25 active:scale-95 flex items-center gap-2 cursor-pointer"
                   >
                     <Check className="w-4 h-4" />
                     <span>Guardar Cambios</span>

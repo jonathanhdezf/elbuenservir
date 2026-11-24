@@ -457,8 +457,8 @@ export default function RepartidorView({
               <button
                 onClick={() => {
                   const phone = justDeliveredOrder.customerPhone.replace(/\D/g, '');
-                  const ticketUrl = `https://elbuenservir.vercel.app/?ticket=${justDeliveredOrder.id}`;
-                  const msg = `¡Hola ${justDeliveredOrder.customerName}! ✨\n\nTu repartidor de *El Buen Servir* ha entregado tu pedido *${justDeliveredOrder.id}* con éxito. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\n¡Muchas gracias por tu preferencia! 🍽️`;
+                  const ticketUrl = `${window.location.origin}/?ticket=${justDeliveredOrder.id}`;
+                  const msg = `¡Hola ${justDeliveredOrder.customerName}! ✨\n\nTu repartidor de *Tlayoyos 3 Marías* ha entregado tu pedido *${justDeliveredOrder.id}* con éxito. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\n¡Muchas gracias por tu preferencia! 🍽️`;
                   window.open(`https://wa.me/52${phone}?text=${encodeURIComponent(msg)}`, '_blank');
                   setOrders(prev => prev.map(o => o.id === justDeliveredOrder.id ? { ...o, whatsappNotified: true } : o));
                   setJustDeliveredOrder(null);

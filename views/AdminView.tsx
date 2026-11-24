@@ -554,8 +554,8 @@ export default function AdminView({
         </div>
         <div className="max-h-[50vh] overflow-y-auto p-1 space-y-4 custom-scrollbar">
           {pending.map(order => {
-            const ticketUrl = `https://elbuenservir.vercel.app/?ticket=${order.id}`;
-            const message = `¡Hola ${order.customerName}! ✨\n\nTu pedido *${order.id}* por un total de *$${order.total.toFixed(2)}* ha sido entregado con éxito. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\nMuchas gracias por tu preferencia en *El Buen Servir*. ¡Que lo disfrutes! 🍽️`;
+            const ticketUrl = `${window.location.origin}/?ticket=${order.id}`;
+            const message = `¡Hola ${order.customerName}! ✨\n\nTu pedido *${order.id}* por un total de *$${order.total.toFixed(2)}* ha sido entregado con éxito. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\nMuchas gracias por tu preferencia en *Tlayoyos 3 Marías*. ¡Que lo disfrutes! 🍽️`;
             
             return (
               <div key={order.id} className="bg-white dark:bg-gray-800 p-6 rounded-[32px] shadow-2xl border-2 border-emerald-500/10 flex flex-col gap-4 group hover:scale-[1.02] transition-all relative overflow-hidden">
@@ -2104,12 +2104,12 @@ export default function AdminView({
                             ));
                           }
                           const phone = o.customerPhone.replace(/\D/g, '');
-                          const ticketUrl = `https://elbuenservir.vercel.app/?ticket=${o.id}`;
+                          const ticketUrl = `${window.location.origin}/?ticket=${o.id}`;
                           const message = o.status === 'kitchen' 
-                            ? `Hola ${o.customerName}, tu pedido ${o.id} de El Buen Servir está siendo preparado en cocina. Te avisaremos cuando esté listo.`
+                            ? `Hola ${o.customerName}, tu pedido ${o.id} de Tlayoyos 3 Marías está siendo preparado en cocina. Te avisaremos cuando esté listo.`
                             : o.status === 'delivery'
-                              ? `Hola ${o.customerName}, tu pedido ${o.id} de El Buen Servir está en camino en reparto. ¡Prepárate para recibirlo!`
-                              : `¡Hola ${o.customerName}! ✨\n\nConfirmamos la entrega de tu pedido *${o.id}*. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\n¡Muchas gracias por tu preferencia en *El Buen Servir*! 🍽️`;
+                              ? `Hola ${o.customerName}, tu pedido ${o.id} de Tlayoyos 3 Marías está en camino en reparto. ¡Prepárate para recibirlo!`
+                              : `¡Hola ${o.customerName}! ✨\n\nConfirmamos la entrega de tu pedido *${o.id}*. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\n¡Muchas gracias por tu preferencia en *Tlayoyos 3 Marías*! 🍽️`;
                             
                           window.open(`https://wa.me/52${phone}?text=${encodeURIComponent(message)}`, '_blank');
                         }}
@@ -2300,12 +2300,12 @@ export default function AdminView({
                               }
                               
                               const phone = o.customerPhone.replace(/\D/g, '');
-                              const ticketUrl = `https://elbuenservir.vercel.app/?ticket=${o.id}`;
+                              const ticketUrl = `${window.location.origin}/?ticket=${o.id}`;
                               const message = o.status === 'kitchen' 
-                                ? `Hola ${o.customerName}, tu pedido ${o.id} de El Buen Servir está siendo preparado en cocina. Te avisaremos cuando esté listo.`
+                                ? `Hola ${o.customerName}, tu pedido ${o.id} de Tlayoyos 3 Marías está siendo preparado en cocina. Te avisaremos cuando esté listo.`
                                 : o.status === 'delivery'
-                                  ? `Hola ${o.customerName}, tu pedido ${o.id} de El Buen Servir está en camino en reparto. ¡Prepárate para recibirlo!`
-                                  : `¡Hola ${o.customerName}! ✨\n\nConfirmamos la entrega de tu pedido *${o.id}*. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\n¡Muchas gracias por tu preferencia en *El Buen Servir*! 🍽️`;
+                                  ? `Hola ${o.customerName}, tu pedido ${o.id} de Tlayoyos 3 Marías está en camino en reparto. ¡Prepárate para recibirlo!`
+                                  : `¡Hola ${o.customerName}! ✨\n\nConfirmamos la entrega de tu pedido *${o.id}*. ✅\n\n🧾 *Consulta y descarga tu Ticket Digital aquí:*\n${ticketUrl}\n\n¡Muchas gracias por tu preferencia en *Tlayoyos 3 Marías*! 🍽️`;
                                 
                               window.open(`https://wa.me/52${phone}?text=${encodeURIComponent(message)}`, '_blank');
                             }}
@@ -3519,7 +3519,7 @@ export default function AdminView({
       }).join('\n');
     }
 
-    const message = `*ESTADO DE CUENTA - CRÉDITO EL BUEN SERVIR*\n\n` +
+    const message = `*ESTADO DE CUENTA - CRÉDITO TLAYOYOS 3 MARÍAS*\n\n` +
       `Estimado(a) *${cust.name}*:\n` +
       `Te compartimos el resumen de tu crédito / cuenta abierta:\n\n` +
       `💳 *Límite de Crédito:* $${limit.toFixed(2)}\n` +

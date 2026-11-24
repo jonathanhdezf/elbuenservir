@@ -109,7 +109,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     }, 350);
   };
 
-  // Promotional WhatsApp Banner & Modal States ("La vida es corta... ¡Whatsappea al Buen Servir!")
+  // Promotional WhatsApp Banner & Modal States ("La vida es corta... ¡Whatsappea a Tlayoyos 3 Marías!")
   const [isPromoModalOpen, setIsPromoModalOpen] = useState(false);
   const [showPromoTopBanner, setShowPromoTopBanner] = useState(true);
 
@@ -295,7 +295,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   // Auth & Profile States
   const [loggedCustomer, setLoggedCustomer] = useState<Customer | null>(() => {
     try {
-      const saved = localStorage.getItem('el_buen_servir_customer');
+      const saved = localStorage.getItem('tlayoyos_3_marias_customer');
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -347,7 +347,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
 
   const [customerSessionCount, setCustomerSessionCount] = useState<number>(() => {
     try {
-      const saved = localStorage.getItem('el_buen_servir_customer');
+      const saved = localStorage.getItem('tlayoyos_3_marias_customer');
       if (saved) {
         const c = JSON.parse(saved);
         if (c?.phone) return getCustomerSessionCount(c.phone);
@@ -478,9 +478,9 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     setLoggedCustomer(customer);
     try {
       if (customer) {
-        localStorage.setItem('el_buen_servir_customer', JSON.stringify(customer));
+        localStorage.setItem('tlayoyos_3_marias_customer', JSON.stringify(customer));
       } else {
-        localStorage.removeItem('el_buen_servir_customer');
+        localStorage.removeItem('tlayoyos_3_marias_customer');
       }
     } catch {
       // ignore
@@ -626,7 +626,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
       return `• ${item.quantity}x ${item.name} (${item.variationLabel}) - $${(item.price * item.quantity).toFixed(2)}${sidesText}${notesText}`;
     }).join('\n');
 
-    const orderText = `*NUEVO PEDIDO EN LÍNEA - EL BUEN SERVIR*\n\n` +
+    const orderText = `*NUEVO PEDIDO EN LÍNEA - TLAYOYOS 3 MARÍAS*\n\n` +
       `🆔 *Orden:* #${orderId}\n` +
       `👤 *Cliente:* ${customer.name}\n` +
       `📱 *Teléfono:* ${customer.phone}\n` +
@@ -774,12 +774,12 @@ export default function PublicView({ categories, menuItems, customers, orders = 
         <div className={`w-full mx-auto px-6 md:px-12 flex justify-between items-center transition-all duration-300 ${isScrolled || isPreview ? 'py-4' : showPromoTopBanner ? 'py-5' : 'py-8'}`}>
           <div className="flex items-center space-x-3 group cursor-pointer" onClick={() => scrollToSection('inicio')}>
             <img
-              src={`${(import.meta as any).env.BASE_URL}assets/logo_nuevo.png`}
-              alt="El Buen Servir"
-              className="w-12 h-12 rounded-2xl object-cover"
+              src={`${(import.meta as any).env.BASE_URL}assets/aistudio/${(isScrolled || isPreview) && !isDarkMode ? 'Designer__4__f4d6f29f.png' : 'Designer__3__462aa070.png'}`}
+              alt="Tlayoyos 3 Marías"
+              className={`w-12 h-12 md:w-14 md:h-14 object-contain transition-all duration-300 group-hover:scale-105 ${(isScrolled || isPreview) && !isDarkMode ? 'drop-shadow-sm' : 'drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)]'}`}
             />
             <div className="flex flex-col">
-              <span className={`text-2xl font-black tracking-tighter leading-none ${isScrolled || isPreview ? 'text-gray-900 dark:text-white' : 'text-white'}`}>EL BUEN SERVIR</span>
+              <span className={`text-2xl font-black tracking-tighter leading-none ${isScrolled || isPreview ? 'text-gray-900 dark:text-white' : 'text-white'}`}>TLAYOYOS 3 MARÍAS</span>
               <span className={`text-[10px] font-bold tracking-[0.3em] uppercase ${isScrolled || isPreview ? 'text-primary-600' : 'text-primary-400'}`}>Desde 1994</span>
             </div>
           </div>
@@ -1131,14 +1131,21 @@ export default function PublicView({ categories, menuItems, customers, orders = 
       {
         !isPreview && (
           <section id="inicio" className="relative h-screen flex items-center justify-center overflow-hidden">
-            <div className="absolute inset-0 z-0">
-              <img
-                src={`${(import.meta as any).env.BASE_URL}buenservirintro-webp.webp`}
-                className="w-full h-full object-cover"
-                alt="El Buen Servir Fondo"
+            <div className="absolute inset-0 z-0 overflow-hidden bg-[#1a0611]">
+              <video
+                src={`${(import.meta as any).env.BASE_URL}assets/aistudio/tlayoyo_efa7202e.mp4`}
+                poster={`${(import.meta as any).env.BASE_URL}buenservirintro-webp.webp`}
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="auto"
+                disablePictureInPicture
+                aria-hidden="true"
+                className="w-full h-full object-cover pointer-events-none"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/40 to-transparent"></div>
-              <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white dark:to-[#0f172a]"></div>
+              <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-[#260718]/55 to-transparent"></div>
+              <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-[#FDFBFC] dark:to-[#110a10]"></div>
             </div>
 
             <div className="relative z-10 w-full px-6 md:px-12">
@@ -1159,7 +1166,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   <button
                     type="button"
                     onClick={() => scrollToSection('menu')}
-                    className="w-full sm:w-auto bg-primary-500 hover:bg-primary-600 text-white px-12 py-6 rounded-3xl text-lg font-black uppercase tracking-widest shadow-2xl shadow-primary-500/40 transition-all hover:-translate-y-1 active:scale-95 text-center cursor-pointer"
+                    className="w-full sm:w-auto bg-gradient-to-r from-primary-500 via-primary-600 to-rose-500 hover:from-primary-600 hover:to-rose-600 text-white px-12 py-6 rounded-3xl text-lg font-black uppercase tracking-widest shadow-2xl shadow-primary-500/40 transition-all hover:-translate-y-1 active:scale-95 text-center cursor-pointer"
                   >
                     Descubrir Menú
                   </button>
@@ -1234,7 +1241,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
               <span className="text-primary-500 italic font-serif">el corazón</span> para tu paladar.
             </h2>
             <p className="text-lg text-gray-500 dark:text-gray-400 leading-relaxed">
-              En El Buen Servir, cada ingrediente es seleccionado cuidadosamente de productores locales para garantizar la frescura y el sabor auténtico que nos ha caracterizado por tres décadas.
+              En Tlayoyos 3 Marías, cada ingrediente es seleccionado cuidadosamente de productores locales para garantizar la frescura y el sabor auténtico que nos ha caracterizado por tres décadas.
             </p>
             <div className="grid grid-cols-2 gap-8">
               <div className="flex items-start space-x-4">
@@ -1396,26 +1403,25 @@ export default function PublicView({ categories, menuItems, customers, orders = 
       {
         !isPreview && (
           <section id="cta" className="py-20 md:py-28 px-4 sm:px-6 md:px-12 relative bg-white dark:bg-gray-950 transition-colors duration-300">
-            <div className="w-full max-w-6xl mx-auto bg-gradient-to-br from-amber-50/90 via-white to-primary-50/70 dark:from-gray-900/95 dark:via-gray-950 dark:to-gray-900/90 rounded-[40px] md:rounded-[56px] p-8 sm:p-12 md:p-20 relative overflow-hidden flex flex-col items-center text-center border-2 border-primary-200/70 dark:border-white/10 shadow-2xl shadow-primary-900/5 dark:shadow-[0_0_80px_rgba(16,185,129,0.15)] backdrop-blur-2xl transition-all duration-300">
+            <div className="w-full max-w-6xl mx-auto bg-gradient-to-br from-primary-50/90 via-white to-rose-50/75 dark:from-[#1f0a17]/95 dark:via-[#110a10] dark:to-[#190913]/90 rounded-[40px] md:rounded-[56px] p-8 sm:p-12 md:p-20 relative overflow-hidden flex flex-col items-center text-center border-2 border-primary-200/70 dark:border-primary-500/20 shadow-2xl shadow-primary-900/10 dark:shadow-[0_0_80px_rgba(228,0,124,0.16)] backdrop-blur-2xl transition-all duration-300">
               
               {/* Dynamic Ambient Glows */}
-              <div className="absolute -top-32 -right-32 w-80 sm:w-96 h-80 sm:h-96 bg-primary-500/10 dark:bg-primary-500/15 rounded-full blur-[100px] md:blur-[120px] pointer-events-none"></div>
-              <div className="absolute -bottom-32 -left-32 w-80 sm:w-96 h-80 sm:h-96 bg-emerald-500/10 dark:bg-emerald-500/25 rounded-full blur-[100px] md:blur-[120px] pointer-events-none"></div>
+              <div className="absolute -top-32 -right-32 w-80 sm:w-96 h-80 sm:h-96 bg-primary-500/15 dark:bg-primary-500/20 rounded-full blur-[100px] md:blur-[120px] pointer-events-none"></div>
+              <div className="absolute -bottom-32 -left-32 w-80 sm:w-96 h-80 sm:h-96 bg-rose-500/15 dark:bg-amber-500/15 rounded-full blur-[100px] md:blur-[120px] pointer-events-none"></div>
               
-              {/* Subtle Tech / Pattern Texture */}
-              <div className="absolute inset-0 bg-[radial-gradient(#f59e0b25_1px,transparent_1px)] dark:bg-[radial-gradient(#ffffff08_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none opacity-60 dark:opacity-80"></div>
+              {/* Subtle Papel Picado / Pattern Texture */}
+              <div className="absolute inset-0 bg-[radial-gradient(#e4007c22_1px,transparent_1px)] dark:bg-[radial-gradient(#ffffff08_1px,transparent_1px)] [background-size:20px_20px] pointer-events-none opacity-60 dark:opacity-80"></div>
 
               <div className="relative z-10 max-w-3xl flex flex-col items-center">
                 {/* Badge */}
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-50 dark:bg-emerald-500/20 border border-emerald-200/80 dark:border-emerald-400/30 text-emerald-700 dark:text-emerald-300 text-xs font-black uppercase tracking-widest mb-6 shadow-sm dark:shadow-[0_0_20px_rgba(16,185,129,0.2)] backdrop-blur-md">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-ping"></span>
-                  <MessageCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-300" />
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-50 dark:bg-primary-500/15 border border-primary-200/80 dark:border-primary-400/30 text-primary-700 dark:text-primary-300 text-xs font-black uppercase tracking-widest mb-6 shadow-sm dark:shadow-[0_0_20px_rgba(228,0,124,0.2)] backdrop-blur-md">
+                  <MessageCircle className="w-4 h-4 text-primary-600 dark:text-primary-300" />
                   <span>Menú Digital • Pedidos a WhatsApp</span>
                 </div>
 
                 {/* Title */}
                 <h2 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-black text-gray-900 dark:text-white mb-6 md:mb-8 tracking-tighter leading-tight">
-                  ¿Listo para una <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-primary-600 to-emerald-600 dark:from-emerald-300 dark:via-teal-200 dark:to-primary-400 font-serif italic font-normal">experiencia digital</span> con nuestro menú?
+                  ¿Listo para una <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 via-rose-500 to-amber-500 dark:from-primary-400 dark:via-rose-300 dark:to-amber-300 font-serif italic font-normal">experiencia digital</span> con nuestro menú?
                 </h2>
 
                 {/* Subtitle */}
@@ -1423,17 +1429,17 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   Explora nuestros platillos, arma tu pedido en segundos desde el menú digital y envíalo directamente a nuestro WhatsApp sin filas ni demoras.
                 </p>
 
-                {/* Micro-feature pills */}
+                {/* Micro-feature chips */}
                 <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 mb-10 md:mb-12">
-                  <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/90 dark:bg-white/5 border border-amber-200/80 dark:border-white/10 text-gray-700 dark:text-gray-300 text-xs font-bold shadow-sm shadow-amber-900/5 backdrop-blur-sm">
-                    <Zap className="w-3.5 h-3.5 text-amber-500 dark:text-amber-300" />
+                  <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/90 dark:bg-white/5 border border-primary-200/80 dark:border-white/10 text-gray-700 dark:text-gray-300 text-xs font-bold shadow-sm shadow-primary-900/5 backdrop-blur-sm">
+                    <Zap className="w-3.5 h-3.5 text-primary-500 dark:text-primary-300" />
                     <span>Sin registros ni apps</span>
                   </div>
-                  <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/90 dark:bg-white/5 border border-amber-200/80 dark:border-white/10 text-gray-700 dark:text-gray-300 text-xs font-bold shadow-sm shadow-amber-900/5 backdrop-blur-sm">
+                  <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/90 dark:bg-white/5 border border-primary-200/80 dark:border-white/10 text-gray-700 dark:text-gray-300 text-xs font-bold shadow-sm shadow-primary-900/5 backdrop-blur-sm">
                     <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" />
                     <span>Precios y menú en vivo</span>
                   </div>
-                  <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/90 dark:bg-white/5 border border-amber-200/80 dark:border-white/10 text-gray-700 dark:text-gray-300 text-xs font-bold shadow-sm shadow-amber-900/5 backdrop-blur-sm">
+                  <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-white/90 dark:bg-white/5 border border-primary-200/80 dark:border-white/10 text-gray-700 dark:text-gray-300 text-xs font-bold shadow-sm shadow-primary-900/5 backdrop-blur-sm">
                     <MessageCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-300" />
                     <span>Atención inmediata</span>
                   </div>
@@ -1454,10 +1460,10 @@ export default function PublicView({ categories, menuItems, customers, orders = 
 
                   <a 
                     href="tel:+522311808272" 
-                    className="w-full sm:w-auto flex items-center justify-center space-x-3 px-6 py-4 sm:py-5 rounded-3xl bg-white hover:bg-amber-50/70 dark:bg-white/5 dark:hover:bg-white/10 border-2 border-amber-200/80 hover:border-emerald-400 dark:border-white/10 text-gray-800 dark:text-gray-200 hover:text-emerald-600 dark:hover:text-emerald-300 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-md shadow-amber-900/5 group"
+                    className="w-full sm:w-auto flex items-center justify-center space-x-3 px-6 py-4 sm:py-5 rounded-3xl bg-white hover:bg-primary-50/70 dark:bg-white/5 dark:hover:bg-white/10 border-2 border-primary-200/80 hover:border-primary-400 dark:border-white/10 text-gray-800 dark:text-gray-200 hover:text-primary-600 dark:hover:text-primary-300 transition-all hover:scale-105 active:scale-95 cursor-pointer shadow-md shadow-primary-900/5 group"
                   >
-                    <div className="w-10 h-10 sm:w-11 sm:h-11 bg-emerald-100 dark:bg-white/10 rounded-full flex items-center justify-center group-hover:bg-emerald-500/20 transition-colors">
-                      <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-600 dark:text-emerald-300" />
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 bg-primary-100 dark:bg-white/10 rounded-full flex items-center justify-center group-hover:bg-primary-500/20 transition-colors">
+                      <Phone className="w-4 h-4 sm:w-5 sm:h-5 text-primary-600 dark:text-primary-300" />
                     </div>
                     <span className="text-sm sm:text-base font-bold">+522311808272</span>
                   </a>
@@ -1476,8 +1482,12 @@ export default function PublicView({ categories, menuItems, customers, orders = 
               <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-16 mb-24">
                 <div className="lg:col-span-1">
                   <div className="flex items-center space-x-2 mb-10">
-                    <img src={`${(import.meta as any).env.BASE_URL}assets/logo_pie.png`} alt="Logo pie" className="w-10 h-10 rounded-xl object-cover mr-3" />
-                    <span className="text-2xl font-black tracking-tighter dark:text-white uppercase">El Buen Servir</span>
+                    <img
+                      src={`${(import.meta as any).env.BASE_URL}assets/aistudio/${isDarkMode ? 'Designer__3__462aa070.png' : 'Designer__4__f4d6f29f.png'}`}
+                      alt="Tlayoyos 3 Marías"
+                      className="w-12 h-12 object-contain drop-shadow-sm mr-3"
+                    />
+                    <span className="text-2xl font-black tracking-tighter dark:text-white uppercase">Tlayoyos 3 Marías</span>
                   </div>
                   <p className="text-gray-500 dark:text-gray-400 leading-relaxed mb-10 italic">
                     "Donde cada bocado cuenta una historia de tradición y excelencia culinaria."
@@ -1554,7 +1564,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
               </div>
 
               <div className="border-t border-gray-100 dark:border-gray-900 pt-12 flex flex-col md:flex-row justify-between items-center text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                <p>&copy; {new Date().getFullYear()} El Buen Servir. Todos los derechos reservados.</p>
+                <p>&copy; {new Date().getFullYear()} Tlayoyos 3 Marías. Todos los derechos reservados.</p>
                 <div className="flex space-x-8 mt-6 md:mt-0">
                   <button
                     type="button"
@@ -2342,7 +2352,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
         )
       }
 
-      {/* Promotional WhatsApp Banner Modal ("La vida es corta... ¡Whatsappea al Buen Servir!") */}
+      {/* Promotional WhatsApp Banner Modal ("La vida es corta... ¡Whatsappea a Tlayoyos 3 Marías!") */}
       <PromoBannerModal
         isOpen={isPromoModalOpen}
         onClose={() => setIsPromoModalOpen(false)}
@@ -2745,7 +2755,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                     <div className="flex items-center justify-between">
                       <p className="text-xs font-bold text-purple-900 dark:text-purple-200 flex items-center gap-1.5">
                         <Building2 className="w-4 h-4 text-purple-500" />
-                        Datos Bancarios El Buen Servir
+                        Datos Bancarios Tlayoyos 3 Marías
                       </p>
                       <span className="text-[9px] font-black uppercase bg-purple-200 dark:bg-purple-900/50 text-purple-800 dark:text-purple-300 px-2 py-0.5 rounded-full">
                         BBVA
@@ -2903,7 +2913,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
           }`}
         >
           {/* Subtle glowing halo behind banner */}
-          <div className="absolute -inset-1 bg-gradient-to-r from-primary-500/20 via-amber-500/20 to-emerald-500/20 rounded-[34px] blur-xl -z-10 animate-ambient-glow pointer-events-none" />
+          <div className="absolute -inset-1 bg-gradient-to-r from-primary-500/25 via-rose-500/20 to-amber-500/15 rounded-[34px] blur-xl -z-10 animate-ambient-glow pointer-events-none" />
 
           {/* Top row with category badge and spacious close button */}
           <div className="flex items-center justify-between gap-3 mb-4">
@@ -2924,12 +2934,12 @@ export default function PublicView({ categories, menuItems, customers, orders = 
 
           {/* Main content with generous breathing room */}
           <div className="flex items-start gap-4 sm:gap-5 mb-5">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-primary-400 via-primary-500 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-primary-500/30 shrink-0 ring-4 ring-primary-500/15">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-primary-500 via-rose-500 to-amber-500 flex items-center justify-center text-white shadow-lg shadow-primary-500/30 shrink-0 ring-4 ring-primary-500/15">
               <Smartphone className="w-7 h-7 sm:w-8 sm:h-8 animate-phone-wiggle" />
             </div>
             <div className="flex-1 min-w-0">
               <h5 className="font-black text-base sm:text-lg uppercase tracking-tight text-gray-900 dark:text-white leading-tight">
-                Instala El Buen Servir
+                Instala Tlayoyos 3 Marías
               </h5>
               <p className="text-xs text-gray-600 dark:text-gray-300 font-medium leading-relaxed mt-1.5">
                 Ten el menú digital siempre a mano en tu celular. Haz pedidos directo a WhatsApp en un solo toque sin descargas pesadas.
