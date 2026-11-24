@@ -211,7 +211,7 @@ export const DigitalTicketModal: React.FC<DigitalTicketModalProps> = ({
                 {/* Brand Header */}
                 <div className="text-center pb-5 border-b-2 border-dashed border-gray-300">
                   <img 
-                    src={`${(import.meta as any).env.BASE_URL}assets/aistudio/Designer__4__f4d6f29f.png`}
+                    src={`${(import.meta as any).env.BASE_URL}assets/aistudio/crea_el_Logotipo_vectorial_profesional_de_Tlayoyos_bbff3d24.png`}
                     alt="Tlayoyos 3 Marías" 
                     className="w-16 h-16 mx-auto mb-2 object-contain"
                     onError={(e) => {

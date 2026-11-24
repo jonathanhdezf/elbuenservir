@@ -12,6 +12,7 @@ import { CustomerProfileModal } from '../components/CustomerProfileModal';
 import { CustomerAvatar } from '../components/CustomerAvatar';
 import { CustomerOnboardingTooltip } from '../components/CustomerOnboardingTooltip';
 import { PromoBannerModal, PromoTopBanner, PromoFloatingButton } from '../components/PromoBannerModal';
+import { TestimonialsCarousel } from '../components/TestimonialsCarousel';
 
 interface PublicViewProps {
   categories: Category[];
@@ -774,7 +775,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
         <div className={`w-full mx-auto px-6 md:px-12 flex justify-between items-center transition-all duration-300 ${isScrolled || isPreview ? 'py-4' : showPromoTopBanner ? 'py-5' : 'py-8'}`}>
           <div className="flex items-center space-x-3 group cursor-pointer" onClick={() => scrollToSection('inicio')}>
             <img
-              src={`${(import.meta as any).env.BASE_URL}assets/aistudio/${(isScrolled || isPreview) && !isDarkMode ? 'Designer__4__f4d6f29f.png' : 'Designer__3__462aa070.png'}`}
+              src={`${(import.meta as any).env.BASE_URL}assets/aistudio/${(isScrolled || isPreview) && !isDarkMode ? 'crea_el_Logotipo_vectorial_profesional_de_Tlayoyos_bbff3d24.png' : 'Designer__3__462aa070.png'}`}
               alt="Tlayoyos 3 Marías"
               className={`w-12 h-12 md:w-14 md:h-14 object-contain transition-all duration-300 group-hover:scale-105 ${(isScrolled || isPreview) && !isDarkMode ? 'drop-shadow-sm' : 'drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)]'}`}
             />
@@ -1327,6 +1328,9 @@ export default function PublicView({ categories, menuItems, customers, orders = 
         </div>
       </section>
 
+      {/* Customer Testimonials Carousel Section */}
+      {!isPreview && <TestimonialsCarousel />}
+
       {/* CTA Section */}
       {
         !isPreview && (
@@ -1411,7 +1415,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                 <div className="lg:col-span-1">
                   <div className="flex items-center space-x-2 mb-10">
                     <img
-                      src={`${(import.meta as any).env.BASE_URL}assets/aistudio/${isDarkMode ? 'Designer__3__462aa070.png' : 'Designer__4__f4d6f29f.png'}`}
+                      src={`${(import.meta as any).env.BASE_URL}assets/aistudio/${isDarkMode ? 'Designer__3__462aa070.png' : 'crea_el_Logotipo_vectorial_profesional_de_Tlayoyos_bbff3d24.png'}`}
                       alt="Tlayoyos 3 Marías"
                       className="w-12 h-12 object-contain drop-shadow-sm mr-3"
                     />

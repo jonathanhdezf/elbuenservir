@@ -127,7 +127,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <img
             alt="Tlayoyos 3 Marías Logo"
             className="relative w-24 h-24 mb-4 object-contain drop-shadow-md transition-transform duration-300 group-hover:scale-105"
-            src={`${(import.meta as any).env.BASE_URL}assets/aistudio/${isDarkMode ? 'Designer__3__462aa070.png' : 'Designer__4__f4d6f29f.png'}`}
+            src={`${(import.meta as any).env.BASE_URL}assets/aistudio/${isDarkMode ? 'Designer__3__462aa070.png' : 'crea_el_Logotipo_vectorial_profesional_de_Tlayoyos_bbff3d24.png'}`}
           />
         </div>
         <h1 className="text-2xl font-bold tracking-tight text-gray-800 dark:text-white">Tlayoyos 3 Marías</h1>

@@ -13,28 +13,16 @@
   "categories": ["food", "restaurants", "shopping"],
   "icons": [
     {
-      "src": "icons/icon-192x192.png",
-      "sizes": "192x192",
+      "src": "assets/aistudio/crea_el_Logotipo_vectorial_profesional_de_Tlayoyos_bbff3d24.png",
+      "sizes": "1254x1254",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "icons/icon-512x512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-maskable-512x512.png",
-      "sizes": "512x512",
+      "src": "assets/aistudio/crea_el_Logotipo_vectorial_profesional_de_Tlayoyos_bbff3d24.png",
+      "sizes": "1254x1254",
       "type": "image/png",
       "purpose": "maskable"
-    },
-    {
-      "src": "assets/aistudio/Designer__3__462aa070.png",
-      "sizes": "1024x1024",
-      "type": "image/png",
-      "purpose": "any"
     }
   ]
 }

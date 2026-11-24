@@ -98,7 +98,7 @@ export const generateTicket = async (order: Order) => {
   });
 
   const base = (import.meta as any).env?.BASE_URL || '/';
-  const logoUrl = `${window.location.origin}${base}assets/aistudio/Designer__4__f4d6f29f.png`;
+  const logoUrl = `${window.location.origin}${base}assets/aistudio/crea_el_Logotipo_vectorial_profesional_de_Tlayoyos_bbff3d24.png`;
 
   // 1. GENERATE DOWNLOADABLE IMAGE
   const offscreenContainer = document.createElement('div');
