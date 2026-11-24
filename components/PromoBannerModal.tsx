@@ -27,17 +27,37 @@ export function PromoBannerModal({
   const [isPaused, setIsPaused] = useState(false);
   const timerRef = useRef<any>(null);
 
-  // Reset countdown whenever opened
+  // Reset countdown whenever opened and trigger instant pop-up sound
   useEffect(() => {
+    let cleanupGestureListener: (() => void) | undefined;
+
     if (isOpen) {
       setTimeLeft(autoCloseSeconds);
       setIsPaused(false);
       try {
-        soundManager.play('notification');
+        soundManager.playPopup(() => {
+          const playOnFirstGesture = (ev: Event) => {
+            const target = ev.target as HTMLElement | null;
+            if (target?.closest('[aria-label="Cerrar modal"]')) return;
+            soundManager.playPopup();
+            window.removeEventListener('pointerdown', playOnFirstGesture);
+            window.removeEventListener('touchstart', playOnFirstGesture);
+          };
+          window.addEventListener('pointerdown', playOnFirstGesture, { once: true, passive: true });
+          window.addEventListener('touchstart', playOnFirstGesture, { once: true, passive: true });
+          cleanupGestureListener = () => {
+            window.removeEventListener('pointerdown', playOnFirstGesture);
+            window.removeEventListener('touchstart', playOnFirstGesture);
+          };
+        });
       } catch (e) { }
     } else {
       if (timerRef.current) clearTimeout(timerRef.current);
     }
+
+    return () => {
+      if (cleanupGestureListener) cleanupGestureListener();
+    };
   }, [isOpen, autoCloseSeconds]);
 
   // Tick countdown timer
@@ -322,7 +342,6 @@ export function PromoFloatingButton({ onOpenModal }: PromoFloatingButtonProps) {
     <button
       type="button"
       onClick={() => {
-        try { soundManager.play('click'); } catch (e) { }
         onOpenModal();
       }}
       title="Ver Promoción: ¡Whatsappea a Tlayoyos 3 Marías!"

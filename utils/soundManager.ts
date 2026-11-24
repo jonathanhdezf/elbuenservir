@@ -6,7 +6,7 @@
 
 import { AdminSection } from '../types';
 
-export type AudioAction = 'confirm' | 'alert' | 'notification' | 'error' | 'navigation' | 'click' | 'recycle';
+export type AudioAction = 'confirm' | 'alert' | 'notification' | 'error' | 'navigation' | 'click' | 'recycle' | 'popup';
 
 const BASE = (import.meta as any).env?.BASE_URL || '/';
 
@@ -37,11 +37,14 @@ const SOUNDS = {
 class SoundManager {
     private static instance: SoundManager;
     private audioRefs: Record<string, HTMLAudioElement> = {};
+    private audioCtx: AudioContext | null = null;
     private lastPlayed: number = 0;
+    private lastPopupPlayed: number = 0;
     private readonly COOLDOWN = 350;
 
     private constructor() {
         this.preload();
+        this.setupAudioUnlock();
     }
 
     public static getInstance(): SoundManager {
@@ -49,6 +52,34 @@ class SoundManager {
             SoundManager.instance = new SoundManager();
         }
         return SoundManager.instance;
+    }
+
+    private getAudioContext(): AudioContext | null {
+        if (typeof window === 'undefined') return null;
+        if (!this.audioCtx) {
+            const Ctx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+            if (Ctx) {
+                try {
+                    this.audioCtx = new Ctx();
+                } catch {
+                    return null;
+                }
+            }
+        }
+        return this.audioCtx;
+    }
+
+    private setupAudioUnlock() {
+        if (typeof window === 'undefined') return;
+        const unlock = () => {
+            const ctx = this.getAudioContext();
+            if (ctx && ctx.state === 'suspended') {
+                ctx.resume().catch(() => { });
+            }
+        };
+        window.addEventListener('pointerdown', unlock, { passive: true });
+        window.addEventListener('touchstart', unlock, { passive: true });
+        window.addEventListener('keydown', unlock, { passive: true });
     }
 
     private preload() {
@@ -60,7 +91,86 @@ class SoundManager {
         });
     }
 
+    private playSynthesizedPopup(onBlocked?: () => void) {
+        const ctx = this.getAudioContext();
+        if (!ctx) return;
+
+        const triggerNotes = () => {
+            const now = ctx.currentTime;
+            const master = ctx.createGain();
+            master.gain.setValueAtTime(0.65, now);
+            master.connect(ctx.destination);
+
+            // 1. Instant tactile bubble "pop" at t = 0ms (unmistakable pop-up opening)
+            const popOsc = ctx.createOscillator();
+            const popGain = ctx.createGain();
+            popOsc.type = 'sine';
+            popOsc.frequency.setValueAtTime(320, now);
+            popOsc.frequency.exponentialRampToValueAtTime(920, now + 0.055);
+            popGain.gain.setValueAtTime(0.001, now);
+            popGain.gain.linearRampToValueAtTime(0.42, now + 0.006);
+            popGain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+            popOsc.connect(popGain);
+            popGain.connect(master);
+            popOsc.start(now);
+            popOsc.stop(now + 0.08);
+
+            // 2. Cheerful two-note ascending pop-up chime (G5 -> C6 + E6 shimmer)
+            const notes = [
+                { freq: 783.99, start: 0.04, dur: 0.16, peak: 0.26, type: 'triangle' as OscillatorType },
+                { freq: 1046.50, start: 0.105, dur: 0.28, peak: 0.30, type: 'sine' as OscillatorType },
+                { freq: 1318.51, start: 0.145, dur: 0.26, peak: 0.14, type: 'sine' as OscillatorType }
+            ];
+
+            notes.forEach(({ freq, start, dur, peak, type }) => {
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, now + start);
+
+                gain.gain.setValueAtTime(0.001, now + start);
+                gain.gain.linearRampToValueAtTime(peak, now + start + 0.01);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + start + dur);
+
+                osc.connect(gain);
+                gain.connect(master);
+                osc.start(now + start);
+                osc.stop(now + start + dur + 0.01);
+            });
+        };
+
+        if (ctx.state === 'suspended') {
+            ctx.resume()
+                .then(() => {
+                    if (ctx.state === 'running') {
+                        triggerNotes();
+                    } else if (onBlocked) {
+                        onBlocked();
+                    }
+                })
+                .catch(() => {
+                    if (onBlocked) onBlocked();
+                });
+            return;
+        }
+
+        triggerNotes();
+    }
+
+    public playPopup(onBlocked?: () => void) {
+        const now = Date.now();
+        if (now - this.lastPopupPlayed < 400) return;
+        this.lastPopupPlayed = now;
+
+        this.playSynthesizedPopup(onBlocked);
+    }
+
     public play(action: AudioAction, section?: AdminSection) {
+        if (action === 'popup') {
+            this.playPopup();
+            return;
+        }
+
         const now = Date.now();
         if (now - this.lastPlayed < this.COOLDOWN) return;
 
