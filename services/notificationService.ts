@@ -95,8 +95,8 @@ class NotificationService {
     if (!this.isSupported() || Notification.permission !== 'granted') return;
 
     const defaultOptions: NotificationOptions = {
-      icon: '/assets/aistudio/Designer__3__462aa070.png',
-      badge: '/assets/aistudio/Designer__3__462aa070.png',
+      icon: '/assets/aistudio/Designer__5__241aba85.png',
+      badge: '/assets/aistudio/Designer__5__241aba85.png',
       vibrate: [200, 100, 200],
       ...options
     };
@@ -159,8 +159,8 @@ class NotificationService {
 
     const options: NotificationOptions = {
       body,
-      icon: '/assets/aistudio/Designer__3__462aa070.png',
-      badge: '/assets/aistudio/Designer__3__462aa070.png',
+      icon: '/assets/aistudio/Designer__5__241aba85.png',
+      badge: '/assets/aistudio/Designer__5__241aba85.png',
       tag: `order-${order.id}`,
       renotify: true,
       requireInteraction: true,
