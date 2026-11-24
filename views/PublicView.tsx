@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Utensils, Clock, MapPin, Instagram, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, Minus, Trash2, ShoppingCart, X, ChefHat, Truck, Monitor, Search, Store, Zap, Mic, Download, Smartphone, Sparkles, User, CreditCard, Banknote, Building2, Landmark, Wallet, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Utensils, Clock, MapPin, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, Minus, Trash2, ShoppingCart, X, ChefHat, Truck, Monitor, Search, Store, Zap, Mic, Download, Smartphone, Sparkles, User, CreditCard, Banknote, Building2, Landmark, Wallet, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { Category, MenuItem, Customer, Order, PaymentMethod, CustomerCreditMovement } from '../types';
 import { soundManager } from '../utils/soundManager';
 import LiveOrderModal from '../components/LiveOrderModal';
@@ -13,6 +13,7 @@ import { CustomerAvatar } from '../components/CustomerAvatar';
 import { CustomerOnboardingTooltip } from '../components/CustomerOnboardingTooltip';
 import { PromoBannerModal, PromoTopBanner, PromoFloatingButton } from '../components/PromoBannerModal';
 import { TestimonialsCarousel } from '../components/TestimonialsCarousel';
+import { FacebookChannelSection } from '../components/FacebookChannelSection';
 
 interface PublicViewProps {
   categories: Category[];
@@ -791,6 +792,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
               { label: 'INICIO', id: 'inicio' },
               { label: 'NUESTRA HISTORIA', id: 'pasion-por-lo-que-hacemos' },
               { label: 'NUESTRO MENU', id: 'menu' },
+              { label: 'FACEBOOK', id: 'facebook-canal' },
               { label: 'CONTACTANOS', id: 'cta' }
             ].map(item => (
               <button
@@ -963,6 +965,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   { label: 'INICIO', id: 'inicio' },
                   { label: 'NUESTRA HISTORIA', id: 'pasion-por-lo-que-hacemos' },
                   { label: 'NUESTRO MENU', id: 'menu' },
+                  { label: 'FACEBOOK', id: 'facebook-canal' },
                   { label: 'CONTACTANOS', id: 'cta' }
                 ].map(item => (
                   <button
@@ -1160,7 +1163,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
             </div>
             <div className="absolute -bottom-6 -right-6 bg-white dark:bg-gray-800 p-8 rounded-4xl shadow-2xl border border-gray-50 dark:border-gray-700 animate-float">
               <Award className="w-12 h-12 text-primary-500 mb-4" />
-              <p className="text-2xl font-black dark:text-white leading-tight">30 Años de <br />Excelencia</p>
+              <p className="text-2xl font-black dark:text-white leading-tight">+50 Años de <br />Tradición</p>
             </div>
           </div>
           <div className="space-y-8">
@@ -1169,9 +1172,17 @@ export default function PublicView({ categories, menuItems, customers, orders = 
               Cocinamos con <br />
               <span className="text-primary-500 italic font-serif">el corazón</span> para tu paladar.
             </h2>
-            <p className="text-lg text-gray-500 dark:text-gray-400 leading-relaxed">
-              En Tlayoyos 3 Marías, cada ingrediente es seleccionado cuidadosamente de productores locales para garantizar la frescura y el sabor auténtico que nos ha caracterizado por tres décadas.
-            </p>
+            <div className="space-y-4">
+              <p className="text-lg text-gray-600 dark:text-gray-300 leading-relaxed font-medium">
+                Los tradicionales Tlayoyos de Teziutlán, Puebla. Somos una tradición regional con más de 50 años de experiencia, siendo así pioneros en el Mercado Victoria, ven y comprueba nuestro único y delicioso sabor.
+              </p>
+              <p className="text-xl font-black text-primary-500 italic tracking-tight">
+                ¡¡¡Donde todo, bien todo rico!!!
+              </p>
+              <p className="text-base text-gray-500 dark:text-gray-400 leading-relaxed">
+                En Tlayoyos 3 Marías, cada ingrediente es seleccionado cuidadosamente de productores locales para garantizar la frescura y el sabor auténtico que nos ha caracterizado por generaciones.
+              </p>
+            </div>
             <div className="grid grid-cols-2 gap-8">
               <div className="flex items-start space-x-4">
                 <div className="p-3 bg-primary-50 dark:bg-primary-950 rounded-2xl">
@@ -1331,6 +1342,9 @@ export default function PublicView({ categories, menuItems, customers, orders = 
       {/* Customer Testimonials Carousel Section */}
       {!isPreview && <TestimonialsCarousel />}
 
+      {/* Official Facebook Channel Section */}
+      {!isPreview && <FacebookChannelSection onScrollToMenu={() => scrollToSection('menu')} />}
+
       {/* CTA Section */}
       {
         !isPreview && (
@@ -1422,14 +1436,25 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                     <span className="text-2xl font-black tracking-tighter dark:text-white uppercase">Tlayoyos 3 Marías</span>
                   </div>
                   <p className="text-gray-500 dark:text-gray-400 leading-relaxed mb-10 italic">
-                    "Donde cada bocado cuenta una historia de tradición y excelencia culinaria."
+                    "¡Todo bien, todo rico!"
                   </p>
                   <div className="flex space-x-3">
-                    {[{ Icon: Instagram, label: 'Instagram' }, { Icon: Facebook, label: 'Facebook' }, { Icon: Phone, label: 'Teléfono' }].map(({ Icon, label }, i) => (
-                      <a key={i} href="#" onClick={(e) => e.preventDefault()} title={label} className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-400 hover:text-white hover:bg-primary-500 transition-all hover:-translate-y-1">
-                        <Icon className="w-5 h-5" />
-                      </a>
-                    ))}
+                    <a
+                      href="https://www.facebook.com/tlayoyos3marias/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="Facebook Oficial Tlayoyos 3 Marías"
+                      className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-400 hover:text-white hover:bg-[#1877F2] transition-all hover:-translate-y-1"
+                    >
+                      <Facebook className="w-5 h-5" />
+                    </a>
+                    <a
+                      href="tel:+522311024672"
+                      title="Llamar a Tlayoyos 3 Marías"
+                      className="w-12 h-12 rounded-2xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center text-gray-400 hover:text-white hover:bg-primary-500 transition-all hover:-translate-y-1"
+                    >
+                      <Phone className="w-5 h-5" />
+                    </a>
                   </div>
                 </div>
 
@@ -1440,6 +1465,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                       { label: 'INICIO', id: 'inicio' },
                       { label: 'NUESTRA HISTORIA', id: 'pasion-por-lo-que-hacemos' },
                       { label: 'NUESTRO MENU', id: 'menu' },
+                      { label: 'FACEBOOK', id: 'facebook-canal' },
                       { label: 'CONTACTANOS', id: 'cta' }
                     ].map(item => (
                       <li key={item.label}>

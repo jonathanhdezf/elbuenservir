@@ -211,12 +211,15 @@ export default function LiveOrderModal({
   const [lastAddedId, setLastAddedId] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
+  const [createdOrderWaUrl, setCreatedOrderWaUrl] = useState<string | null>(null);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [customApiKey, setCustomApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
 
   // Live session & audio references
   const sessionRef = useRef<any>(null);
+  const isSessionOpenRef = useRef(false);
+  const statusRef = useRef<SessionStatus>('idle');
   const audioContextRef = useRef<AudioContext | null>(null);
   const activeSourcesRef = useRef<AudioBufferSourceNode[]>([]);
   const nextStartTimeRef = useRef<number>(0);
@@ -242,9 +245,13 @@ export default function LiveOrderModal({
   const onAddOrderRef = useRef(onAddOrder);
   const onUpdateCustomerRef = useRef(onUpdateCustomer);
   const createdOrderRef = useRef<Order | null>(null);
-  const pendingAutoWhatsAppUrlRef = useRef<string | null>(null);
-  const autoSendTimerRef = useRef<any>(null);
+  const handledToolCallIdsRef = useRef<Set<string>>(new Set());
   const handleToolCallsRef = useRef<(calls: any[]) => void>(() => {});
+
+  const updateStatus = useCallback((next: SessionStatus) => {
+    statusRef.current = next;
+    setStatus(next);
+  }, []);
 
   useEffect(() => {
     isMutedRef.current = isMuted;
@@ -548,15 +555,11 @@ export default function LiveOrderModal({
       if (onAddOrderRef.current) {
         onAddOrderRef.current(newOrder);
       }
-
-      try { soundManager.play('confirm_tpv'); } catch (e) { }
-    } else if (onAddOrderRef.current && JSON.stringify(existingOrder) !== JSON.stringify(newOrder)) {
-      // Update order if user tweaked delivery/payment after auto-creation
-      onAddOrderRef.current(newOrder);
     }
 
     createdOrderRef.current = newOrder;
     setCreatedOrder(newOrder);
+    setCreatedOrderWaUrl(waUrl);
     return { order: newOrder, waUrl };
   }, []);
 
@@ -620,30 +623,18 @@ export default function LiveOrderModal({
       source.start(nextStartTimeRef.current);
       nextStartTimeRef.current += buffer.duration;
       activeSourcesRef.current.push(source);
-      setStatus('speaking');
+      updateStatus('speaking');
 
       source.onended = () => {
         activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
-        if (activeSourcesRef.current.length === 0) {
-          setStatus('listening');
-          // If an order was finalized and is waiting for farewell audio to finish, open WhatsApp now
-          if (pendingAutoWhatsAppUrlRef.current) {
-            const url = pendingAutoWhatsAppUrlRef.current;
-            pendingAutoWhatsAppUrlRef.current = null;
-            if (autoSendTimerRef.current) {
-              clearTimeout(autoSendTimerRef.current);
-              autoSendTimerRef.current = null;
-            }
-            setTimeout(() => {
-              try { window.open(url, '_blank'); } catch (e) { }
-            }, 400);
-          }
+        if (activeSourcesRef.current.length === 0 && isSessionOpenRef.current) {
+          updateStatus('listening');
         }
       };
     } catch (e) {
       console.warn("Error decoding audio chunk", e);
     }
-  }, []);
+  }, [updateStatus]);
 
   // Stop queued and playing audio
   const stopAllAudio = useCallback(() => {
@@ -656,10 +647,10 @@ export default function LiveOrderModal({
     } else {
       nextStartTimeRef.current = 0;
     }
-    if (status === 'speaking') {
-      setStatus('listening');
+    if (statusRef.current === 'speaking' && isSessionOpenRef.current) {
+      updateStatus('listening');
     }
-  }, [status]);
+  }, [updateStatus]);
 
   // Helper to check if current cart has drinks or desserts
   const checkCartExtras = useCallback((itemsToCheck: SofiaCartItem[]) => {
@@ -698,6 +689,14 @@ export default function LiveOrderModal({
     const responses: any[] = [];
 
     for (const call of functionCalls) {
+      const callKey = call.id || `${call.name}-${JSON.stringify(call.args || {})}`;
+      if (call.id && handledToolCallIdsRef.current.has(call.id)) {
+        continue;
+      }
+      if (call.id) {
+        handledToolCallIdsRef.current.add(call.id);
+      }
+
       if (call.name === "updateOrder") {
         const { action, item } = call.args || {};
         if (item && item.name) {
@@ -731,7 +730,7 @@ export default function LiveOrderModal({
         }
 
         responses.push({
-          id: call.id,
+          id: call.id || callKey,
           name: "updateOrder",
           response: {
             output: {
@@ -793,9 +792,8 @@ export default function LiveOrderModal({
           cashAmountPaidRef.current = cashStr;
         }
 
-        setIsOrderTrayExpanded(true);
-
-        // Immediately generate & save the order in the restaurant system!
+        // Keep Sofia's live voice screen visible while she confirms & says goodbye;
+        // surface an inline order confirmation banner instead of covering the stage or hijacking focus.
         const result = generateAndSaveOrder({
           deliveryMethod: resolvedDelivery,
           address: resolvedAddr,
@@ -806,35 +804,27 @@ export default function LiveOrderModal({
         });
 
         if (result) {
-          setCurrentSofiaSpeech(`¡Pedido #${result.order.id} generado con éxito! Muchas gracias por tu preferencia en Tlayoyos 3 Marías.`);
-          pendingAutoWhatsAppUrlRef.current = result.waUrl;
-          if (autoSendTimerRef.current) clearTimeout(autoSendTimerRef.current);
-          autoSendTimerRef.current = setTimeout(() => {
-            if (pendingAutoWhatsAppUrlRef.current) {
-              const url = pendingAutoWhatsAppUrlRef.current;
-              pendingAutoWhatsAppUrlRef.current = null;
-              try { window.open(url, '_blank'); } catch (e) { }
-            }
-          }, 5000);
+          setCurrentSofiaSpeech(`¡Pedido #${result.order.id} registrado con éxito! Muchas gracias por tu preferencia en Tlayoyos 3 Marías.`);
         } else {
-          setCurrentSofiaSpeech("¡Excelente! Revisa y confirma los detalles de tu pedido en pantalla.");
+          setCurrentSofiaSpeech("¡Excelente! Revisa y confirma los detalles de tu pedido en tu carrito.");
         }
 
         responses.push({
-          id: call.id,
+          id: call.id || callKey,
           name: "completeOrder",
           response: {
             output: {
               success: true,
               orderId: result?.order.id || null,
-              message: "Pedido generado y registrado exitosamente en el sistema de Tlayoyos 3 Marías."
+              total: result?.order.total || null,
+              message: "Pedido registrado exitosamente en el sistema. Confirma brevemente el folio, total y forma de entrega al cliente con calidez, indícale que ya puede tocar el botón de WhatsApp en pantalla si desea enviar su comprobante y mantente atenta por si necesita algo más."
             }
           }
         });
       }
     }
 
-    if (sessionRef.current && responses.length > 0) {
+    if (sessionRef.current && isSessionOpenRef.current && responses.length > 0) {
       try {
         sessionRef.current.sendToolResponse({ functionResponses: responses });
       } catch (e) {
@@ -847,17 +837,12 @@ export default function LiveOrderModal({
     handleToolCallsRef.current = handleToolCalls;
   }, [handleToolCalls]);
 
-  // Clean disconnect
-  const disconnect = useCallback(() => {
-    isConnectingRef.current = false;
-    if (autoSendTimerRef.current) {
-      clearTimeout(autoSendTimerRef.current);
-      autoSendTimerRef.current = null;
-    }
-    pendingAutoWhatsAppUrlRef.current = null;
+  // Clean up mic & Web Audio nodes without wiping cart/order state
+  const cleanupAudioPipeline = useCallback(() => {
     stopAllAudio();
 
     if (processorRef.current) {
+      processorRef.current.onaudioprocess = null;
       try { processorRef.current.disconnect(); } catch (e) { }
       processorRef.current = null;
     }
@@ -885,24 +870,39 @@ export default function LiveOrderModal({
       try { mediaStreamRef.current.getTracks().forEach(t => t.stop()); } catch (e) { }
       mediaStreamRef.current = null;
     }
-    if (sessionRef.current) {
-      try { sessionRef.current.close(); } catch (e) { }
-      sessionRef.current = null;
-    }
     if (audioContextRef.current) {
       try { audioContextRef.current.close(); } catch (e) { }
       audioContextRef.current = null;
     }
-
-    setStatus('idle');
   }, [stopAllAudio]);
+
+  // Clean disconnect
+  const disconnect = useCallback(() => {
+    isConnectingRef.current = false;
+    isSessionOpenRef.current = false;
+    handledToolCallIdsRef.current.clear();
+
+    const activeSession = sessionRef.current;
+    sessionRef.current = null;
+    if (activeSession) {
+      try { activeSession.close(); } catch (e) { }
+    }
+
+    cleanupAudioPipeline();
+    updateStatus('idle');
+  }, [cleanupAudioPipeline, updateStatus]);
 
   // Connect to Gemini Multimodal Live API
   const connect = useCallback(async () => {
-    if (isConnectingRef.current || sessionRef.current) return;
+    if (isConnectingRef.current || (sessionRef.current && isSessionOpenRef.current)) return;
+    if (sessionRef.current && !isSessionOpenRef.current) {
+      try { sessionRef.current.close(); } catch (e) { }
+      sessionRef.current = null;
+    }
     isConnectingRef.current = true;
+    handledToolCallIdsRef.current.clear();
     setConnectionError(null);
-    setStatus('connecting');
+    updateStatus('connecting');
 
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -969,7 +969,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
 7. Una vez ofrecidos las bebidas y postres, pregúntale amablemente si prefiere recoger en mostrador (pickup) o entrega a domicilio (delivery).
 8. Si elige entrega a domicilio, sugiere su dirección registrada o pregúntale a qué dirección enviarlo.
 9. Pregúntale su método de pago (efectivo, tarjeta, transferencia o credito).
-10. REGLA CRÍTICA DE CIERRE: En cuanto tengas el método de entrega (y dirección si es domicilio) y la forma de pago, DEBES EJECUTAR OBLIGATORIAMENTE la herramienta 'completeOrder' incluyendo orderType, deliveryAddress, paymentMethod y la lista completa de 'items' del pedido (con sus 'notes' de preparación si aplican), y despídete amablemente agradeciendo su preferencia en Tlayoyos 3 Marías.
+10. REGLA CRÍTICA DE CIERRE: En cuanto tengas el método de entrega (y dirección si es domicilio) y la forma de pago, EJECUTA la herramienta 'completeOrder' incluyendo orderType, deliveryAddress, paymentMethod y la lista completa de 'items' (con sus 'notes' si aplican). Luego confirma al cliente el registro de su pedido, indícale amablemente que ya tiene disponible su botón para enviarlo por WhatsApp en pantalla y quédate en línea atenta por si desea agregar algo más o despedirse.
 11. Mantén tus intervenciones habladas breves, fluidas y directas (1 a 2 oraciones), para que la conversación sea rápida y amena como una llamada telefónica real.`;
 
       let sessionInstance: any = null;
@@ -992,16 +992,22 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
           onopen: () => {
             console.log("Gemini Live session connected!");
             sessionRef.current = sessionInstance;
+            isSessionOpenRef.current = true;
             isConnectingRef.current = false;
-            setStatus('listening');
+            updateStatus('listening');
 
-            const welcomePrompt = loggedCustomer
-              ? `¡Hola! Ya entré a la llamada. Salúdame amablemente por mi nombre ${loggedCustomer.name.split(' ')[0]} y pregúntame qué se me antoja ordenar hoy.`
-              : '¡Hola! Ya entré a la llamada. Salúdame amablemente y pregúntame qué se me antoja ordenar hoy en Tlayoyos 3 Marías.';
+            const hasExistingCart = cartRef.current.length > 0;
+            const welcomePrompt = createdOrderRef.current
+              ? `Se retomó la llamada del pedido #${createdOrderRef.current.id}. Saluda brevemente y pregúntale si necesita algo más o ayuda para enviarlo por WhatsApp.`
+              : hasExistingCart
+                ? `Se retomó la llamada. Ya tenemos ${cartRef.current.length} platillo(s) en la orden. Saluda brevemente y continúa atendiendo el pedido.`
+                : loggedCustomer
+                  ? `¡Hola! Ya entré a la llamada. Salúdame amablemente por mi nombre ${loggedCustomer.name.split(' ')[0]} y pregúntame qué se me antoja ordenar hoy.`
+                  : '¡Hola! Ya entré a la llamada. Salúdame amablemente y pregúntame qué se me antoja ordenar hoy en Tlayoyos 3 Marías.';
 
             // Greet customer via Gemini's live neural audio
             setTimeout(() => {
-              if (sessionRef.current) {
+              if (sessionRef.current && isSessionOpenRef.current) {
                 try {
                   sessionRef.current.sendClientContent({
                     turns: [{ role: 'user', parts: [{ text: welcomePrompt }] }],
@@ -1023,7 +1029,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
               silentGain.connect(audioContextRef.current.destination);
 
               processor.onaudioprocess = (e) => {
-                if (isMutedRef.current || !sessionRef.current) return;
+                if (isMutedRef.current || !isSessionOpenRef.current || !sessionRef.current) return;
                 const input = e.inputBuffer.getChannelData(0);
                 const downsampled = downsampleTo24kHz(input, audioContextRef.current?.sampleRate || SAMPLE_RATE);
                 const pcm16 = floatTo16BitPCM(downsampled);
@@ -1031,10 +1037,10 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
 
                 try {
                   sessionRef.current.sendRealtimeInput({
-                    media: { data: base64, mimeType: "audio/pcm;rate=24000" }
+                    audio: { data: base64, mimeType: "audio/pcm;rate=24000" }
                   });
                 } catch (err) {
-                  console.warn("sendRealtimeInput error", err);
+                  isSessionOpenRef.current = false;
                 }
               };
             }
@@ -1066,8 +1072,8 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
             }
 
             if (msg.serverContent?.turnComplete) {
-              if (activeSourcesRef.current.length === 0) {
-                setStatus('listening');
+              if (activeSourcesRef.current.length === 0 && isSessionOpenRef.current) {
+                updateStatus('listening');
               }
             }
 
@@ -1081,25 +1087,42 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
           onerror: (err: any) => {
             console.error("Gemini Live session error:", err);
             isConnectingRef.current = false;
-            setStatus('error');
-            setConnectionError("Error en la conexión de audio con Sofía.");
+            isSessionOpenRef.current = false;
+            sessionRef.current = null;
+            cleanupAudioPipeline();
+            updateStatus('error');
+            setConnectionError("Se interrumpió la conexión de audio con Sofía. Toca Reintentar para continuar.");
           },
           onclose: (e: any) => {
-            console.log("Gemini Live session closed:", e?.reason || '');
+            console.log("Gemini Live session closed:", e?.code, e?.reason || '');
+            const wasActive = isSessionOpenRef.current;
             isConnectingRef.current = false;
-            setStatus('idle');
+            isSessionOpenRef.current = false;
+            sessionRef.current = null;
+            cleanupAudioPipeline();
+            updateStatus('idle');
+            if (wasActive && e?.code && e.code !== 1000) {
+              setConnectionError("La llamada de voz se pausó. Toca 'Conectar con Sofía' para retomarla sin perder tu pedido.");
+            }
           }
         }
       });
 
-      sessionRef.current = sessionInstance;
+      if (isConnectingRef.current || isSessionOpenRef.current) {
+        sessionRef.current = sessionInstance;
+      } else {
+        try { sessionInstance.close(); } catch (e) { }
+      }
     } catch (err: any) {
       console.error("Live connection initialization failed:", err);
       isConnectingRef.current = false;
-      setStatus('error');
+      isSessionOpenRef.current = false;
+      sessionRef.current = null;
+      cleanupAudioPipeline();
+      updateStatus('error');
       setConnectionError(err.message || "No se pudo iniciar la sesión de voz con Sofía.");
     }
-  }, [hasApiKey, resolvedApiKey, menuItems, categories, loggedCustomer, playAudioChunk, stopAllAudio]);
+  }, [hasApiKey, resolvedApiKey, menuItems, categories, loggedCustomer, playAudioChunk, stopAllAudio, cleanupAudioPipeline, updateStatus]);
 
   // Connect automatically when modal opens, and reset completed state on fresh open
   useEffect(() => {
@@ -1108,6 +1131,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
       if (createdOrderRef.current) {
         createdOrderRef.current = null;
         setCreatedOrder(null);
+        setCreatedOrderWaUrl(null);
         cartRef.current = [];
         setCart([]);
         setIsOrderTrayExpanded(false);
@@ -1225,9 +1249,9 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
     setLastUserSpeech(cleanText);
     setTranscriptHistory(prev => [...prev, { role: 'user', text: cleanText, time: now }]);
     setInputText('');
-    setStatus('thinking');
+    updateStatus('thinking');
 
-    if (sessionRef.current) {
+    if (sessionRef.current && isSessionOpenRef.current) {
       try {
         sessionRef.current.sendClientContent({
           turns: [{ role: 'user', parts: [{ text: cleanText }] }],
@@ -1236,6 +1260,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
         return;
       } catch (e) {
         console.warn("sendClientContent error:", e);
+        isSessionOpenRef.current = false;
       }
     }
 
@@ -1243,7 +1268,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
     const reply = runLocalHospitalityEngine(cleanText);
     setCurrentSofiaSpeech(reply);
     setTranscriptHistory(prev => [...prev, { role: 'ai', text: reply, time: now }]);
-    setStatus('idle');
+    updateStatus('idle');
   };
 
   // Quick add dish from carousel
@@ -1262,7 +1287,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
     setLastUserSpeech(userText);
     setTranscriptHistory(prev => [...prev, { role: 'user', text: userText, time: now }]);
 
-    if (sessionRef.current) {
+    if (sessionRef.current && isSessionOpenRef.current) {
       try {
         sessionRef.current.sendClientContent({
           turns: [{
@@ -1271,7 +1296,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
           }],
           turnComplete: true
         });
-        setStatus('thinking');
+        updateStatus('thinking');
         return;
       } catch (e) { }
     }
@@ -1300,12 +1325,13 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
     });
 
     if (result) {
-      window.open(result.waUrl, '_blank');
+      setIsMuted(true);
+      try {
+        window.open(result.waUrl, '_blank', 'noopener,noreferrer');
+      } catch (e) { }
     }
 
     setIsSending(false);
-    disconnect();
-    onClose();
   };
 
   // Transfer to App Cart
@@ -1513,7 +1539,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
           <div
             className="relative flex items-center justify-center my-3 sm:my-5 cursor-pointer"
             onClick={() => {
-              if (status === 'idle') {
+              if (status === 'idle' || status === 'error') {
                 connect();
               } else {
                 setIsMuted(!isMuted);
@@ -1605,6 +1631,51 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
               </p>
             )}
           </div>
+
+          {/* Non-intrusive Confirmed Order Banner (keeps Sofía live & visible while offering 1-tap WhatsApp) */}
+          {createdOrder && (
+            <div className="w-full max-w-2xl mt-3 p-3.5 sm:p-4 rounded-3xl bg-emerald-500/15 border border-emerald-500/40 backdrop-blur-md shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/30">
+                  <Check className="w-5 h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm font-black uppercase tracking-wider text-emerald-300 truncate">
+                    Pedido #{createdOrder.id} · ${createdOrder.total.toFixed(2)}
+                  </p>
+                  <p className="text-[11px] text-gray-300 truncate">
+                    {deliveryMethod === 'delivery' ? 'Envío a domicilio' : 'Recoger en mostrador'} · Puedes seguir hablando con Sofía o enviar tu resumen
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsOrderTrayExpanded(true)}
+                  className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/15 text-xs font-black uppercase tracking-wider text-white transition-all"
+                >
+                  Ver Ticket
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (createdOrderWaUrl) {
+                      setIsMuted(true);
+                      try {
+                        window.open(createdOrderWaUrl, '_blank', 'noopener,noreferrer');
+                      } catch (e) { }
+                    } else {
+                      handleSendToWhatsApp();
+                    }
+                  }}
+                  className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-white text-xs font-black uppercase tracking-wider flex items-center gap-1.5 shadow-lg shadow-emerald-500/30 transition-all active:scale-95"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  <span>WhatsApp</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Visual Dish Carousel (Interactive Touch Ordering) */}
           <div className="w-full max-w-3xl mt-4 sm:mt-6">
@@ -1726,7 +1797,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
             <button
               type="button"
               onClick={() => {
-                if (status === 'idle') {
+                if (status === 'idle' || status === 'error') {
                   connect();
                 } else {
                   setIsMuted(!isMuted);
@@ -1734,7 +1805,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
                 }
               }}
               className={`flex-1 py-4 px-6 rounded-2xl font-black uppercase text-xs sm:text-sm tracking-wider flex items-center justify-center gap-3 transition-all shadow-xl cursor-pointer ${
-                status === 'idle'
+                status === 'idle' || status === 'error'
                   ? 'bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-500/30'
                   : isMuted
                     ? 'bg-red-500 hover:bg-red-600 text-white shadow-red-500/40'
@@ -1745,6 +1816,11 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
                 <>
                   <PhoneCall className="w-5 h-5" />
                   <span>Conectar con Sofía</span>
+                </>
+              ) : status === 'error' ? (
+                <>
+                  <RefreshCw className="w-5 h-5" />
+                  <span>Reconectar con Sofía</span>
                 </>
               ) : isMuted ? (
                 <>
@@ -1788,12 +1864,22 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
           <div className="absolute inset-0 z-30 flex flex-col bg-[#070b14]/98 backdrop-blur-2xl animate-in slide-in-from-bottom duration-300">
             {/* Drawer Header */}
             <div className="p-5 border-b border-white/10 flex items-center justify-between shrink-0 bg-white/[0.02]">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <ShoppingCart className="w-5 h-5 text-emerald-400" />
                 <h3 className="text-base font-black uppercase tracking-wider text-white">Tu Pedido con Sofía</h3>
                 <span className="text-xs font-black text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full">
                   {cartItemsCount} {cartItemsCount === 1 ? 'platillo' : 'platillos'}
                 </span>
+                {(status === 'speaking' || status === 'listening') && (
+                  <button
+                    type="button"
+                    onClick={() => setIsOrderTrayExpanded(false)}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-black uppercase tracking-wider text-emerald-300 hover:bg-emerald-500/25 transition-all"
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${status === 'speaking' ? 'bg-emerald-400 animate-ping' : 'bg-teal-400 animate-pulse'}`} />
+                    <span>{status === 'speaking' ? 'Sofía hablando' : 'Volver con Sofía'}</span>
+                  </button>
+                )}
               </div>
               <button
                 type="button"
