@@ -10,12 +10,14 @@ import {
   Play,
   Pause,
   Volume2,
-  VolumeX
+  VolumeX,
+  Film
 } from 'lucide-react';
 
 const FACEBOOK_PAGE_URL = 'https://www.facebook.com/tlayoyos3marias/';
-const FACEBOOK_POST_URL =
-  'https://www.facebook.com/tlayoyos3marias/posts/pfbid0dnroPtqnExEBtkMrRdXkMPbQyh3KXXgjRoZBXU3qcxdaiRRJYR1nLKdvyRjN2weol';
+const FACEBOOK_VIDEO_URL = 'https://www.facebook.com/watch/?v=1409135404346666';
+const FACEBOOK_VIDEO_EMBED_URL =
+  'https://www.facebook.com/plugins/video.php?href=https%3A%2F%2Fwww.facebook.com%2Fwatch%2F%3Fv%3D1409135404346666&show_text=false&width=500';
 
 interface FacebookChannelSectionProps {
   onScrollToMenu?: () => void;
@@ -25,6 +27,7 @@ export const FacebookChannelSection: React.FC<FacebookChannelSectionProps> = ({ 
   const [avatarError, setAvatarError] = useState(false);
   const [videoError, setVideoError] = useState(false);
   const [posterError, setPosterError] = useState(false);
+  const [playerMode, setPlayerMode] = useState<'facebook' | 'local'>('facebook');
   const [copied, setCopied] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(true);
@@ -33,7 +36,7 @@ export const FacebookChannelSection: React.FC<FacebookChannelSectionProps> = ({ 
   const baseUrl = (import.meta as any).env.BASE_URL || '/';
   const videoSrc = `${baseUrl}assets/aistudio/tlayoyo_efa7202e.mp4`;
   const postImageSrc = `${baseUrl}assets/aistudio/494373878_1231809338952223_3147762754903625367_n_0b7eeb8e.jpg`;
-  const avatarSrc = `${baseUrl}assets/aistudio/Designer__5__241aba85.png`;
+  const avatarSrc = `${baseUrl}assets/aistudio/3m_7640444f.jpg`;
 
   const handleTogglePlay = () => {
     const vid = videoRef.current;
@@ -57,7 +60,7 @@ export const FacebookChannelSection: React.FC<FacebookChannelSectionProps> = ({ 
   const handleCopyLink = async () => {
     try {
       if (navigator.clipboard && navigator.clipboard.writeText) {
-        await navigator.clipboard.writeText(FACEBOOK_POST_URL);
+        await navigator.clipboard.writeText(FACEBOOK_VIDEO_URL);
         setCopied(true);
         setTimeout(() => setCopied(false), 2500);
       }
@@ -166,7 +169,7 @@ export const FacebookChannelSection: React.FC<FacebookChannelSectionProps> = ({ 
             </div>
           </div>
 
-          {/* Right Column: Native Reliable Featured Video & Facebook Post Card */}
+          {/* Right Column: Official Facebook Video Embed with Instant Local Video Switcher */}
           <div className="lg:col-span-6 flex">
             <article className="w-full flex flex-col justify-between bg-white dark:bg-gray-900 border border-gray-200/90 dark:border-gray-800 rounded-3xl shadow-xl shadow-gray-900/5 dark:shadow-black/30 overflow-hidden">
               {/* Post Header */}
@@ -198,20 +201,38 @@ export const FacebookChannelSection: React.FC<FacebookChannelSectionProps> = ({ 
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                      Publicación destacada · @tlayoyos3marias
+                      Video oficial · @tlayoyos3marias
                     </p>
                   </div>
                 </div>
 
-                <a
-                  href={FACEBOOK_PAGE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label="Abrir página oficial en Facebook"
-                  className="p-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 text-[#1877F2] dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/50 transition-colors shrink-0"
-                >
-                  <Facebook className="w-5 h-5" aria-hidden="true" />
-                </a>
+                {/* Player Source Switcher (Facebook Watch Embed vs Local MP4 Fallback) */}
+                <div className="inline-flex items-center p-1 rounded-xl bg-gray-100 dark:bg-gray-800 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPlayerMode('facebook')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-colors cursor-pointer ${
+                      playerMode === 'facebook'
+                        ? 'bg-[#1877F2] text-white shadow-sm'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <Facebook className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Facebook</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPlayerMode('local')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-black uppercase tracking-wider transition-colors cursor-pointer ${
+                      playerMode === 'local'
+                        ? 'bg-primary-600 text-white shadow-sm'
+                        : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                  >
+                    <Film className="w-3.5 h-3.5" aria-hidden="true" />
+                    <span>Rápido</span>
+                  </button>
+                </div>
               </div>
 
               {/* Post Copy */}
@@ -224,82 +245,107 @@ export const FacebookChannelSection: React.FC<FacebookChannelSectionProps> = ({ 
                 </p>
               </div>
 
-              {/* Video / Media Stage (100% compatible with Vercel & all browsers, zero Meta X-Frame-Options block) */}
-              <div className="relative w-full h-72 sm:h-80 bg-gray-950 overflow-hidden group">
-                {!videoError ? (
-                  <video
-                    ref={videoRef}
-                    src={videoSrc}
-                    poster={postImageSrc}
-                    autoPlay
-                    loop
-                    muted={isMuted}
-                    playsInline
-                    onError={() => setVideoError(true)}
-                    className="w-full h-full object-cover"
-                  />
-                ) : !posterError ? (
-                  <img
-                    src={postImageSrc}
-                    alt="Tlayoyos 3 Marías en Facebook"
-                    referrerPolicy="no-referrer"
-                    onError={() => setPosterError(true)}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950 text-white p-6 text-center">
-                    <Facebook className="w-10 h-10 mb-2 text-[#1877F2]" aria-hidden="true" />
-                    <span className="text-sm font-black uppercase tracking-wider">Tlayoyos 3 Marías</span>
-                    <span className="text-xs text-gray-400 mt-1">Video oficial en Facebook</span>
+              {/* Media Stage */}
+              {playerMode === 'facebook' ? (
+                <div className="w-full bg-gray-950">
+                  <div className="w-full flex justify-center bg-black">
+                    <iframe
+                      src={FACEBOOK_VIDEO_EMBED_URL}
+                      title="Video oficial de Tlayoyos 3 Marías en Facebook"
+                      className="w-full max-w-[500px] h-[360px] sm:h-[420px] border-0 overflow-hidden bg-black"
+                      scrolling="no"
+                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
                   </div>
-                )}
-
-                {/* Contrast Scrim & Controls */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent flex flex-col justify-between p-4 sm:p-5 pointer-events-none">
-                  <div className="flex items-center justify-end gap-2 pointer-events-auto">
-                    {!videoError && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={handleTogglePlay}
-                          aria-label={isPlaying ? 'Pausar video' : 'Reproducir video'}
-                          className="p-2.5 rounded-xl bg-black/55 hover:bg-black/75 text-white backdrop-blur-md border border-white/15 transition-colors cursor-pointer"
-                        >
-                          {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleToggleMute}
-                          aria-label={isMuted ? 'Activar sonido' : 'Silenciar sonido'}
-                          className="p-2.5 rounded-xl bg-black/55 hover:bg-black/75 text-white backdrop-blur-md border border-white/15 transition-colors cursor-pointer"
-                        >
-                          {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-                        </button>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="flex items-end justify-between gap-3 pointer-events-auto">
-                    <div>
-                      <p className="text-xs font-bold uppercase tracking-wider text-white/80">
-                        Facebook · Video oficial
-                      </p>
-                      <p className="text-sm sm:text-base font-black text-white">
-                        Tlayoyos 3 Marías Teziutlán
-                      </p>
-                    </div>
-                    <a
-                      href={FACEBOOK_POST_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#1464cf] text-white text-xs font-black uppercase tracking-wider shadow-lg transition-colors whitespace-nowrap shrink-0"
+                  <div className="px-4 py-2.5 bg-gray-900 border-t border-gray-800 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-300">
+                    <span>¿Tu navegador bloquea el reproductor de Facebook?</span>
+                    <button
+                      type="button"
+                      onClick={() => setPlayerMode('local')}
+                      className="font-bold text-primary-400 hover:text-primary-300 underline underline-offset-2 cursor-pointer"
                     >
-                      <span>Ver video en Facebook</span>
-                      <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
-                    </a>
+                      Ver en modo rápido
+                    </button>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="relative w-full h-[360px] sm:h-[420px] bg-gray-950 overflow-hidden group">
+                  {!videoError ? (
+                    <video
+                      ref={videoRef}
+                      src={videoSrc}
+                      poster={postImageSrc}
+                      autoPlay
+                      loop
+                      muted={isMuted}
+                      playsInline
+                      onError={() => setVideoError(true)}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : !posterError ? (
+                    <img
+                      src={postImageSrc}
+                      alt="Tlayoyos 3 Marías en Facebook"
+                      referrerPolicy="no-referrer"
+                      onError={() => setPosterError(true)}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-gray-900 to-gray-950 text-white p-6 text-center">
+                      <Facebook className="w-10 h-10 mb-2 text-[#1877F2]" aria-hidden="true" />
+                      <span className="text-sm font-black uppercase tracking-wider">Tlayoyos 3 Marías</span>
+                      <span className="text-xs text-gray-400 mt-1">Video oficial en Facebook</span>
+                    </div>
+                  )}
+
+                  {/* Contrast Scrim & Controls */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/15 to-transparent flex flex-col justify-between p-4 sm:p-5 pointer-events-none">
+                    <div className="flex items-center justify-end gap-2 pointer-events-auto">
+                      {!videoError && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleTogglePlay}
+                            aria-label={isPlaying ? 'Pausar video' : 'Reproducir video'}
+                            className="p-2.5 rounded-xl bg-black/55 hover:bg-black/75 text-white backdrop-blur-md border border-white/15 transition-colors cursor-pointer"
+                          >
+                            {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleToggleMute}
+                            aria-label={isMuted ? 'Activar sonido' : 'Silenciar sonido'}
+                            className="p-2.5 rounded-xl bg-black/55 hover:bg-black/75 text-white backdrop-blur-md border border-white/15 transition-colors cursor-pointer"
+                          >
+                            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-end justify-between gap-3 pointer-events-auto">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wider text-white/80">
+                          Reproducción directa
+                        </p>
+                        <p className="text-sm sm:text-base font-black text-white">
+                          Tlayoyos 3 Marías Teziutlán
+                        </p>
+                      </div>
+                      <a
+                        href={FACEBOOK_VIDEO_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#1464cf] text-white text-xs font-black uppercase tracking-wider shadow-lg transition-colors whitespace-nowrap shrink-0"
+                      >
+                        <span>Ver en Watch</span>
+                        <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Card Bottom Footer */}
               <div className="p-4 sm:px-6 bg-gray-50/80 dark:bg-gray-950/60 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-3">
@@ -322,12 +368,12 @@ export const FacebookChannelSection: React.FC<FacebookChannelSectionProps> = ({ 
                 </button>
 
                 <a
-                  href={FACEBOOK_POST_URL}
+                  href={FACEBOOK_VIDEO_URL}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-[#1877F2] dark:hover:bg-[#1877F2] dark:hover:text-white text-xs font-black uppercase tracking-wider transition-colors whitespace-nowrap shrink-0"
                 >
-                  <span>Abrir publicación</span>
+                  <span>Ver video en Facebook</span>
                   <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
                 </a>
               </div>

@@ -1,5 +1,5 @@
-// Service Worker for Tlayoyos 3 Marías PWA - v7
-const CACHE_NAME = 'tlayoyos-3-marias-v7';
+// Service Worker for Tlayoyos 3 Marías PWA - v8
+const CACHE_NAME = 'tlayoyos-3-marias-v8';
 
 self.addEventListener('install', (event) => {
   // Activate immediately without waiting for other tabs
@@ -125,8 +125,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.body || 'Toca para abrir el módulo de pedidos en el panel de administración.',
-    icon: '/assets/aistudio/Designer__5__241aba85.png',
-    badge: '/assets/aistudio/Designer__5__241aba85.png',
+    icon: '/assets/aistudio/3m_7640444f.jpg',
+    badge: '/assets/aistudio/3m_7640444f.jpg',
     tag: data.tag || (orderId ? `order-${orderId}` : `order-${Date.now()}`),
     vibrate: [300, 100, 300, 100, 300],
     requireInteraction: true,

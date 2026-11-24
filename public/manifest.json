@@ -13,15 +13,15 @@
   "categories": ["food", "restaurants", "shopping"],
   "icons": [
     {
-      "src": "assets/aistudio/Designer__5__241aba85.png",
-      "sizes": "1024x1024",
-      "type": "image/png",
+      "src": "assets/aistudio/3m_7640444f.jpg",
+      "sizes": "960x960",
+      "type": "image/jpeg",
       "purpose": "any"
     },
     {
-      "src": "assets/aistudio/Designer__5__241aba85.png",
-      "sizes": "1024x1024",
-      "type": "image/png",
+      "src": "assets/aistudio/3m_7640444f.jpg",
+      "sizes": "960x960",
+      "type": "image/jpeg",
       "purpose": "maskable"
     }
   ]
