@@ -95,8 +95,8 @@ class NotificationService {
     if (!this.isSupported() || Notification.permission !== 'granted') return;
 
     const defaultOptions: NotificationOptions = {
-      icon: '/assets/aistudio/crea_el_Logotipo_vectorial_profesional_de_Tlayoyos_bbff3d24.png',
-      badge: '/assets/aistudio/crea_el_Logotipo_vectorial_profesional_de_Tlayoyos_bbff3d24.png',
+      icon: '/assets/aistudio/Designer__3__462aa070.png',
+      badge: '/assets/aistudio/Designer__3__462aa070.png',
       vibrate: [200, 100, 200],
       ...options
     };
@@ -159,8 +159,8 @@ class NotificationService {
 
     const options: NotificationOptions = {
       body,
-      icon: '/assets/aistudio/crea_el_Logotipo_vectorial_profesional_de_Tlayoyos_bbff3d24.png',
-      badge: '/assets/aistudio/crea_el_Logotipo_vectorial_profesional_de_Tlayoyos_bbff3d24.png',
+      icon: '/assets/aistudio/Designer__3__462aa070.png',
+      badge: '/assets/aistudio/Designer__3__462aa070.png',
       tag: `order-${order.id}`,
       renotify: true,
       requireInteraction: true,
