@@ -1087,7 +1087,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   <span className="text-primary-500 font-serif italic font-normal">Cocina</span> con <br />
                   Herencia.
                 </h1>
-                <p className="text-xl text-black/70 dark:text-white/70 mb-6 max-w-xl leading-relaxed font-medium">
+                <p className="text-xl text-white/90 dark:text-white/80 mb-6 max-w-xl leading-relaxed font-medium drop-shadow-sm">
                   Cada plato cuenta una historia. Descubre la fusión perfecta entre técnicas tradicionales y una visión culinaria moderna.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center gap-4">
