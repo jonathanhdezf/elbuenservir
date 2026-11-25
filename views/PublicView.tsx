@@ -782,7 +782,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
             />
             <div className="flex flex-col">
               <span className={`text-2xl font-black tracking-tighter leading-none ${isScrolled || isPreview ? 'text-gray-900 dark:text-white' : 'text-white'}`}>TLAYOYOS 3 MARÍAS</span>
-              <span className={`text-[10px] font-bold tracking-[0.3em] uppercase ${isScrolled || isPreview ? 'text-primary-600' : 'text-primary-400'}`}>Desde 1994</span>
+              <span className={`text-[10px] font-bold tracking-[0.3em] uppercase ${isScrolled || isPreview ? 'text-primary-600' : 'text-primary-400'}`}>DESDE 1950</span>
             </div>
           </div>
 
@@ -1327,9 +1327,6 @@ export default function PublicView({ categories, menuItems, customers, orders = 
         </div>
       </section>
 
-      {/* Customer Testimonials Carousel Section */}
-      {!isPreview && <TestimonialsCarousel />}
-
       {/* Official Facebook Channel Section */}
       {!isPreview && <FacebookChannelSection onScrollToMenu={() => scrollToSection('menu')} />}
 
@@ -1407,6 +1404,9 @@ export default function PublicView({ categories, menuItems, customers, orders = 
           </section>
         )
       }
+
+      {/* Customer Testimonials Carousel Section */}
+      {!isPreview && <TestimonialsCarousel />}
 
       {/* Footer */}
       {
