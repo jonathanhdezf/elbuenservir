@@ -804,6 +804,22 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                 {item.label}
               </button>
             ))}
+            {onEnterControlPanel && (
+              <button
+                type="button"
+                onClick={() => {
+                  soundManager.play('click');
+                  onEnterControlPanel();
+                }}
+                aria-label="Portal de Administración"
+                title="Administración"
+                className={`p-1.5 rounded-lg opacity-35 hover:opacity-100 hover:text-primary-500 transition-all cursor-pointer ${
+                  isScrolled || isPreview ? 'text-gray-500 dark:text-gray-400' : 'text-white/75'
+                }`}
+              >
+                <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+            )}
           </div>
           <div className="flex items-center space-x-4 md:space-x-6">
             {/* Customer Profile (when logged in) */}
@@ -1053,6 +1069,23 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
                   <span>Hablar con Sofía (IA)</span>
                 </button>
+
+                {onEnterControlPanel && (
+                  <div className="pt-1 flex justify-center">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundManager.play('click');
+                        setIsMobileMenuOpen(false);
+                        onEnterControlPanel();
+                      }}
+                      className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-widest text-gray-400/80 dark:text-gray-500 hover:text-primary-500 transition-colors cursor-pointer py-1"
+                    >
+                      <Lock className="w-3 h-3" aria-hidden="true" />
+                      <span>Acceso interno</span>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )
@@ -1550,6 +1583,20 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   >
                     Cookies
                   </button>
+                  {onEnterControlPanel && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        soundManager.play('click');
+                        onEnterControlPanel();
+                      }}
+                      aria-label="Portal de Administración"
+                      title="Administración"
+                      className="inline-flex items-center text-gray-300 dark:text-gray-700 hover:text-primary-500 dark:hover:text-primary-400 transition-colors cursor-pointer"
+                    >
+                      <Lock className="w-3.5 h-3.5" aria-hidden="true" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

@@ -351,8 +351,18 @@ const INITIAL_LOGS: SiteLog[] = [
     type: 'success'
   }
 ];
+const isAdminRoutePath = (pathname: string) => {
+  const normalized = pathname.replace(/\/+$/, '').toLowerCase();
+  return normalized === '/administracion' || normalized === '/admin';
+};
+
 export default function App() {
-  const [view, setView] = useState<'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch' | 'control_panel' | 'driver_portal'>('public');
+  const [view, setView] = useState<'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch' | 'control_panel' | 'driver_portal'>(() => {
+    if (typeof window !== 'undefined' && isAdminRoutePath(window.location.pathname)) {
+      return 'control_panel';
+    }
+    return 'public';
+  });
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(INITIAL_ITEMS);
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
@@ -406,6 +416,13 @@ export default function App() {
 
   const handleEnterControlPanel = () => {
     if (isPanelAuthenticated) {
+      try {
+        if (!isAdminRoutePath(window.location.pathname)) {
+          window.history.pushState({}, '', '/administracion');
+        }
+      } catch {
+        // ignore
+      }
       setView('control_panel');
     } else {
       setIsAuthModalOpen(true);
@@ -470,6 +487,13 @@ export default function App() {
         }));
       }, 50);
     } else {
+      try {
+        if (!isAdminRoutePath(window.location.pathname)) {
+          window.history.pushState({}, '', '/administracion');
+        }
+      } catch {
+        // ignore
+      }
       setView('control_panel');
     }
   };
@@ -541,6 +565,11 @@ export default function App() {
   useEffect(() => {
     const handleUrlNavigation = () => {
       try {
+        if (isAdminRoutePath(window.location.pathname)) {
+          setView('control_panel');
+          return;
+        }
+
         const search = window.location.search;
         const params = new URLSearchParams(search);
         const viewParam = params.get('view');
@@ -549,6 +578,8 @@ export default function App() {
 
         if ((viewParam === 'admin' && sectionParam === 'orders') || actionParam === 'open_orders' || sectionParam === 'orders') {
           handleOpenAdminOrders(params.get('orderId'));
+        } else if (window.location.pathname === '/' || window.location.pathname === '') {
+          setView((currentView) => (currentView === 'control_panel' ? 'public' : currentView));
         }
       } catch (e) {
         console.warn('Error reading URL navigation params:', e);
@@ -847,7 +878,16 @@ export default function App() {
             />
             <ControlPanelAuthModal
               isOpen={true}
-              onClose={() => setView('public')}
+              onClose={() => {
+                try {
+                  if (isAdminRoutePath(window.location.pathname)) {
+                    window.history.replaceState({}, '', '/');
+                  }
+                } catch {
+                  // ignore
+                }
+                setView('public');
+              }}
               onSuccess={handleAuthSuccess}
             />
           </>
@@ -867,6 +907,13 @@ export default function App() {
           onExit={() => {
             setIsPanelAuthenticated(false);
             notificationService.setAdminAuthenticated(false);
+            try {
+              if (isAdminRoutePath(window.location.pathname)) {
+                window.history.replaceState({}, '', '/');
+              }
+            } catch {
+              // ignore
+            }
             setView('public');
           }}
           isDarkMode={isDarkMode}
@@ -960,7 +1007,16 @@ export default function App() {
             setView('control_panel');
           }}
           onViewDigitalTicket={handleOpenDigitalTicket}
-          onGoToPublicSite={() => setView('public')}
+          onGoToPublicSite={() => {
+            try {
+              if (isAdminRoutePath(window.location.pathname)) {
+                window.history.replaceState({}, '', '/');
+              }
+            } catch {
+              // ignore
+            }
+            setView('public');
+          }}
           enabledModules={enabledModules}
         />
       );
