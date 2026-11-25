@@ -1104,16 +1104,6 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                   </button>
                   <button
                     onClick={() => {
-                      soundManager.play('click');
-                      setIsLiveOrderOpen(true);
-                    }}
-                    className="w-full sm:w-auto group flex items-center justify-center gap-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-white px-9 py-6 rounded-3xl text-lg font-black uppercase tracking-wider shadow-2xl shadow-emerald-500/30 transition-all hover:-translate-y-1 active:scale-95 cursor-pointer"
-                  >
-                    <Sparkles className="w-6 h-6 text-amber-300 animate-pulse" />
-                    <span>Pedir con Sofía IA</span>
-                  </button>
-                  <button
-                    onClick={() => {
                       setOrderStep(cartItems.length > 0 ? 3 : 1);
                       setIsOrderModalOpen(true);
                     }}
