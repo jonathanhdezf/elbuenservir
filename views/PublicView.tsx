@@ -2584,7 +2584,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
         onClose={() => setIsPromoModalOpen(false)}
         onOpenSofia={() => setIsLiveOrderOpen(true)}
         onScrollToMenu={() => scrollToSection('menu')}
-        autoCloseSeconds={7}
+        autoCloseSeconds={12}
       />
 
       {/* Floating Re-open Promo Button */}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   X, MessageCircle, Sparkles, Clock, ArrowRight, Utensils,
-  Mic, Play, Pause, ExternalLink, Flame
+  Mic, Pause, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
 
@@ -21,11 +21,40 @@ export function PromoBannerModal({
   onClose,
   onOpenSofia,
   onScrollToMenu,
-  autoCloseSeconds = 7
+  autoCloseSeconds = 12
 }: PromoBannerModalProps) {
   const [timeLeft, setTimeLeft] = useState(autoCloseSeconds);
   const [isPaused, setIsPaused] = useState(false);
+  const [activeSlide, setActiveSlide] = useState(0);
   const timerRef = useRef<any>(null);
+
+  const baseUrl = (import.meta as any).env.BASE_URL || '/';
+  const promoSlides = [
+    {
+      src: `${baseUrl}assets/aistudio/591729797_1423529089780246_9166269732555178978_n_6cf3e08f.jpg`,
+      alt: 'Este clima se acompaña con Tlayoyos 3 Marías',
+      objectPos: 'object-[center_20%]',
+      aspectClass: 'aspect-square max-w-[330px]'
+    },
+    {
+      src: `${baseUrl}assets/aistudio/642411781_1502498118550009_1593438138219254161_n_d5eacb2d.jpg`,
+      alt: '¡Buen provecho! Hambre no esperes más - Tlayoyos 3 Marías',
+      objectPos: 'object-center',
+      aspectClass: 'aspect-square max-w-[330px]'
+    },
+    {
+      src: `${baseUrl}assets/aistudio/708911120_1584545090345311_309224322891505235_n_95094b68.jpg`,
+      alt: 'Así se ve un tlayoyo hecho con cariño - Tlayoyos 3 Marías',
+      objectPos: 'object-center',
+      aspectClass: 'aspect-[6/5] max-w-[360px]'
+    },
+    {
+      src: `${baseUrl}assets/aistudio/494373878_1231809338952223_3147762754903625367_n_0b7eeb8e.jpg`,
+      alt: '¿De qué le vamos a dar? - Tlayoyos 3 Marías',
+      objectPos: 'object-center',
+      aspectClass: 'aspect-square max-w-[330px]'
+    }
+  ];
 
   // Reset countdown whenever opened and trigger instant pop-up sound
   useEffect(() => {
@@ -60,6 +89,15 @@ export function PromoBannerModal({
     };
   }, [isOpen, autoCloseSeconds]);
 
+  // Auto-rotate promo images when modal is open and not paused
+  useEffect(() => {
+    if (!isOpen || isPaused || promoSlides.length <= 1) return;
+    const slideTimer = setInterval(() => {
+      setActiveSlide((prev) => (prev + 1) % promoSlides.length);
+    }, 3200);
+    return () => clearInterval(slideTimer);
+  }, [isOpen, isPaused, promoSlides.length]);
+
   // Tick countdown timer
   useEffect(() => {
     if (!isOpen || isPaused) {
@@ -87,7 +125,7 @@ export function PromoBannerModal({
   const progressPercent = Math.max(0, Math.min(100, (timeLeft / autoCloseSeconds) * 100));
 
   const handleOpenWhatsApp = () => {
-    try { soundManager.play('confirm_generic'); } catch (e) { }
+    try { soundManager.play('click'); } catch (e) { }
     window.open(whatsappUrl, '_blank');
     onClose();
   };
@@ -106,8 +144,15 @@ export function PromoBannerModal({
     }
   };
 
-  const baseUrl = (import.meta as any).env.BASE_URL || '/';
-  const bannerImgSrc = `${baseUrl}assets/aistudio/494373878_1231809338952223_3147762754903625367_n_0b7eeb8e.jpg`;
+  const currentSlide = promoSlides[activeSlide] || promoSlides[0];
+  const handlePrevSlide = () => {
+    setIsPaused(true);
+    setActiveSlide((prev) => (prev - 1 + promoSlides.length) % promoSlides.length);
+  };
+  const handleNextSlide = () => {
+    setIsPaused(true);
+    setActiveSlide((prev) => (prev + 1) % promoSlides.length);
+  };
 
   return (
     <div className="fixed inset-0 z-[600] flex items-center justify-center p-3 sm:p-4 overflow-y-auto font-sans animate-in fade-in duration-300">
@@ -187,22 +232,70 @@ export function PromoBannerModal({
 
         {/* Modal Body */}
         <div className="px-4 sm:px-6 pt-1 pb-5 space-y-4 relative z-10">
-          {/* Main Visual Image Banner */}
-          <div className="relative rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-primary-400/35 shadow-2xl bg-black/40 group aspect-square max-h-[310px] mx-auto flex items-center justify-center">
-            <img
-              src={bannerImgSrc}
-              alt="¿De qué le vamos a dar? - Tlayoyos 3 Marías"
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-            />
-            {/* Glossy gradient reflection */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-white/5 pointer-events-none" />
+          {/* Main Visual Promo Carousel */}
+          <div className="space-y-2.5">
+            <div className={`relative rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-primary-400/35 shadow-2xl bg-black/40 group ${currentSlide.aspectClass} w-full mx-auto flex items-center justify-center transition-all duration-300`}>
+              <img
+                key={currentSlide.src}
+                src={currentSlide.src}
+                alt={currentSlide.alt}
+                className={`w-full h-full object-cover ${currentSlide.objectPos} transition-transform duration-700 group-hover:scale-105 animate-in fade-in`}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-white/5 pointer-events-none" />
 
-            {/* Quick action overlay pill positioned so bottom text & logo stay clear */}
-            <div className="absolute top-3 right-3 flex items-center justify-end">
-              <span className="px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/20 text-[11px] font-black text-white flex items-center gap-1.5 shadow-lg">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span>Teziutlán</span>
-              </span>
+              {/* Prev / Next Navigation Buttons */}
+              <button
+                type="button"
+                onClick={handlePrevSlide}
+                aria-label="Imagen anterior"
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/20 flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleNextSlide}
+                aria-label="Imagen siguiente"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/60 hover:bg-black/80 text-white border border-white/20 flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+
+              {/* Top Right Counter & Location */}
+              <div className="absolute top-3 right-3 z-20 flex items-center gap-1.5">
+                <span className="px-2.5 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/20 text-[11px] font-bold text-white tabular-nums">
+                  {activeSlide + 1}/{promoSlides.length}
+                </span>
+                <span className="px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/20 text-[11px] font-black text-white shadow-lg">
+                  Teziutlán
+                </span>
+              </div>
+            </div>
+
+            {/* Thumbnail Strip */}
+            <div className="flex items-center justify-center gap-2">
+              {promoSlides.map((slide, idx) => (
+                <button
+                  key={slide.src}
+                  type="button"
+                  onClick={() => {
+                    setIsPaused(true);
+                    setActiveSlide(idx);
+                  }}
+                  aria-label={`Ver promoción ${idx + 1}`}
+                  className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                    idx === activeSlide
+                      ? 'border-primary-400 scale-105 shadow-md shadow-primary-500/30'
+                      : 'border-white/15 opacity-60 hover:opacity-100'
+                  }`}
+                >
+                  <img
+                    src={slide.src}
+                    alt={slide.alt}
+                    className={`w-full h-full object-cover ${slide.objectPos}`}
+                  />
+                </button>
+              ))}
             </div>
           </div>
 
