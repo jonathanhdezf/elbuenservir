@@ -4,7 +4,7 @@ import {
     User, Key, AlertCircle, ChevronDown,
     Plus, Minus, Trash2, CheckCircle, Search,
     Sun, Moon, Phone, Clipboard, Map, Utensils, MapPin,
-    ChevronLeft, ChevronRight, ArrowLeft, MessageSquare, Check
+    ChevronLeft, ChevronRight, ArrowLeft, MessageSquare, Check, Hash
 } from 'lucide-react';
 import { MenuItem, Category, Order, OrderItem, Staff, Customer, PaymentMethod } from '../types';
 import { soundManager } from '../utils/soundManager';
@@ -13,14 +13,23 @@ import { useMobileBack } from '../hooks/useMobileBack';
 import {
     TLAYOYO_SALSAS,
     TLAYOYO_CHEESE_OPTIONS,
-    DEFAULT_TLAYOYO_SELECTION,
-    TlayoyoSelection,
+    TlayoyoSalsa,
+    TlayoyoCheeseMode,
     isTlayoyoDish,
-    toggleTlayoyoSalsa,
-    toggleTlayoyoSalsaAparte,
-    setTlayoyoSinSalsa,
     formatTlayoyoVariationLabel
 } from '../utils/tlayoyoConfig';
+
+interface TpvTlayoyoDraft {
+    salsas: TlayoyoSalsa[];
+    salsaMode: 'con' | 'aparte' | 'sin' | null;
+    cheese: TlayoyoCheeseMode | null;
+}
+
+const EMPTY_TPV_TLAYOYO: TpvTlayoyoDraft = {
+    salsas: [],
+    salsaMode: null,
+    cheese: null
+};
 
 interface TPVViewProps {
     categories: Category[];
@@ -71,7 +80,8 @@ export default function TPVView({
     const [selectedTable, setSelectedTable] = useState<string>(initialTable || 'Mostrador');
     const [selectedAddress, setSelectedAddress] = useState<string>('');
     const [activePosView, setActivePosView] = useState<'menu' | 'cart'>('menu');
-    const [tlayoyoSelections, setTlayoyoSelections] = useState<Record<string, TlayoyoSelection>>({});
+    const [tlayoyoSelections, setTlayoyoSelections] = useState<Record<string, TpvTlayoyoDraft>>({});
+    const [tlayoyoError, setTlayoyoError] = useState<Record<string, string>>({});
     const [lastAddedToast, setLastAddedToast] = useState<string | null>(null);
 
     // Modal States
@@ -79,6 +89,13 @@ export default function TPVView({
     const [tempCustomer, setTempCustomer] = useState<Customer | null>(null);
     const [regName, setRegName] = useState('');
     const [regAddress, setRegAddress] = useState('');
+
+    // Exact Quantity Modal State
+    type QuantityTarget =
+        | { mode: 'variation'; item: MenuItem; variation: { id: string; label: string; price: number } }
+        | { mode: 'cartIndex'; index: number; name: string; variationLabel: string; price: number };
+    const [qtyModalTarget, setQtyModalTarget] = useState<QuantityTarget | null>(null);
+    const [qtyInputValue, setQtyInputValue] = useState<string>('');
 
     // Payment States
     const [tpvPaymentMethod, setTpvPaymentMethod] = useState<PaymentMethod>('efectivo');
@@ -98,8 +115,14 @@ export default function TPVView({
     };
 
     // Mobile Back Button Navigation Logic
-    const hasOpenTpvModal = modalType !== 'none';
-    const handleCloseTpvModal = () => setModalType('none');
+    const hasOpenTpvModal = modalType !== 'none' || qtyModalTarget !== null;
+    const handleCloseTpvModal = () => {
+        if (qtyModalTarget) {
+            setQtyModalTarget(null);
+            return;
+        }
+        setModalType('none');
+    };
 
     useMobileBack({
         hasOpenModal: hasOpenTpvModal,
@@ -158,6 +181,17 @@ export default function TPVView({
         const timer = setTimeout(() => setLastAddedToast(null), 1800);
         return () => clearTimeout(timer);
     }, [lastAddedToast]);
+
+    useEffect(() => {
+        if (!qtyModalTarget) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                setQtyModalTarget(null);
+            }
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [qtyModalTarget]);
 
     const isTableOccupied = (tableName: string) => {
         return orders.some(o =>
@@ -263,10 +297,76 @@ export default function TPVView({
         soundManager.play('navigation');
     };
 
-    const getCartVariationQty = (itemId: string, variationLabel: string) => {
-        return cart
-            .filter(i => i.id === itemId && i.variationLabel === variationLabel)
-            .reduce((sum, i) => sum + i.quantity, 0);
+    const resetTlayoyoDraft = (itemId: string) => {
+        setTlayoyoSelections(prev => {
+            if (!prev[itemId]) return prev;
+            const next = { ...prev };
+            delete next[itemId];
+            return next;
+        });
+        setTlayoyoError(prev => {
+            if (!prev[itemId]) return prev;
+            const next = { ...prev };
+            delete next[itemId];
+            return next;
+        });
+    };
+
+    const toggleTpvSalsa = (itemId: string, salsa: TlayoyoSalsa) => {
+        setTlayoyoSelections(prev => {
+            const base = prev[itemId] || EMPTY_TPV_TLAYOYO;
+            if (base.salsaMode === 'sin' || base.salsaMode === null) {
+                return { ...prev, [itemId]: { ...base, salsaMode: 'con', salsas: [salsa] } };
+            }
+            const exists = base.salsas.includes(salsa);
+            const nextSalsas = exists
+                ? base.salsas.filter(s => s !== salsa)
+                : [...base.salsas, salsa];
+            if (nextSalsas.length === 0 && base.salsaMode === 'con') {
+                return { ...prev, [itemId]: { ...base, salsaMode: null, salsas: [] } };
+            }
+            return { ...prev, [itemId]: { ...base, salsas: nextSalsas } };
+        });
+        setTlayoyoError(prev => ({ ...prev, [itemId]: '' }));
+    };
+
+    const toggleTpvSalsaAparte = (itemId: string) => {
+        setTlayoyoSelections(prev => {
+            const base = prev[itemId] || EMPTY_TPV_TLAYOYO;
+            if (base.salsaMode === 'aparte') {
+                return {
+                    ...prev,
+                    [itemId]: {
+                        ...base,
+                        salsaMode: base.salsas.length > 0 ? 'con' : null
+                    }
+                };
+            }
+            return { ...prev, [itemId]: { ...base, salsaMode: 'aparte' } };
+        });
+        setTlayoyoError(prev => ({ ...prev, [itemId]: '' }));
+    };
+
+    const toggleTpvSinSalsa = (itemId: string) => {
+        setTlayoyoSelections(prev => {
+            const base = prev[itemId] || EMPTY_TPV_TLAYOYO;
+            if (base.salsaMode === 'sin') {
+                return { ...prev, [itemId]: { ...base, salsaMode: null, salsas: [] } };
+            }
+            return { ...prev, [itemId]: { ...base, salsaMode: 'sin', salsas: [] } };
+        });
+        setTlayoyoError(prev => ({ ...prev, [itemId]: '' }));
+    };
+
+    const toggleTpvCheese = (itemId: string, cheese: TlayoyoCheeseMode) => {
+        setTlayoyoSelections(prev => {
+            const base = prev[itemId] || EMPTY_TPV_TLAYOYO;
+            return {
+                ...prev,
+                [itemId]: { ...base, cheese: base.cheese === cheese ? null : cheese }
+            };
+        });
+        setTlayoyoError(prev => ({ ...prev, [itemId]: '' }));
     };
 
     const addToCart = (item: MenuItem, variation: any, delta: number = 1) => {
@@ -287,25 +387,10 @@ export default function TPVView({
                 isOld: false
             }];
         });
+        if (isTlayoyoDish(item)) {
+            resetTlayoyoDraft(item.id);
+        }
         setLastAddedToast(`${delta > 1 ? `${delta}× ` : ''}${item.name} agregado`);
-        soundManager.play('click');
-    };
-
-    const decrementCartVariation = (itemId: string, variationLabel: string) => {
-        setCart(prev => {
-            const matchIdx = [...prev]
-                .reverse()
-                .findIndex(i => i.id === itemId && i.variationLabel === variationLabel);
-            if (matchIdx === -1) return prev;
-            const targetIndex = prev.length - 1 - matchIdx;
-            const target = prev[targetIndex];
-            if (target.quantity <= 1) {
-                return prev.filter((_, idx) => idx !== targetIndex);
-            }
-            return prev.map((item, idx) =>
-                idx === targetIndex ? { ...item, quantity: item.quantity - 1 } : item
-            );
-        });
         soundManager.play('click');
     };
 
@@ -336,6 +421,55 @@ export default function TPVView({
         setCart(prev => prev.filter((_, idx) => idx !== index));
         setEditingItemNoteKey(null);
         soundManager.play('click');
+    };
+
+    const openQtyModal = (target: QuantityTarget, currentQty: number) => {
+        setQtyModalTarget(target);
+        setQtyInputValue(currentQty > 0 ? String(currentQty) : '');
+        soundManager.play('click');
+    };
+
+    const applyExactQty = (exactQty: number) => {
+        if (!qtyModalTarget) return;
+        const safeQty = Math.max(0, Math.min(999, Math.floor(exactQty)));
+
+        if (qtyModalTarget.mode === 'variation') {
+            const { item, variation } = qtyModalTarget;
+            setCart(prev => {
+                if (safeQty === 0) {
+                    return prev.filter(i => !(i.id === item.id && i.variationLabel === variation.label && !i.notes));
+                }
+                const existingIdx = prev.findIndex(i => i.id === item.id && i.variationLabel === variation.label && !i.notes);
+                if (existingIdx !== -1) {
+                    return prev.map((i, idx) => idx === existingIdx ? { ...i, quantity: safeQty, isOld: false } : i);
+                }
+                return [...prev, {
+                    id: item.id,
+                    name: item.name,
+                    variationLabel: variation.label,
+                    price: variation.price,
+                    quantity: safeQty,
+                    isOld: false
+                }];
+            });
+            if (safeQty > 0) {
+                setLastAddedToast(`${safeQty}× ${item.name}`);
+            }
+            if (isTlayoyoDish(item)) {
+                resetTlayoyoDraft(item.id);
+            }
+        } else {
+            const { index } = qtyModalTarget;
+            setCart(prev => {
+                if (safeQty === 0) {
+                    return prev.filter((_, idx) => idx !== index);
+                }
+                return prev.map((item, idx) => idx === index ? { ...item, quantity: safeQty } : item);
+            });
+        }
+
+        soundManager.play('confirm');
+        setQtyModalTarget(null);
     };
 
     const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
@@ -417,8 +551,11 @@ export default function TPVView({
         setCustomerPhone('');
         setOrderNotes('');
         setEditingItemNoteKey(null);
+        setTlayoyoSelections({});
+        setTlayoyoError({});
         setSelectedTable(initialTable || 'Mostrador');
         setSelectedAddress('');
+        setActivePosView('menu');
         setModalType('none');
         soundManager.play('confirm');
     };
@@ -762,34 +899,47 @@ export default function TPVView({
                         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4 pb-6">
                             {visibleItems.map(item => {
                                 if (isTlayoyoDish(item)) {
-                                    const sel = tlayoyoSelections[item.id] || DEFAULT_TLAYOYO_SELECTION;
+                                    const sel = tlayoyoSelections[item.id] || EMPTY_TPV_TLAYOYO;
                                     const baseVar = item.variations[0] || { id: 'm-tlayoyos-v1', label: 'Por pieza', price: 10 };
-                                    const currentLabel = formatTlayoyoVariationLabel(sel);
-                                    const activeQty = getCartVariationQty(item.id, currentLabel);
-                                    const totalDishQty = cart
-                                        .filter(i => i.id === item.id)
-                                        .reduce((sum, i) => sum + i.quantity, 0);
+                                    const isTlayoyoReady = sel.salsaMode !== null && sel.cheese !== null;
+                                    const resolvedLabel = isTlayoyoReady
+                                        ? formatTlayoyoVariationLabel({
+                                            salsas: sel.salsas,
+                                            salsaMode: sel.salsaMode!,
+                                            cheese: sel.cheese!
+                                        })
+                                        : '';
+                                    const inlineErr = tlayoyoError[item.id];
+
+                                    const handleTlayoyoAction = (action: 'add1' | 'add3' | 'exact') => {
+                                        if (!isTlayoyoReady) {
+                                            const missingMsg = sel.salsaMode === null && sel.cheese === null
+                                                ? 'Selecciona salsa y queso para agregar'
+                                                : sel.salsaMode === null
+                                                    ? 'Falta seleccionar la salsa'
+                                                    : 'Falta seleccionar el queso';
+                                            setTlayoyoError(prev => ({ ...prev, [item.id]: missingMsg }));
+                                            soundManager.play('error');
+                                            return;
+                                        }
+                                        const variationPayload = { ...baseVar, label: resolvedLabel };
+                                        if (action === 'exact') {
+                                            const existingQty = cart.find(i => i.id === item.id && i.variationLabel === resolvedLabel && !i.notes)?.quantity || 0;
+                                            openQtyModal({ mode: 'variation', item, variation: variationPayload }, existingQty);
+                                        } else {
+                                            addToCart(item, variationPayload, action === 'add3' ? 3 : 1);
+                                        }
+                                    };
 
                                     return (
                                         <div
                                             key={item.id}
-                                            className={`bg-white dark:bg-[#1a1118] rounded-2xl p-4 sm:p-5 border transition-colors space-y-3 ${
-                                                totalDishQty > 0
-                                                    ? 'border-primary-500/50 shadow-sm'
-                                                    : 'border-gray-200/80 dark:border-white/10 hover:border-primary-300 dark:hover:border-primary-500/40'
-                                            }`}
+                                            className="bg-white dark:bg-[#1a1118] rounded-2xl p-4 sm:p-5 border border-gray-200/80 dark:border-white/10 hover:border-primary-300 dark:hover:border-primary-500/40 transition-colors space-y-3"
                                         >
                                             <div className="flex items-start justify-between gap-2">
-                                                <div className="min-w-0">
-                                                    <h3 className="text-sm font-extrabold text-gray-900 dark:text-white leading-snug">
-                                                        {item.name}
-                                                    </h3>
-                                                    {totalDishQty > 0 && (
-                                                        <span className="text-[11px] font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                                                            {totalDishQty} {totalDishQty === 1 ? 'pieza en comanda' : 'piezas en comanda'}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                <h3 className="text-sm font-extrabold text-gray-900 dark:text-white leading-snug">
+                                                    {item.name}
+                                                </h3>
                                                 <span className="text-sm font-black text-primary-500 tabular-nums shrink-0">
                                                     ${baseVar.price.toFixed(2)}
                                                 </span>
@@ -801,19 +951,16 @@ export default function TPVView({
                                                 </span>
                                                 <div className="flex flex-wrap gap-1.5">
                                                     {TLAYOYO_SALSAS.map(salsa => {
-                                                        const isSelected = sel.salsaMode !== 'sin' && sel.salsas.includes(salsa);
+                                                        const isSelected = sel.salsaMode !== 'sin' && sel.salsaMode !== null && sel.salsas.includes(salsa);
                                                         return (
                                                             <button
                                                                 key={salsa}
                                                                 type="button"
-                                                                onClick={() => setTlayoyoSelections(prev => ({
-                                                                    ...prev,
-                                                                    [item.id]: toggleTlayoyoSalsa(prev[item.id], salsa)
-                                                                }))}
+                                                                onClick={() => toggleTpvSalsa(item.id, salsa)}
                                                                 className={`min-h-[36px] px-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
                                                                     isSelected
                                                                         ? 'bg-primary-500 text-white shadow-sm'
-                                                                        : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10'
+                                                                        : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10 hover:border-primary-300'
                                                                 }`}
                                                             >
                                                                 {salsa}
@@ -822,28 +969,22 @@ export default function TPVView({
                                                     })}
                                                     <button
                                                         type="button"
-                                                        onClick={() => setTlayoyoSelections(prev => ({
-                                                            ...prev,
-                                                            [item.id]: toggleTlayoyoSalsaAparte(prev[item.id])
-                                                        }))}
+                                                        onClick={() => toggleTpvSalsaAparte(item.id)}
                                                         className={`min-h-[36px] px-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
                                                             sel.salsaMode === 'aparte'
                                                                 ? 'bg-amber-500 text-white shadow-sm'
-                                                                : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10'
+                                                                : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10 hover:border-amber-300'
                                                         }`}
                                                     >
                                                         Aparte
                                                     </button>
                                                     <button
                                                         type="button"
-                                                        onClick={() => setTlayoyoSelections(prev => ({
-                                                            ...prev,
-                                                            [item.id]: setTlayoyoSinSalsa(prev[item.id])
-                                                        }))}
+                                                        onClick={() => toggleTpvSinSalsa(item.id)}
                                                         className={`min-h-[36px] px-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
                                                             sel.salsaMode === 'sin'
                                                                 ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
-                                                                : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10'
+                                                                : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10 hover:border-gray-400'
                                                         }`}
                                                     >
                                                         Sin salsa
@@ -860,14 +1001,11 @@ export default function TPVView({
                                                         <button
                                                             key={opt}
                                                             type="button"
-                                                            onClick={() => setTlayoyoSelections(prev => ({
-                                                                ...prev,
-                                                                [item.id]: { ...(prev[item.id] || DEFAULT_TLAYOYO_SELECTION), cheese: opt }
-                                                            }))}
+                                                            onClick={() => toggleTpvCheese(item.id, opt)}
                                                             className={`min-h-[36px] px-1.5 rounded-xl text-[11px] font-bold transition-colors cursor-pointer truncate ${
                                                                 sel.cheese === opt
                                                                     ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
-                                                                    : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10'
+                                                                    : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10 hover:border-gray-400'
                                                             }`}
                                                         >
                                                             {opt}
@@ -876,53 +1014,40 @@ export default function TPVView({
                                                 </div>
                                             </div>
 
-                                            {activeQty > 0 ? (
-                                                <div className="flex items-center justify-between gap-2 p-1 rounded-2xl bg-primary-500/10 border border-primary-500/35">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => decrementCartVariation(item.id, currentLabel)}
-                                                        aria-label="Quitar una pieza"
-                                                        className="min-w-[44px] min-h-[44px] rounded-xl bg-white dark:bg-[#1a1118] text-gray-700 dark:text-white hover:text-red-500 flex items-center justify-center shadow-sm active:scale-95 transition-all cursor-pointer"
-                                                    >
-                                                        {activeQty === 1 ? <Trash2 className="w-4 h-4 text-red-500" /> : <Minus className="w-4 h-4" />}
-                                                    </button>
-                                                    <div className="text-center px-2">
-                                                        <span className="text-sm font-black text-gray-900 dark:text-white tabular-nums block leading-tight">
-                                                            {activeQty} {activeQty === 1 ? 'pieza' : 'piezas'}
-                                                        </span>
-                                                        <span className="text-[11px] font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                                                            ${(activeQty * baseVar.price).toFixed(2)}
-                                                        </span>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => addToCart(item, { ...baseVar, label: currentLabel }, 1)}
-                                                        aria-label="Agregar una pieza"
-                                                        className="min-w-[44px] min-h-[44px] rounded-xl bg-primary-500 hover:bg-primary-600 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all cursor-pointer"
-                                                    >
-                                                        <Plus className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => addToCart(item, { ...baseVar, label: currentLabel }, 1)}
-                                                        className="flex-1 min-h-[46px] flex items-center justify-between px-4 bg-primary-500/10 hover:bg-primary-500 text-primary-700 dark:text-primary-300 hover:text-white rounded-xl transition-colors font-bold text-xs cursor-pointer active:scale-[0.98]"
-                                                    >
-                                                        <span>+ Agregar</span>
-                                                        <span className="font-black tabular-nums">${baseVar.price.toFixed(2)}</span>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => addToCart(item, { ...baseVar, label: currentLabel }, 3)}
-                                                        title="Agregar 3 piezas"
-                                                        className="min-w-[48px] min-h-[46px] px-3 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-primary-500 hover:text-white text-gray-800 dark:text-white font-black text-xs tabular-nums transition-colors cursor-pointer active:scale-95"
-                                                    >
-                                                        +3
-                                                    </button>
-                                                </div>
+                                            {inlineErr && (
+                                                <p className="text-[11px] font-bold text-red-600 dark:text-red-400 flex items-center gap-1.5">
+                                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                                    <span>{inlineErr}</span>
+                                                </p>
                                             )}
+
+                                            <div className="flex items-center gap-1.5">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleTlayoyoAction('add1')}
+                                                    className="flex-1 min-h-[46px] flex items-center justify-between px-3.5 bg-gray-50 dark:bg-white/5 hover:bg-primary-500 hover:text-white text-gray-900 dark:text-white rounded-xl transition-colors font-bold text-xs cursor-pointer active:scale-[0.98]"
+                                                >
+                                                    <span>+ Agregar</span>
+                                                    <span className="font-black tabular-nums">${baseVar.price.toFixed(2)}</span>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleTlayoyoAction('add3')}
+                                                    title="Agregar 3 piezas"
+                                                    className="min-w-[44px] min-h-[46px] px-2.5 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-primary-500 hover:text-white text-gray-800 dark:text-white font-black text-xs tabular-nums transition-colors cursor-pointer active:scale-95"
+                                                >
+                                                    +3
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleTlayoyoAction('exact')}
+                                                    title="Ingresar cantidad exacta (ej. 20 o 50)"
+                                                    className="min-w-[50px] min-h-[46px] px-2.5 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-gray-900 hover:text-white dark:hover:bg-white dark:hover:text-gray-900 text-gray-700 dark:text-gray-200 font-bold text-[11px] flex items-center justify-center gap-1 transition-colors cursor-pointer active:scale-95"
+                                                >
+                                                    <Hash className="w-3.5 h-3.5" />
+                                                    <span>Cant.</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     );
                                 }
@@ -937,56 +1062,27 @@ export default function TPVView({
                                         </h3>
                                         <div className="space-y-2">
                                             {item.variations.map(vari => {
-                                                const variQty = getCartVariationQty(item.id, vari.label);
-                                                if (variQty > 0) {
-                                                    return (
-                                                        <div
-                                                            key={vari.id}
-                                                            className="w-full min-h-[46px] flex items-center justify-between gap-2 pl-3 pr-1.5 py-1.5 bg-primary-500/10 border border-primary-500/35 rounded-xl"
-                                                        >
-                                                            <div className="min-w-0">
-                                                                <span className="text-xs font-bold text-gray-900 dark:text-white block truncate">
-                                                                    {vari.label}
-                                                                </span>
-                                                                <span className="text-[11px] font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                                                                    ${vari.price.toFixed(2)} c/u
-                                                                </span>
-                                                            </div>
-                                                            <div className="flex items-center gap-1 shrink-0">
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => decrementCartVariation(item.id, vari.label)}
-                                                                    aria-label={`Quitar ${item.name} ${vari.label}`}
-                                                                    className="min-w-[38px] min-h-[38px] rounded-lg bg-white dark:bg-[#1a1118] text-gray-700 dark:text-white hover:text-red-500 flex items-center justify-center shadow-sm active:scale-95 transition-all cursor-pointer"
-                                                                >
-                                                                    {variQty === 1 ? <Trash2 className="w-3.5 h-3.5 text-red-500" /> : <Minus className="w-3.5 h-3.5" />}
-                                                                </button>
-                                                                <span className="w-7 text-center text-xs font-black tabular-nums text-gray-900 dark:text-white">
-                                                                    {variQty}
-                                                                </span>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => addToCart(item, vari, 1)}
-                                                                    aria-label={`Agregar ${item.name} ${vari.label}`}
-                                                                    className="min-w-[38px] min-h-[38px] rounded-lg bg-primary-500 hover:bg-primary-600 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all cursor-pointer"
-                                                                >
-                                                                    <Plus className="w-3.5 h-3.5" />
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                }
-
+                                                const existingQty = cart.find(i => i.id === item.id && i.variationLabel === vari.label && !i.notes)?.quantity || 0;
                                                 return (
+                                                <div key={vari.id} className="flex items-center gap-1.5">
                                                     <button
-                                                        key={vari.id}
                                                         type="button"
                                                         onClick={() => addToCart(item, vari, 1)}
-                                                        className="w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 bg-gray-50 dark:bg-white/5 hover:bg-primary-500 hover:text-white rounded-xl transition-colors cursor-pointer active:scale-[0.98]"
+                                                        className="flex-1 min-h-[46px] flex items-center justify-between px-3.5 py-2.5 bg-gray-50 dark:bg-white/5 hover:bg-primary-500 hover:text-white text-gray-900 dark:text-white rounded-xl transition-colors cursor-pointer active:scale-[0.98]"
                                                     >
                                                         <span className="text-xs font-semibold truncate pr-2">{vari.label}</span>
                                                         <span className="font-black text-xs tabular-nums shrink-0">${vari.price.toFixed(2)}</span>
                                                     </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openQtyModal({ mode: 'variation', item, variation: vari }, existingQty)}
+                                                        title={`Ingresar cantidad para ${item.name} (${vari.label})`}
+                                                        aria-label={`Ingresar cantidad para ${item.name} ${vari.label}`}
+                                                        className="min-w-[44px] min-h-[46px] px-2.5 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-gray-900 hover:text-white dark:hover:bg-white dark:hover:text-gray-900 text-gray-600 dark:text-gray-300 font-bold text-[11px] flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0"
+                                                    >
+                                                        <Hash className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
                                                 );
                                             })}
                                         </div>
@@ -1121,9 +1217,14 @@ export default function TPVView({
                                                     >
                                                         {item.quantity === 1 ? <Trash2 className="w-4 h-4 text-red-500" /> : <Minus className="w-4 h-4" />}
                                                     </button>
-                                                    <span className="w-7 text-center text-sm font-black tabular-nums text-gray-900 dark:text-white">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => openQtyModal({ mode: 'cartIndex', index: idx, name: item.name, variationLabel: item.variationLabel, price: item.price }, item.quantity)}
+                                                        title="Tocar para escribir cantidad exacta (ej. 20 o 50)"
+                                                        className="min-w-[36px] min-h-[40px] px-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-center text-sm font-black tabular-nums text-gray-900 dark:text-white underline decoration-dotted decoration-primary-500/60 underline-offset-2 cursor-pointer"
+                                                    >
                                                         {item.quantity}
-                                                    </span>
+                                                    </button>
                                                     <button
                                                         type="button"
                                                         title="Aumentar pieza"
@@ -1532,6 +1633,118 @@ export default function TPVView({
                             >
                                 Volver / Cancelar
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Exact Quantity Entry Modal */}
+            {qtyModalTarget && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div
+                        className="fixed inset-0"
+                        onClick={() => setQtyModalTarget(null)}
+                    />
+                    <div className="relative z-10 w-full max-w-sm bg-white dark:bg-[#1a1118] rounded-3xl shadow-2xl border border-gray-200/80 dark:border-white/10 overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 space-y-5">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-primary-500 block">
+                                        Cantidad exacta
+                                    </span>
+                                    <h3 className="text-lg font-extrabold text-gray-900 dark:text-white truncate mt-0.5">
+                                        {qtyModalTarget.mode === 'variation' ? qtyModalTarget.item.name : qtyModalTarget.name}
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                        {qtyModalTarget.mode === 'variation' ? qtyModalTarget.variation.label : qtyModalTarget.variationLabel} · ${(qtyModalTarget.mode === 'variation' ? qtyModalTarget.variation.price : qtyModalTarget.price).toFixed(2)} c/u
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setQtyModalTarget(null)}
+                                    aria-label="Cerrar"
+                                    className="min-w-[44px] min-h-[44px] rounded-xl text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center cursor-pointer shrink-0"
+                                >
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    const parsed = parseInt(qtyInputValue, 10);
+                                    if (!isNaN(parsed)) {
+                                        applyExactQty(parsed);
+                                    }
+                                }}
+                                className="space-y-4"
+                            >
+                                <div>
+                                    <label htmlFor="tpv-exact-qty-input" className="text-xs font-bold text-gray-600 dark:text-gray-300 block mb-2">
+                                        Ingresa el número de piezas
+                                    </label>
+                                    <input
+                                        id="tpv-exact-qty-input"
+                                        autoFocus
+                                        type="number"
+                                        inputMode="numeric"
+                                        min="0"
+                                        max="999"
+                                        value={qtyInputValue}
+                                        onFocus={(e) => e.target.select()}
+                                        onChange={(e) => setQtyInputValue(e.target.value)}
+                                        placeholder="Ej. 20 o 50"
+                                        className="w-full min-h-[56px] bg-gray-50 dark:bg-white/5 border-2 border-gray-200 dark:border-white/10 focus:border-primary-500 rounded-2xl px-4 text-center text-3xl font-black tabular-nums outline-none text-gray-900 dark:text-white transition-colors"
+                                    />
+                                    {(() => {
+                                        const parsed = parseInt(qtyInputValue, 10);
+                                        const unitPrice = qtyModalTarget.mode === 'variation' ? qtyModalTarget.variation.price : qtyModalTarget.price;
+                                        if (!isNaN(parsed) && parsed > 0) {
+                                            return (
+                                                <p className="text-center text-xs font-bold text-primary-600 dark:text-primary-400 tabular-nums mt-2">
+                                                    {parsed} {parsed === 1 ? 'pieza' : 'piezas'} = ${(parsed * unitPrice).toFixed(2)}
+                                                </p>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </div>
+
+                                <div>
+                                    <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block mb-2">
+                                        Cantidades rápidas (1 toque)
+                                    </span>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {[5, 10, 15, 20, 30, 50].map(preset => (
+                                            <button
+                                                key={preset}
+                                                type="button"
+                                                onClick={() => applyExactQty(preset)}
+                                                className="min-h-[44px] rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-primary-500 hover:text-white text-gray-900 dark:text-white font-black text-sm tabular-nums transition-colors cursor-pointer active:scale-95"
+                                            >
+                                                {preset}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => applyExactQty(0)}
+                                        className="min-h-[48px] px-4 rounded-2xl bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/20 font-bold text-xs uppercase tracking-wider cursor-pointer transition-colors"
+                                    >
+                                        Quitar
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={qtyInputValue.trim() === '' || isNaN(parseInt(qtyInputValue, 10))}
+                                        className="flex-1 min-h-[48px] rounded-2xl bg-primary-500 hover:bg-primary-600 disabled:opacity-45 disabled:cursor-not-allowed text-white font-bold text-xs uppercase tracking-wider shadow-md shadow-primary-500/25 cursor-pointer transition-all active:scale-[0.98]"
+                                    >
+                                        Aplicar Cantidad
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
