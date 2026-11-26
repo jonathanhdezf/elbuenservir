@@ -1139,6 +1139,12 @@ export default function AdminView({
                       </div>
                     ))}
                   </div>
+                  {viewingOrder.notes && (
+                    <div className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/40 text-xs font-bold text-amber-800 dark:text-amber-200">
+                      <span className="uppercase tracking-wider text-[10px] block opacity-75 mb-0.5">Comentarios del Pedido</span>
+                      {viewingOrder.notes}
+                    </div>
+                  )}
                 </div>
 
                 {/* Super User Management Section */}
@@ -1462,6 +1468,12 @@ export default function AdminView({
                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl font-black ${it.isOld ? 'bg-gray-100 text-gray-300' : 'bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white'}`}>{it.quantity}</div>
                       </div>
                     ))}
+                    {order.notes && (
+                      <div className="p-3 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-700/50 text-xs font-bold text-amber-900 dark:text-amber-200">
+                        <span className="uppercase tracking-wider text-[10px] block opacity-75 mb-0.5">Nota general</span>
+                        {order.notes}
+                      </div>
+                    )}
                   </div>
                   <div className="p-8 pt-0">
                     <button

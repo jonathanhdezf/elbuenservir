@@ -383,6 +383,8 @@ export default function App() {
   const [staff, setStaff] = useState<Staff[]>(INITIAL_STAFF);
   const [logs, setLogs] = useState<SiteLog[]>(INITIAL_LOGS);
   const [tpvEditOrder, setTpvEditOrder] = useState<Order | null>(null);
+  const [tpvInitialTable, setTpvInitialTable] = useState<string | null>(null);
+  const [tpvReturnView, setTpvReturnView] = useState<'control_panel' | 'local_dispatch'>('control_panel');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [systemBgColor, setSystemBgColor] = useState('#0f172a');
   const [systemBgEffect, setSystemBgEffect] = useState<'none' | 'gradient' | 'animated-blobs' | 'stars'>('gradient');
@@ -1075,18 +1077,29 @@ export default function App() {
             handleSetOrders(prev => [fullOrder, ...prev]);
             notificationService.notifyNewOrder(fullOrder);
             setTpvEditOrder(null);
+            setTpvInitialTable(null);
+            if (tpvReturnView === 'local_dispatch') {
+              setTpvReturnView('control_panel');
+              setView('local_dispatch');
+            }
           }}
           onUpdateOrder={(order) => {
             handleSetOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...order } : o));
             setTpvEditOrder(null);
+            setTpvInitialTable(null);
+            setTpvReturnView('control_panel');
             setView('local_dispatch');
           }}
           initialOrder={tpvEditOrder}
+          initialTable={tpvInitialTable}
           isDarkMode={isDarkMode}
           setIsDarkMode={setIsDarkMode}
           onExit={() => {
+            const target = tpvReturnView;
             setTpvEditOrder(null);
-            setView('control_panel');
+            setTpvInitialTable(null);
+            setTpvReturnView('control_panel');
+            setView(target);
           }}
         />
       );
@@ -1101,9 +1114,22 @@ export default function App() {
           onUpdateOrder={(updated) => handleSetOrders(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o))}
           onEditOrder={(order) => {
             setTpvEditOrder(order);
+            setTpvInitialTable(null);
+            setTpvReturnView('local_dispatch');
             setView('tpv');
           }}
-          setView={setView}
+          onOpenTableOrder={(tableNum) => {
+            setTpvEditOrder(null);
+            setTpvInitialTable(tableNum);
+            setTpvReturnView('local_dispatch');
+            setView('tpv');
+          }}
+          setView={(nextView) => {
+            if (nextView === 'tpv') {
+              setTpvReturnView('local_dispatch');
+            }
+            setView(nextView);
+          }}
         />
       );
     }

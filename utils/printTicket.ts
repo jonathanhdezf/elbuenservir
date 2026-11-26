@@ -62,6 +62,7 @@ const getTicketHtml = (order: Order, logoUrl: string, date: string) => {
       <div style="text-align: right; margin-top: 10px; font-weight: bold; font-size: 16px; border-top: 1px dashed black; padding-top: 8px;">
         <p style="margin: 0;">TOTAL: $${order.total.toFixed(2)}</p>
       </div>
+      ${order.notes ? `<div style="margin-top: 8px; padding: 6px; border: 1px dashed black; font-size: 11px;"><strong>COMENTARIOS:</strong> ${order.notes}</div>` : ''}
 
       <div style="margin-top: 10px; border-top: 1px dashed black; padding-top: 10px; font-size: 11px;">
         <p style="margin: 2px 0;"><strong>Método de Pago:</strong> ${order.paymentMethod ? order.paymentMethod.toUpperCase() : 'EFECTIVO'}</p>

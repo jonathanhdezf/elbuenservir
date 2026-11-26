@@ -1,11 +1,10 @@
-
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-    Monitor, Lock, LogIn, X, ShoppingBag,
-    ArrowRight, User, Key, AlertCircle, ChevronDown,
-    Plus, Minus, Trash2, Printer, CheckCircle, Search,
+    Monitor, LogIn, X, ShoppingBag,
+    User, Key, AlertCircle, ChevronDown,
+    Plus, Minus, Trash2, CheckCircle, Search,
     Sun, Moon, Phone, Clipboard, Map, Utensils, MapPin,
-    ChevronLeft, ChevronRight
+    ChevronLeft, ChevronRight, ArrowLeft, MessageSquare, Check
 } from 'lucide-react';
 import { MenuItem, Category, Order, OrderItem, Staff, Customer, PaymentMethod } from '../types';
 import { soundManager } from '../utils/soundManager';
@@ -34,6 +33,7 @@ interface TPVViewProps {
     onAddCustomer: (customer: Customer) => void;
     updateCustomerStats: (name: string, phone: string, amount: number, adding?: boolean) => void;
     initialOrder?: Order | null;
+    initialTable?: string | null;
     isDarkMode: boolean;
     setIsDarkMode: (val: boolean) => void;
     onExit: () => void;
@@ -50,6 +50,7 @@ export default function TPVView({
     onAddCustomer,
     updateCustomerStats,
     initialOrder,
+    initialTable,
     isDarkMode,
     setIsDarkMode,
     onExit
@@ -64,12 +65,14 @@ export default function TPVView({
     const [cart, setCart] = useState<OrderItem[]>([]);
     const [customerName, setCustomerName] = useState('');
     const [customerPhone, setCustomerPhone] = useState('');
+    const [orderNotes, setOrderNotes] = useState('');
+    const [editingItemNoteKey, setEditingItemNoteKey] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-    const [selectedTable, setSelectedTable] = useState<string>('Mostrador');
+    const [selectedTable, setSelectedTable] = useState<string>(initialTable || 'Mostrador');
     const [selectedAddress, setSelectedAddress] = useState<string>('');
     const [activePosView, setActivePosView] = useState<'menu' | 'cart'>('menu');
-    const [showCartMobile, setShowCartMobile] = useState(false);
     const [tlayoyoSelections, setTlayoyoSelections] = useState<Record<string, TlayoyoSelection>>({});
+    const [lastAddedToast, setLastAddedToast] = useState<string | null>(null);
 
     // Modal States
     const [modalType, setModalType] = useState<'none' | 'location' | 'onboarding' | 'registration' | 'payment'>('none');
@@ -86,7 +89,7 @@ export default function TPVView({
 
     const scrollCategories = (direction: 'left' | 'right') => {
         if (categoriesScrollRef.current) {
-            const scrollAmount = 200;
+            const scrollAmount = 220;
             categoriesScrollRef.current.scrollBy({
                 left: direction === 'left' ? -scrollAmount : scrollAmount,
                 behavior: 'smooth'
@@ -112,24 +115,35 @@ export default function TPVView({
         }
     });
 
-    // Initial Order Logic
-    React.useEffect(() => {
+    // Sync preselected table when opened from Despacho Local
+    useEffect(() => {
+        if (initialTable && !initialOrder) {
+            setSelectedTable(initialTable);
+            setSelectedAddress('');
+        }
+    }, [initialTable, initialOrder]);
+
+    // Initial Order Logic (editing existing table order from Despacho Local)
+    useEffect(() => {
         if (initialOrder) {
-            // Mark items as old so kitchen knows they are already prepared
             const itemsWithOldStatus = initialOrder.items.map(item => ({ ...item, isOld: true }));
             setCart(itemsWithOldStatus);
             setCustomerName(initialOrder.customerName);
             setCustomerPhone(initialOrder.customerPhone);
+            setOrderNotes(initialOrder.notes || '');
 
-            // Extract table name from address (e.g., "Mesa: 5")
             if (initialOrder.address?.includes('Mesa:')) {
                 const tableName = initialOrder.address.split('Mesa:')[1]?.trim();
                 setSelectedTable(tableName || 'Mostrador');
+                setSelectedAddress('');
+            } else if (initialOrder.address?.startsWith('Domicilio:')) {
+                setSelectedTable('Mostrador');
+                setSelectedAddress(initialOrder.address.replace('Domicilio:', '').trim());
             } else {
                 setSelectedTable('Mostrador');
+                setSelectedAddress('');
             }
 
-            // Auto login waiter
             if (initialOrder.waiterId) {
                 const waiter = staff.find(s => s.id === initialOrder.waiterId);
                 if (waiter) setLoggedInStaff(waiter);
@@ -139,41 +153,43 @@ export default function TPVView({
         }
     }, [initialOrder, staff]);
 
+    useEffect(() => {
+        if (!lastAddedToast) return;
+        const timer = setTimeout(() => setLastAddedToast(null), 1800);
+        return () => clearTimeout(timer);
+    }, [lastAddedToast]);
+
     const isTableOccupied = (tableName: string) => {
         return orders.some(o =>
-            o.address?.includes(`Mesa: ${tableName}`) &&
+            o.address?.toLowerCase().includes(`mesa: ${tableName.toLowerCase()}`) &&
             !['delivered', 'cancelled'].includes(o.status)
         );
     };
 
     const handlePhoneSearch = (phone: string) => {
         setCustomerPhone(phone);
-
-        // Normalize input and DB phones for comparison
         const cleanedInput = phone.replace(/\D/g, '');
 
         if (cleanedInput.length >= 10) {
-            // Find customer with matching phone (checking normalized version)
             const found = customers.find(c => c.phone.replace(/\D/g, '').includes(cleanedInput));
 
             if (found) {
-                // Only update if it's a new match to avoid re-rendering/playing sound unnecessarily
                 if (tempCustomer?.id !== found.id) {
                     setTempCustomer(found);
                     setCustomerName(found.name);
-                    setModalType('location');
+                    // Only ask for location if not already bound to a specific table from entry
+                    if (!initialTable && !initialOrder && selectedTable === 'Mostrador') {
+                        setModalType('location');
+                    }
                     soundManager.play('notification');
                 }
             } else {
-                // Only show onboarding modal if exactly 10 digits (standard length) 
-                // to allow user to correct without constant interruptions if they type more/less
                 if (cleanedInput.length === 10 && modalType === 'none') {
                     setModalType('onboarding');
                     soundManager.play('alert');
                 }
             }
         } else {
-            // Clear temp state if input is too short
             if (cleanedInput.length < 10 && tempCustomer) {
                 setTempCustomer(null);
                 setCustomerName('');
@@ -182,7 +198,7 @@ export default function TPVView({
     };
 
     const handleQuickSale = () => {
-        setCustomerName('Publico General');
+        setCustomerName(selectedTable === 'Mostrador' ? 'Público General' : `Mesa ${selectedTable}`);
         setCustomerPhone('0000000000');
         setModalType('none');
         soundManager.play('click');
@@ -217,7 +233,11 @@ export default function TPVView({
         onAddCustomer(newCustomer);
         setCustomerName(newCustomer.name);
         setTempCustomer(newCustomer);
-        setModalType('location');
+        if (!initialTable && !initialOrder && selectedTable === 'Mostrador') {
+            setModalType('location');
+        } else {
+            setModalType('none');
+        }
         setRegName('');
         setRegAddress('');
         soundManager.play('confirm');
@@ -245,9 +265,9 @@ export default function TPVView({
 
     const addToCart = (item: MenuItem, variation: any) => {
         setCart(prev => {
-            const existing = prev.find(i => i.id === item.id && i.variationLabel === variation.label);
+            const existing = prev.find(i => i.id === item.id && i.variationLabel === variation.label && !i.notes);
             if (existing) {
-                return prev.map(i => i.id === item.id && i.variationLabel === variation.label
+                return prev.map(i => i === existing
                     ? { ...i, quantity: i.quantity + 1, isOld: false }
                     : i
                 );
@@ -261,39 +281,59 @@ export default function TPVView({
                 isOld: false
             }];
         });
+        setLastAddedToast(`${item.name} agregado`);
         soundManager.play('click');
     };
 
-    const updateQuantity = (id: string, label: string, delta: number) => {
-        setCart(prev => prev.map(item =>
-            item.id === id && item.variationLabel === label
+    const updateQuantity = (index: number, delta: number) => {
+        setCart(prev => prev.map((item, idx) =>
+            idx === index
                 ? { ...item, quantity: Math.max(1, item.quantity + delta) }
                 : item
         ));
         soundManager.play('click');
     };
 
-    const removeFromCart = (id: string, label: string) => {
-        setCart(prev => prev.filter(i => !(i.id === id && i.variationLabel === label)));
+    const updateItemNote = (index: number, note: string) => {
+        setCart(prev => prev.map((item, idx) =>
+            idx === index
+                ? { ...item, notes: note }
+                : item
+        ));
+    };
+
+    const removeFromCart = (index: number) => {
+        setCart(prev => prev.filter((_, idx) => idx !== index));
+        setEditingItemNoteKey(null);
         soundManager.play('click');
     };
 
     const cartTotal = cart.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+    const totalPieces = cart.reduce((acc, item) => acc + item.quantity, 0);
+
+    const resolvedCustomerName = customerName.trim() || (selectedTable === 'Mostrador' ? 'Público General' : `Mesa ${selectedTable}`);
+    const locationSummaryLabel = selectedAddress
+        ? `Domicilio`
+        : selectedTable === 'Mostrador'
+            ? 'Mostrador'
+            : `Mesa ${selectedTable}`;
 
     const handleFinalizeOrder = () => {
-        if (!customerName.trim() || cart.length === 0) {
-            setPaymentError('Faltan datos del cliente o productos en el carrito');
+        if (cart.length === 0) {
+            setPaymentError('Agrega al menos un platillo a la comanda');
             return;
         }
 
-        // Si es pedido en MOSTRADOR (sea Publico General o Cliente Registrado), pedimos pago inmediato
+        // Pedidos en Mostrador o Domicilio piden cobro; pedidos en Mesa van directo a cocina con cuenta abierta
         if (selectedTable === 'Mostrador') {
+            if (!customerName.trim()) {
+                setCustomerName('Público General');
+            }
             setModalType('payment');
             setPaymentError(null);
             setCashReceived('');
             soundManager.play('notification');
         } else {
-            // Pedidos a MESA se mandan a cocina sin pago inmediato (cuenta abierta)
             handleConfirmPayment('pending');
         }
     };
@@ -306,11 +346,16 @@ export default function TPVView({
             return;
         }
 
+        const sanitizedItems = cart.map(item => ({
+            ...item,
+            notes: item.notes?.trim() || undefined
+        }));
+
         const newOrder: Partial<Order> = {
             id: initialOrder ? initialOrder.id : `TPV-${Date.now().toString().slice(-4)}`,
-            customerName,
+            customerName: resolvedCustomerName,
             customerPhone: customerPhone || 'N/A',
-            items: cart,
+            items: sanitizedItems,
             total: cartTotal,
             status: 'kitchen',
             paymentMethod: tpvPaymentMethod,
@@ -319,18 +364,19 @@ export default function TPVView({
             change: status === 'paid' && tpvPaymentMethod === 'efectivo' ? (cashValue - cartTotal) : undefined,
             createdAt: initialOrder ? initialOrder.createdAt : new Date().toISOString(),
             source: 'tpv',
-            address: selectedAddress ? `Domicilio: ${selectedAddress}` : (selectedTable === 'Mostrador' ? 'Mostrador: General' : `Mesa: ${selectedTable}`),
-            waiterId: loggedInStaff?.id
+            address: selectedAddress
+                ? `Domicilio: ${selectedAddress}`
+                : (selectedTable === 'Mostrador' ? 'Mostrador: General' : `Mesa: ${selectedTable}`),
+            waiterId: loggedInStaff?.id,
+            notes: orderNotes.trim() || undefined
         };
 
-        // Generar Ticket (simulado o Real)
         if (initialOrder && onUpdateOrder) {
             onUpdateOrder(newOrder);
         } else {
             onAddOrder(newOrder);
         }
 
-        // Print ticket immediately if paid or regular flow
         if (status === 'paid') {
             generateTicket(newOrder as Order);
             updateCustomerStats(newOrder.customerName!, newOrder.customerPhone!, newOrder.total!, true);
@@ -339,86 +385,173 @@ export default function TPVView({
         setCart([]);
         setCustomerName('');
         setCustomerPhone('');
-        setSelectedTable('Mostrador');
+        setOrderNotes('');
+        setEditingItemNoteKey(null);
+        setSelectedTable(initialTable || 'Mostrador');
         setSelectedAddress('');
         setModalType('none');
         soundManager.play('confirm');
     };
 
+    const visibleItems = menuItems.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+        if (searchQuery.trim()) return matchesSearch && item.isActive;
+        if (activeTab === 'cat-3') {
+            return matchesSearch && item.isActive && item.categoryId !== 'cat-1' && item.categoryId !== 'cat-2';
+        }
+        return matchesSearch && item.isActive && item.categoryId === activeTab;
+    });
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // TPV ACCESS (LOGIN + ENTRY LOCATION SELECTION)
+    // ─────────────────────────────────────────────────────────────────────────────
     if (!loggedInStaff) {
         return (
-            <div className="min-h-screen bg-[#f8fafc] dark:bg-gray-950 flex items-center justify-center p-6 transition-colors duration-500">
-                <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-[48px] shadow-2xl overflow-hidden border-4 border-white dark:border-gray-800 relative">
-                    <div className="absolute top-0 right-0 p-8">
-                        <button title="Cerrar terminal" onClick={onExit} className="p-3 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-2xl">
-                            <X className="w-6 h-6" />
+            <div className="min-h-[100dvh] bg-[#FDFBFC] dark:bg-[#110a10] flex items-center justify-center p-4 sm:p-6 overflow-y-auto transition-colors">
+                <div className="w-full max-w-lg bg-white dark:bg-[#1a1118] rounded-3xl shadow-xl border border-gray-200/80 dark:border-white/10 overflow-hidden">
+                    {/* Top Bar */}
+                    <div className="px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between gap-3">
+                        <button
+                            type="button"
+                            onClick={onExit}
+                            className="inline-flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-2xl bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-gray-800 dark:text-white text-xs font-bold transition-colors cursor-pointer"
+                        >
+                            <ArrowLeft className="w-4 h-4 text-primary-500" />
+                            <span>Volver</span>
+                        </button>
+                        <button
+                            type="button"
+                            title={isDarkMode ? 'Modo Claro' : 'Modo Oscuro'}
+                            onClick={() => setIsDarkMode(!isDarkMode)}
+                            className="min-w-[44px] min-h-[44px] rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+                        >
+                            {isDarkMode ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5" />}
                         </button>
                     </div>
 
-                    <div className="p-8">
-                        <div className="flex flex-col items-center text-center mb-6">
-                            <div className="w-24 h-24 bg-primary-500 rounded-[32px] flex items-center justify-center text-white shadow-2xl shadow-primary-500/30 mb-6 group hover:rotate-12 transition-transform duration-500">
-                                <Monitor className="w-12 h-12" />
+                    <div className="p-6 sm:p-8 space-y-6">
+                        <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 bg-primary-500 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary-500/25 shrink-0">
+                                <Monitor className="w-7 h-7" />
                             </div>
-                            <h2 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">TPV Access</h2>
-                            <p className="text-gray-500 font-bold uppercase tracking-widest text-xs mt-2">Sistema de Toma de Pedidos</p>
+                            <div>
+                                <h2 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                                    TPV Terminal
+                                </h2>
+                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+                                    {initialTable
+                                        ? `Mesa ${initialTable} seleccionada · Ingresa con tu usuario`
+                                        : 'Selecciona tu usuario y ubicación del servicio'}
+                                </p>
+                            </div>
                         </div>
 
-                        <form onSubmit={handleLogin} className="space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-2">Seleccionar Personal</label>
-                                <div className="relative group">
-                                    <div className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors">
-                                        <User className="w-5 h-5" />
+                        <form onSubmit={handleLogin} className="space-y-5">
+                            {/* Location selection happens HERE upon entering */}
+                            {initialTable ? (
+                                <div className="p-3.5 rounded-2xl bg-primary-500/10 border border-primary-500/25 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2.5">
+                                        <Utensils className="w-4 h-4 text-primary-600 dark:text-primary-400 shrink-0" />
+                                        <span className="text-xs font-bold text-primary-700 dark:text-primary-300">
+                                            Ubicación asignada: Mesa {initialTable}
+                                        </span>
                                     </div>
+                                    <span className="text-[11px] font-semibold text-primary-600 dark:text-primary-400">
+                                        Lista para ordenar
+                                    </span>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block">
+                                        Ubicación del Servicio
+                                    </label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {['Mostrador', '1', '2', '3', '4', '5'].map(table => {
+                                            const occupied = table !== 'Mostrador' && isTableOccupied(table);
+                                            const isSelected = selectedTable === table;
+                                            return (
+                                                <button
+                                                    key={table}
+                                                    type="button"
+                                                    disabled={occupied}
+                                                    onClick={() => {
+                                                        setSelectedTable(table);
+                                                        setSelectedAddress('');
+                                                        soundManager.play('click');
+                                                    }}
+                                                    className={`min-h-[44px] px-2.5 rounded-2xl text-xs font-bold border transition-all cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed ${
+                                                        isSelected
+                                                            ? 'bg-primary-500 border-primary-500 text-white shadow-sm'
+                                                            : occupied
+                                                                ? 'bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-900/40 text-red-500'
+                                                                : 'bg-gray-50 dark:bg-white/5 border-gray-200/80 dark:border-white/10 text-gray-700 dark:text-gray-200 hover:border-primary-300'
+                                                    }`}
+                                                >
+                                                    {table === 'Mostrador' ? 'Mostrador' : occupied ? `Mesa ${table} (Ocup.)` : `Mesa ${table}`}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block">
+                                    Personal
+                                </label>
+                                <div className="relative">
+                                    <User className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                                     <select
                                         title="Seleccionar empleado"
                                         value={selectedStaffId}
                                         onChange={(e) => setSelectedStaffId(e.target.value)}
                                         required
-                                        className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-3xl pl-16 pr-12 py-4 font-black text-gray-700 dark:text-white appearance-none outline-none transition-all shadow-inner uppercase tracking-wider"
+                                        className="w-full min-h-[48px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-primary-500 rounded-2xl pl-11 pr-10 text-sm font-bold text-gray-800 dark:text-white appearance-none outline-none transition-all cursor-pointer"
                                     >
-                                        <option value="" disabled>Elegir Usuario...</option>
+                                        <option value="" disabled>Elegir usuario...</option>
                                         {staff.filter(s => s.role !== 'driver').map(s => (
-                                            <option key={s.id} value={s.id}>{s.name} ({s.role.toUpperCase()})</option>
+                                            <option key={s.id} value={s.id} className="bg-white dark:bg-gray-900 text-gray-900 dark:text-white">
+                                                {s.name} ({s.role.toUpperCase()})
+                                            </option>
                                         ))}
                                     </select>
-                                    <div className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                                        <ChevronDown className="w-5 h-5" />
-                                    </div>
+                                    <ChevronDown className="w-4 h-4 text-gray-400 absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                                 </div>
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-2">Contraseña Digital</label>
-                                <div className="relative group">
-                                    <div className="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors">
-                                        <Key className="w-5 h-5" />
-                                    </div>
+                                <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block">
+                                    Contraseña Digital
+                                </label>
+                                <div className="relative">
+                                    <Key className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
                                     <input
                                         type="password"
                                         value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="••••••••"
+                                        onChange={(e) => {
+                                            setPassword(e.target.value);
+                                            if (loginError) setLoginError(null);
+                                        }}
+                                        placeholder="••••"
                                         required
-                                        className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-3xl pl-16 pr-6 py-4 font-black text-gray-700 dark:text-white outline-none transition-all shadow-inner tracking-[0.5em]"
+                                        className="w-full min-h-[48px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-primary-500 rounded-2xl pl-11 pr-4 text-base font-black text-gray-800 dark:text-white outline-none transition-all tracking-[0.4em] placeholder:tracking-normal"
                                     />
                                 </div>
                             </div>
 
                             {loginError && (
-                                <div className="flex items-center gap-2 text-red-500 font-black uppercase text-[10px] tracking-widest bg-red-50 dark:bg-red-500/10 p-4 rounded-2xl animate-shake">
-                                    <AlertCircle className="w-4 h-4" />
-                                    {loginError}
+                                <div className="flex items-center gap-2 text-red-600 dark:text-red-400 font-bold text-xs bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 p-3.5 rounded-2xl animate-shake">
+                                    <AlertCircle className="w-4 h-4 shrink-0" />
+                                    <span>{loginError}</span>
                                 </div>
                             )}
 
                             <button
                                 type="submit"
-                                className="w-full bg-gray-900 dark:bg-white text-white dark:text-gray-900 py-5 rounded-[32px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-2xl hover:shadow-primary-500/20"
+                                className="w-full min-h-[52px] bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2.5 active:scale-[0.98] transition-all shadow-lg shadow-primary-500/25 cursor-pointer"
                             >
-                                <LogIn className="w-6 h-6" />
-                                Acceder al Sistema
+                                <LogIn className="w-5 h-5" />
+                                <span>Ingresar a Terminal</span>
                             </button>
                         </form>
                     </div>
@@ -427,436 +560,654 @@ export default function TPVView({
         );
     }
 
+    // ─────────────────────────────────────────────────────────────────────────────
+    // ACTIVE TPV TERMINAL (DUAL-SCROLLABLE SPLIT LAYOUT)
+    // ─────────────────────────────────────────────────────────────────────────────
     return (
-        <div className="flex flex-col lg:flex-row h-screen w-full bg-[#f8fafc] dark:bg-gray-950 overflow-hidden font-sans transition-colors duration-500">
-            {/* Main POS Layout */}
-            <div className={`flex-1 flex flex-col min-w-0 bg-white dark:bg-gray-900 shadow-xl z-10 transition-all duration-300 ${activePosView === 'menu' ? 'flex' : 'hidden lg:flex'}`}>
-                <header className="p-4 md:p-6 lg:p-8 flex items-center justify-between shrink-0 border-b border-gray-100 dark:border-gray-800">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-primary-500 rounded-2xl flex items-center justify-center text-white shadow-lg">
-                            <Monitor className="w-6 h-6" />
+        <div className="h-[100dvh] w-full flex flex-col overflow-hidden bg-[#FDFBFC] dark:bg-[#110a10] text-gray-900 dark:text-gray-100 font-sans transition-colors">
+            {/* Main Responsive Split Workspace */}
+            <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
+                {/* LEFT COLUMN: MENU */}
+                <div
+                    className={`flex-1 min-h-0 h-full flex-col min-w-0 overflow-hidden ${
+                        activePosView === 'menu' ? 'flex' : 'hidden lg:flex'
+                    }`}
+                >
+                    {/* Header */}
+                    <header className="shrink-0 bg-[#FDFBFC]/95 dark:bg-[#110a10]/95 backdrop-blur-xl border-b border-gray-200/80 dark:border-white/10 px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                            <button
+                                type="button"
+                                onClick={onExit}
+                                title="Volver"
+                                className="min-w-[44px] min-h-[44px] px-3 rounded-2xl bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-gray-800 dark:text-white flex items-center justify-center gap-1.5 font-bold text-xs transition-all active:scale-95 cursor-pointer shrink-0"
+                            >
+                                <ArrowLeft className="w-4 h-4 text-primary-500" />
+                                <span className="hidden sm:inline">Salir</span>
+                            </button>
+                            <div className="min-w-0">
+                                <h1 className="text-base sm:text-xl font-extrabold tracking-tight text-gray-900 dark:text-white truncate leading-tight">
+                                    TPV Terminal
+                                </h1>
+                                <p className="text-xs font-medium text-gray-500 dark:text-gray-400 truncate flex items-center gap-1.5">
+                                    <span>{loggedInStaff.name}</span>
+                                    <span aria-hidden="true">·</span>
+                                    <span className="text-primary-600 dark:text-primary-400 font-bold">{locationSummaryLabel}</span>
+                                </p>
+                            </div>
                         </div>
-                        <div>
-                            <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter uppercase leading-none">TPV Terminal</h1>
-                            <p className="text-[10px] font-black text-primary-500 dark:text-primary-400 uppercase tracking-widest mt-1.5 flex items-center gap-2">
-                                <span className="w-1.5 h-1.5 bg-primary-500 rounded-full animate-pulse"></span>
-                                Sesión: {loggedInStaff.name}
-                            </p>
-                        </div>
-                    </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="relative group hidden sm:block">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <div className="flex items-center gap-2 shrink-0">
+                            {/* Desktop Search */}
+                            <div className="relative hidden md:block">
+                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                <input
+                                    type="text"
+                                    placeholder="Buscar platillo..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="min-h-[44px] bg-white dark:bg-[#1a1118] border border-gray-200/80 dark:border-white/10 rounded-2xl pl-10 pr-8 text-xs font-semibold focus:border-primary-500 outline-none w-56 lg:w-64 transition-all text-gray-900 dark:text-white"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchQuery('')}
+                                        aria-label="Limpiar búsqueda"
+                                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                            </div>
+
+                            <button
+                                type="button"
+                                title={isDarkMode ? 'Modo Claro' : 'Modo Oscuro'}
+                                onClick={() => setIsDarkMode(!isDarkMode)}
+                                className="min-w-[44px] min-h-[44px] rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+                            >
+                                {isDarkMode ? <Sun className="w-5 h-5 text-amber-500" /> : <Moon className="w-5 h-5" />}
+                            </button>
+
+                            <button
+                                type="button"
+                                title="Cambiar usuario"
+                                onClick={handleLogout}
+                                className="min-w-[44px] min-h-[44px] rounded-xl text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer"
+                            >
+                                <LogIn className="w-5 h-5 rotate-180" />
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Mobile Search + Categories Bar (shrink-0 so menu list scrolls cleanly below) */}
+                    <div className="shrink-0 px-4 sm:px-6 lg:px-8 pt-3 pb-2 space-y-2.5 border-b border-gray-200/70 dark:border-white/10 bg-[#FDFBFC] dark:bg-[#110a10]">
+                        <div className="relative md:hidden">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                             <input
                                 type="text"
-                                placeholder="Buscar platillo..."
+                                placeholder="Buscar platillo en el menú..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="bg-gray-100 dark:bg-gray-800 border-none rounded-2xl pl-10 pr-4 py-2.5 text-xs font-bold uppercase tracking-wider focus:ring-2 ring-primary-500 outline-none w-64 transition-all"
+                                className="w-full min-h-[42px] bg-white dark:bg-[#1a1118] border border-gray-200/80 dark:border-white/10 rounded-2xl pl-10 pr-9 text-xs font-semibold focus:border-primary-500 outline-none transition-all text-gray-900 dark:text-white"
                             />
-                        </div>
-                        <button
-                            title={isDarkMode ? "Modo Claro" : "Modo Oscuro"}
-                            onClick={() => setIsDarkMode(!isDarkMode)}
-                            className="p-3 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
-                        >
-                            {isDarkMode ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
-                        </button>
-                        <button
-                            title="Cerrar sesión"
-                            onClick={handleLogout}
-                            className="p-3 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"
-                        >
-                            <LogIn className="w-6 h-6 rotate-180" />
-                        </button>
-                    </div>
-                </header>
-
-                <div className="flex-1 overflow-y-auto px-6 md:px-8 py-6 custom-scrollbar pb-32">
-                    {/* Categories Tabs */}
-                    <div className="relative mb-8 group/cats px-4 md:px-12">
-                        <button
-                            onClick={() => scrollCategories('left')}
-                            title="Desplazar a la izquierda"
-                            aria-label="Desplazar categorías a la izquierda"
-                            className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-full shadow-lg items-center justify-center text-gray-400 hover:text-primary-500 hover:scale-110 active:scale-95 transition-all z-10"
-                        >
-                            <ChevronLeft className="w-5 h-5" />
-                        </button>
-
-                        <div
-                            ref={categoriesScrollRef}
-                            className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar scroll-smooth px-1"
-                        >
-                            {categories.map(cat => (
+                            {searchQuery && (
                                 <button
-                                    key={cat.id}
-                                    onClick={() => setActiveTab(cat.id)}
-                                    className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${activeTab === cat.id
-                                        ? 'bg-gray-900 dark:bg-primary-500 text-white shadow-xl translate-y-[-2px]'
-                                        : 'bg-gray-50 dark:bg-gray-800 text-gray-400 hover:bg-gray-100'
-                                        }`}
+                                    type="button"
+                                    onClick={() => setSearchQuery('')}
+                                    aria-label="Limpiar búsqueda"
+                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
                                 >
-                                    {cat.name}
+                                    <X className="w-4 h-4" />
                                 </button>
-                            ))}
+                            )}
                         </div>
 
-                        <button
-                            onClick={() => scrollCategories('right')}
-                            title="Desplazar a la derecha"
-                            aria-label="Desplazar categorías a la derecha"
-                            className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 w-10 h-10 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 rounded-full shadow-lg items-center justify-center text-gray-400 hover:text-primary-500 hover:scale-110 active:scale-95 transition-all z-10"
-                        >
-                            <ChevronRight className="w-5 h-5" />
-                        </button>
+                        <div className="relative md:px-9">
+                            <button
+                                type="button"
+                                onClick={() => scrollCategories('left')}
+                                aria-label="Desplazar categorías a la izquierda"
+                                className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 w-8 h-8 bg-white dark:bg-[#1a1118] border border-gray-200/80 dark:border-white/10 rounded-xl items-center justify-center text-gray-500 hover:text-primary-500 transition-colors cursor-pointer z-10"
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </button>
+
+                            <div
+                                ref={categoriesScrollRef}
+                                className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth"
+                            >
+                                {categories.map(cat => {
+                                    const isSelected = activeTab === cat.id && !searchQuery.trim();
+                                    return (
+                                        <button
+                                            key={cat.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setSearchQuery('');
+                                                setActiveTab(cat.id);
+                                                soundManager.play('click');
+                                            }}
+                                            className={`min-h-[42px] px-4 rounded-2xl text-xs font-bold transition-all whitespace-nowrap shrink-0 border cursor-pointer ${
+                                                isSelected
+                                                    ? 'bg-primary-500 border-primary-500 text-white shadow-sm shadow-primary-500/20'
+                                                    : 'bg-white dark:bg-[#1a1118] border-gray-200/80 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-primary-300'
+                                            }`}
+                                        >
+                                            {cat.name}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => scrollCategories('right')}
+                                aria-label="Desplazar categorías a la derecha"
+                                className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 w-8 h-8 bg-white dark:bg-[#1a1118] border border-gray-200/80 dark:border-white/10 rounded-xl items-center justify-center text-gray-500 hover:text-primary-500 transition-colors cursor-pointer z-10"
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Menu Items Grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {menuItems.filter(item => {
-                            const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-                            if (activeTab === 'cat-3') {
-                                return matchesSearch && item.categoryId !== 'cat-1' && item.categoryId !== 'cat-2';
-                            }
-                            return matchesSearch && item.categoryId === activeTab;
-                        }).map(item => {
-                            if (isTlayoyoDish(item)) {
-                                const sel = tlayoyoSelections[item.id] || DEFAULT_TLAYOYO_SELECTION;
-                                const baseVar = item.variations[0] || { id: 'm-tlayoyos-v1', label: 'Por pieza', price: 10 };
-                                return (
-                                    <div key={item.id} className="bg-gray-50 dark:bg-gray-800/50 rounded-[32px] p-5 border border-transparent hover:border-primary-500/30 transition-all group space-y-3">
-                                        <div className="flex items-center justify-between gap-2">
-                                            <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight line-clamp-1">{item.name}</h3>
-                                            <span className="text-xs font-black text-primary-500 shrink-0">${baseVar.price.toFixed(2)}</span>
-                                        </div>
+                    {/* Scrollable Menu Grid */}
+                    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 lg:px-8 py-4 sm:py-6 custom-scrollbar">
+                        {lastAddedToast && (
+                            <div className="lg:hidden mb-3 px-3.5 py-2.5 rounded-2xl bg-emerald-600 text-white text-xs font-bold flex items-center justify-between gap-2 shadow-sm animate-in fade-in duration-150">
+                                <span className="flex items-center gap-2 truncate">
+                                    <Check className="w-4 h-4 shrink-0" />
+                                    <span className="truncate">{lastAddedToast}</span>
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setActivePosView('cart')}
+                                    className="underline font-extrabold shrink-0 cursor-pointer"
+                                >
+                                    Ver comanda
+                                </button>
+                            </div>
+                        )}
 
-                                        <div>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">Salsa(s):</span>
-                                            <div className="flex flex-wrap gap-1">
-                                                {TLAYOYO_SALSAS.map(salsa => {
-                                                    const isSelected = sel.salsaMode !== 'sin' && sel.salsas.includes(salsa);
-                                                    return (
-                                                        <button
-                                                            key={salsa}
-                                                            type="button"
-                                                            onClick={() => setTlayoyoSelections(prev => ({
-                                                                ...prev,
-                                                                [item.id]: toggleTlayoyoSalsa(prev[item.id], salsa)
-                                                            }))}
-                                                            className={`py-1 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
-                                                                isSelected
-                                                                    ? 'bg-primary-500 text-white shadow-sm'
-                                                                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
-                                                            }`}
-                                                        >
-                                                            {salsa}
-                                                        </button>
-                                                    );
-                                                })}
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setTlayoyoSelections(prev => ({
-                                                        ...prev,
-                                                        [item.id]: toggleTlayoyoSalsaAparte(prev[item.id])
-                                                    }))}
-                                                    className={`py-1 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
-                                                        sel.salsaMode === 'aparte'
-                                                            ? 'bg-amber-500 text-white shadow-sm'
-                                                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
-                                                    }`}
-                                                >
-                                                    Aparte
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setTlayoyoSelections(prev => ({
-                                                        ...prev,
-                                                        [item.id]: setTlayoyoSinSalsa(prev[item.id])
-                                                    }))}
-                                                    className={`py-1 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
-                                                        sel.salsaMode === 'sin'
-                                                            ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
-                                                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
-                                                    }`}
-                                                >
-                                                    Sin salsa
-                                                </button>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3.5 sm:gap-4 pb-6">
+                            {visibleItems.map(item => {
+                                if (isTlayoyoDish(item)) {
+                                    const sel = tlayoyoSelections[item.id] || DEFAULT_TLAYOYO_SELECTION;
+                                    const baseVar = item.variations[0] || { id: 'm-tlayoyos-v1', label: 'Por pieza', price: 10 };
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            className="bg-white dark:bg-[#1a1118] rounded-2xl p-4 sm:p-5 border border-gray-200/80 dark:border-white/10 hover:border-primary-300 dark:hover:border-primary-500/40 transition-colors space-y-3"
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <h3 className="text-sm font-extrabold text-gray-900 dark:text-white leading-snug">
+                                                    {item.name}
+                                                </h3>
+                                                <span className="text-sm font-black text-primary-500 tabular-nums shrink-0">
+                                                    ${baseVar.price.toFixed(2)}
+                                                </span>
                                             </div>
-                                        </div>
 
-                                        <div>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">Queso:</span>
-                                            <div className="grid grid-cols-3 gap-1">
-                                                {TLAYOYO_CHEESE_OPTIONS.map(opt => (
+                                            <div>
+                                                <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block mb-1.5">
+                                                    Salsa(s)
+                                                </span>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {TLAYOYO_SALSAS.map(salsa => {
+                                                        const isSelected = sel.salsaMode !== 'sin' && sel.salsas.includes(salsa);
+                                                        return (
+                                                            <button
+                                                                key={salsa}
+                                                                type="button"
+                                                                onClick={() => setTlayoyoSelections(prev => ({
+                                                                    ...prev,
+                                                                    [item.id]: toggleTlayoyoSalsa(prev[item.id], salsa)
+                                                                }))}
+                                                                className={`min-h-[36px] px-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                                                                    isSelected
+                                                                        ? 'bg-primary-500 text-white shadow-sm'
+                                                                        : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10'
+                                                                }`}
+                                                            >
+                                                                {salsa}
+                                                            </button>
+                                                        );
+                                                    })}
                                                     <button
-                                                        key={opt}
                                                         type="button"
                                                         onClick={() => setTlayoyoSelections(prev => ({
                                                             ...prev,
-                                                            [item.id]: { ...(prev[item.id] || DEFAULT_TLAYOYO_SELECTION), cheese: opt }
+                                                            [item.id]: toggleTlayoyoSalsaAparte(prev[item.id])
                                                         }))}
-                                                        className={`py-1.5 px-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer truncate ${
-                                                            sel.cheese === opt
-                                                                ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
-                                                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                                                        className={`min-h-[36px] px-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                                                            sel.salsaMode === 'aparte'
+                                                                ? 'bg-amber-500 text-white shadow-sm'
+                                                                : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10'
                                                         }`}
                                                     >
-                                                        {opt}
+                                                        Aparte
                                                     </button>
-                                                ))}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setTlayoyoSelections(prev => ({
+                                                            ...prev,
+                                                            [item.id]: setTlayoyoSinSalsa(prev[item.id])
+                                                        }))}
+                                                        className={`min-h-[36px] px-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                                                            sel.salsaMode === 'sin'
+                                                                ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
+                                                                : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10'
+                                                        }`}
+                                                    >
+                                                        Sin salsa
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div>
+                                                <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block mb-1.5">
+                                                    Queso
+                                                </span>
+                                                <div className="grid grid-cols-3 gap-1.5">
+                                                    {TLAYOYO_CHEESE_OPTIONS.map(opt => (
+                                                        <button
+                                                            key={opt}
+                                                            type="button"
+                                                            onClick={() => setTlayoyoSelections(prev => ({
+                                                                ...prev,
+                                                                [item.id]: { ...(prev[item.id] || DEFAULT_TLAYOYO_SELECTION), cheese: opt }
+                                                            }))}
+                                                            className={`min-h-[36px] px-1.5 rounded-xl text-[11px] font-bold transition-colors cursor-pointer truncate ${
+                                                                sel.cheese === opt
+                                                                    ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
+                                                                    : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10'
+                                                            }`}
+                                                        >
+                                                            {opt}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={() => addToCart(item, { ...baseVar, label: formatTlayoyoVariationLabel(sel) })}
+                                                className="w-full min-h-[44px] flex items-center justify-between px-4 bg-primary-500/10 hover:bg-primary-500 text-primary-700 dark:text-primary-300 hover:text-white rounded-xl transition-colors font-bold text-xs cursor-pointer active:scale-[0.98]"
+                                            >
+                                                <span>+ Agregar pieza</span>
+                                                <span className="font-black tabular-nums">${baseVar.price.toFixed(2)}</span>
+                                            </button>
+                                        </div>
+                                    );
+                                }
+
+                                return (
+                                    <div
+                                        key={item.id}
+                                        className="bg-white dark:bg-[#1a1118] rounded-2xl p-4 sm:p-5 border border-gray-200/80 dark:border-white/10 hover:border-primary-300 dark:hover:border-primary-500/40 transition-colors flex flex-col justify-between gap-3"
+                                    >
+                                        <h3 className="text-sm font-extrabold text-gray-900 dark:text-white leading-snug">
+                                            {item.name}
+                                        </h3>
+                                        <div className="space-y-2">
+                                            {item.variations.map(vari => (
+                                                <button
+                                                    key={vari.id}
+                                                    type="button"
+                                                    onClick={() => addToCart(item, vari)}
+                                                    className="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 bg-gray-50 dark:bg-white/5 hover:bg-primary-500 hover:text-white rounded-xl transition-colors cursor-pointer active:scale-[0.98]"
+                                                >
+                                                    <span className="text-xs font-semibold truncate pr-2">{vari.label}</span>
+                                                    <span className="font-black text-xs tabular-nums shrink-0">${vari.price.toFixed(2)}</span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {visibleItems.length === 0 && (
+                                <div className="col-span-full py-16 text-center bg-white dark:bg-[#1a1118] rounded-3xl border border-dashed border-gray-200 dark:border-white/10">
+                                    <p className="text-sm font-bold text-gray-600 dark:text-gray-300">
+                                        No se encontraron platillos
+                                    </p>
+                                    <p className="text-xs text-gray-400 mt-1">
+                                        Prueba otra búsqueda o categoría
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* RIGHT COLUMN: COMANDA (NO LOCATION PICKER INSIDE + ORDER & ITEM COMMENTS) */}
+                <div
+                    className={`w-full lg:w-[400px] xl:w-[440px] flex-1 lg:flex-none min-h-0 h-full flex-col overflow-hidden bg-white dark:bg-[#160e15] lg:border-l border-gray-200/80 dark:border-white/10 ${
+                        activePosView === 'cart' ? 'flex' : 'hidden lg:flex'
+                    }`}
+                >
+                    {/* Comanda Header */}
+                    <div className="shrink-0 px-4 sm:px-6 py-4 border-b border-gray-100 dark:border-white/10 flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                            <h2 className="text-lg sm:text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                                Comanda
+                            </h2>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate mt-0.5">
+                                {locationSummaryLabel}
+                                {selectedAddress ? `: ${selectedAddress}` : ''}
+                                <span aria-hidden="true"> · </span>
+                                <span className="tabular-nums font-semibold">{totalPieces} {totalPieces === 1 ? 'pieza' : 'piezas'}</span>
+                            </p>
+                        </div>
+
+                        {activePosView === 'cart' && (
+                            <button
+                                type="button"
+                                onClick={() => setActivePosView('menu')}
+                                className="lg:hidden min-h-[40px] px-3 rounded-xl bg-gray-100 dark:bg-white/10 text-xs font-bold text-gray-700 dark:text-gray-200 cursor-pointer"
+                            >
+                                + Platillos
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Scrollable Comanda Content */}
+                    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 sm:px-6 py-4 space-y-4 custom-scrollbar">
+                        {/* Customer Phone Search / Quick Client Strip */}
+                        <div className="space-y-2.5">
+                            <div className="flex items-center gap-2">
+                                <div className="relative flex-1">
+                                    <Phone className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                    <input
+                                        type="tel"
+                                        placeholder="Tel. cliente (opcional)..."
+                                        value={customerPhone}
+                                        onChange={(e) => handlePhoneSearch(e.target.value)}
+                                        className="w-full min-h-[44px] bg-gray-50 dark:bg-white/5 border border-gray-200/80 dark:border-white/10 focus:border-primary-500 rounded-2xl pl-10 pr-3.5 text-xs font-semibold outline-none transition-all text-gray-900 dark:text-white"
+                                    />
+                                </div>
+                                {!customerName && (
+                                    <button
+                                        type="button"
+                                        onClick={handleQuickSale}
+                                        className="min-h-[44px] px-3.5 rounded-2xl bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-xs font-bold text-gray-700 dark:text-gray-200 whitespace-nowrap shrink-0 cursor-pointer transition-colors"
+                                    >
+                                        {selectedTable === 'Mostrador' ? 'Público Gral.' : `Mesa ${selectedTable}`}
+                                    </button>
+                                )}
+                            </div>
+
+                            {customerName && (
+                                <div className="px-3.5 py-2.5 bg-primary-500/10 border border-primary-500/20 rounded-2xl flex items-center justify-between gap-2">
+                                    <div className="min-w-0">
+                                        <span className="text-[11px] font-semibold text-primary-600 dark:text-primary-400 block">
+                                            Cliente asignado
+                                        </span>
+                                        <span className="text-xs font-extrabold text-gray-900 dark:text-white truncate block">
+                                            {customerName}
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        title="Quitar cliente"
+                                        onClick={() => {
+                                            setCustomerName('');
+                                            setCustomerPhone('');
+                                            setTempCustomer(null);
+                                        }}
+                                        className="min-w-[36px] min-h-[36px] rounded-xl text-primary-500 hover:bg-primary-500/10 flex items-center justify-center cursor-pointer"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Cart Items */}
+                        <div className="space-y-3">
+                            {cart.map((item, idx) => {
+                                const noteKey = `${idx}-${item.id}`;
+                                const isEditingNote = editingItemNoteKey === noteKey;
+                                return (
+                                    <div
+                                        key={`${item.id}-${item.variationLabel}-${idx}`}
+                                        className="bg-gray-50/80 dark:bg-white/[0.04] rounded-2xl p-3.5 border border-gray-200/70 dark:border-white/10 space-y-2.5"
+                                    >
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div className="flex-1 min-w-0">
+                                                <h4 className="text-xs sm:text-sm font-extrabold text-gray-900 dark:text-white leading-snug">
+                                                    {item.name}
+                                                </h4>
+                                                <p className="text-[11px] font-medium text-gray-500 dark:text-gray-400 mt-0.5 tabular-nums">
+                                                    {item.variationLabel} · ${(item.price * item.quantity).toFixed(2)}
+                                                </p>
+                                            </div>
+
+                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                <div className="flex items-center bg-white dark:bg-[#1a1118] border border-gray-200/80 dark:border-white/10 rounded-xl p-0.5">
+                                                    <button
+                                                        type="button"
+                                                        title="Reducir"
+                                                        onClick={() => updateQuantity(idx, -1)}
+                                                        className="w-8 h-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-primary-500 rounded-lg cursor-pointer"
+                                                    >
+                                                        <Minus className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <span className="w-6 text-center text-xs font-black tabular-nums text-gray-900 dark:text-white">
+                                                        {item.quantity}
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        title="Aumentar"
+                                                        onClick={() => updateQuantity(idx, 1)}
+                                                        className="w-8 h-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-primary-500 rounded-lg cursor-pointer"
+                                                    >
+                                                        <Plus className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+
+                                                <button
+                                                    type="button"
+                                                    title="Eliminar"
+                                                    onClick={() => removeFromCart(idx)}
+                                                    className="w-9 h-9 flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors cursor-pointer"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
                                             </div>
                                         </div>
 
-                                        <button
-                                            type="button"
-                                            onClick={() => addToCart(item, { ...baseVar, label: formatTlayoyoVariationLabel(sel) })}
-                                            className="w-full flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-2xl hover:bg-primary-500 hover:text-white transition-all shadow-sm group-hover:shadow-md cursor-pointer"
-                                        >
-                                            <span className="text-[10px] font-bold uppercase tracking-wide truncate pr-2">+ Agregar pieza</span>
-                                            <span className="font-black text-xs shrink-0">${baseVar.price}</span>
-                                        </button>
-                                    </div>
-                                );
-                            }
-
-                            return (
-                                <div key={item.id} className="bg-gray-50 dark:bg-gray-800/50 rounded-[32px] p-5 border border-transparent hover:border-primary-500/30 transition-all group">
-                                    <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight mb-3 line-clamp-1">{item.name}</h3>
-                                    <div className="space-y-2">
-                                        {item.variations.map(vari => (
+                                        {/* Per-item Comment / Note */}
+                                        {isEditingNote ? (
+                                            <div className="flex items-center gap-1.5">
+                                                <input
+                                                    autoFocus
+                                                    type="text"
+                                                    value={item.notes || ''}
+                                                    onChange={(e) => updateItemNote(idx, e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') setEditingItemNoteKey(null);
+                                                    }}
+                                                    placeholder="Ej. Sin cebolla, salsa aparte..."
+                                                    className="flex-1 min-h-[36px] bg-white dark:bg-[#1a1118] border border-primary-400 rounded-xl px-3 text-xs text-gray-800 dark:text-white outline-none"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEditingItemNoteKey(null)}
+                                                    className="min-h-[36px] px-3 rounded-xl bg-primary-500 text-white text-xs font-bold cursor-pointer"
+                                                >
+                                                    Listo
+                                                </button>
+                                            </div>
+                                        ) : (
                                             <button
-                                                key={vari.id}
-                                                onClick={() => addToCart(item, vari)}
-                                                className="w-full flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-2xl hover:bg-primary-500 hover:text-white transition-all shadow-sm group-hover:shadow-md cursor-pointer"
+                                                type="button"
+                                                onClick={() => setEditingItemNoteKey(noteKey)}
+                                                className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors cursor-pointer"
                                             >
-                                                <span className="text-[10px] font-bold uppercase tracking-wide">{vari.label}</span>
-                                                <span className="font-black text-xs">${vari.price}</span>
+                                                <MessageSquare className="w-3.5 h-3.5 shrink-0" />
+                                                <span className="truncate">
+                                                    {item.notes ? `Nota: ${item.notes}` : 'Agregar comentario al platillo'}
+                                                </span>
                                             </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* Mobile/Small Laptop Navigation */}
-                <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-t border-gray-100 dark:border-gray-800 px-6 py-4 flex items-center justify-around z-50">
-                    <button
-                        onClick={() => setActivePosView('menu')}
-                        className={`flex flex-col items-center gap-1 ${activePosView === 'menu' ? 'text-primary-500' : 'text-gray-400'}`}
-                    >
-                        <Utensils className="w-6 h-6" />
-                        <span className="text-[10px] font-black uppercase">Menú</span>
-                    </button>
-                    <button
-                        onClick={() => setActivePosView('cart')}
-                        className={`flex flex-col items-center gap-1 relative ${activePosView === 'cart' ? 'text-primary-500' : 'text-gray-400'}`}
-                    >
-                        <ShoppingBag className="w-6 h-6" />
-                        <span className="text-[10px] font-black uppercase">Comanda</span>
-                        {cart.length > 0 && (
-                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] font-black w-4 h-4 rounded-full flex items-center justify-center">
-                                {cart.length}
-                            </span>
-                        )}
-                    </button>
-                </div>
-            </div>
-
-            {/* Right Sidebar: Order Summary */}
-            <div className={`
-                ${activePosView === 'cart' ? 'flex' : 'hidden lg:flex'} 
-                w-full lg:w-[400px] xl:w-[450px] flex-col bg-gray-50 dark:bg-gray-950 border-l border-gray-200 dark:border-gray-800 pt-6 lg:pt-8 transition-all duration-300
-            `}>
-                <div className="px-6 lg:px-10 shrink-0 mb-6">
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-3">
-                            <h2 className="text-2xl lg:text-3xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">Comanda</h2>
-                        </div>
-                        <div className="px-4 py-1.5 bg-primary-100 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 rounded-full text-[10px] font-black uppercase tracking-widest">
-                            {cart.length} Items
-                        </div>
-                    </div>
-
-                    <div className="relative group">
-                        <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary-500 transition-colors">
-                            <Phone className="w-5 h-5" />
-                        </div>
-                        <input
-                            type="tel"
-                            placeholder="Buscar por teléfono..."
-                            value={customerPhone}
-                            onChange={(e) => handlePhoneSearch(e.target.value)}
-                            className="w-full bg-white dark:bg-gray-900 border-2 border-transparent focus:border-primary-500 rounded-3xl pl-14 pr-6 py-4 font-black text-sm uppercase tracking-wider outline-none transition-all shadow-sm"
-                        />
-                    </div>
-
-                    {customerName && (
-                        <div className="mt-4 p-4 bg-primary-50 dark:bg-primary-900/20 rounded-2xl flex items-center justify-between animate-in fade-in slide-in-from-top-2">
-                            <div className="flex-1 min-w-0 mr-4">
-                                <p className="text-[10px] font-black text-primary-500 uppercase tracking-widest">Cliente Seleccionado</p>
-                                <p className="text-sm font-black text-gray-900 dark:text-white uppercase truncate">{customerName}</p>
-                            </div>
-                            <button
-                                title="Borrar selección"
-                                onClick={() => { setCustomerName(''); setCustomerPhone(''); setTempCustomer(null); }}
-                                className="p-2 text-primary-400 hover:text-primary-600 transition-colors"
-                            >
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                    )}
-
-                    <div className="mt-6">
-                        <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-[0.2em] ml-2 block mb-3">Ubicación Actual: <span className="text-primary-500">{selectedAddress ? 'Domicilio' : (selectedTable === 'Mostrador' ? 'Mostrador' : `Mesa ${selectedTable}`)}</span></label>
-                        <div className="grid grid-cols-3 gap-2">
-                            {['Mostrador', '1', '2', '3', '4', '5'].map(table => {
-                                const occupied = table !== 'Mostrador' && isTableOccupied(table);
-                                return (
-                                    <button
-                                        key={table}
-                                        disabled={occupied && selectedTable !== table}
-                                        title={occupied ? `Mesa ocupada` : (table === 'Mostrador' ? 'Asignar a Mostrador' : `Asignar a Mesa ${table}`)}
-                                        onClick={() => {
-                                            setSelectedTable(table);
-                                            setSelectedAddress('');
-                                            soundManager.play('click');
-                                        }}
-                                        className={`py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border-2 transition-all relative ${selectedTable === table && !selectedAddress
-                                            ? 'bg-primary-500 border-primary-500 text-white shadow-lg'
-                                            : occupied
-                                                ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/50 text-red-500 opacity-80'
-                                                : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-800 text-gray-400 hover:border-gray-200'
-                                            }`}
-                                    >
-                                        {table === 'Mostrador' ? 'Mostrador' : `Mesa ${table}`}
-                                        {occupied && (
-                                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 border-2 border-white dark:border-gray-900 rounded-full"></div>
                                         )}
-                                    </button>
+                                    </div>
                                 );
                             })}
+
+                            {cart.length === 0 && (
+                                <div className="flex flex-col items-center justify-center py-10 text-center border border-dashed border-gray-200 dark:border-white/10 rounded-3xl">
+                                    <ShoppingBag className="w-10 h-10 mb-2.5 text-gray-300 dark:text-gray-600" />
+                                    <p className="font-bold text-xs text-gray-500 dark:text-gray-400">
+                                        Sin platillos seleccionados
+                                    </p>
+                                    <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                                        Elige platillos del menú para armar la comanda
+                                    </p>
+                                </div>
+                            )}
                         </div>
-                        {selectedAddress && (
-                            <div className="mt-2 p-3 bg-white dark:bg-gray-900 border-2 border-primary-500 rounded-2xl text-[10px] font-black uppercase text-primary-500 truncate shadow-md">
-                                Domicilio: {selectedAddress}
-                            </div>
-                        )}
-                    </div>
-                </div>
 
-                <div className="flex-1 overflow-y-auto custom-scrollbar min-h-0 relative">
-                    <div className="px-6 lg:px-10 space-y-4 py-4">
-                        {cart.map((item, idx) => (
-                            <div key={`${item.id}-${item.variationLabel}-${idx}`}
-                                className="bg-white dark:bg-gray-900 rounded-[28px] p-5 shadow-sm border border-gray-100 dark:border-gray-800 flex items-center justify-between group">
-                                <div className="flex-1 min-w-0 mr-4">
-                                    <h4 className="text-[11px] font-black text-gray-900 dark:text-white uppercase truncate">{item.name}</h4>
-                                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{item.variationLabel} • ${item.price}</p>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center bg-gray-50 dark:bg-gray-800 rounded-2xl p-1">
-                                        <button
-                                            title="Reducir"
-                                            onClick={() => updateQuantity(item.id, item.variationLabel, -1)}
-                                            className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-primary-500 hover:bg-white dark:hover:bg-gray-700 rounded-xl transition-all"
-                                        >
-                                            <Minus className="w-3 h-3" />
-                                        </button>
-                                        <span className="w-6 text-center text-xs font-black dark:text-white">{item.quantity}</span>
-                                        <button
-                                            title="Aumentar"
-                                            onClick={() => updateQuantity(item.id, item.variationLabel, 1)}
-                                            className="w-7 h-7 flex items-center justify-center text-gray-500 hover:text-primary-500 hover:bg-white dark:hover:bg-gray-700 rounded-xl transition-all"
-                                        >
-                                            <Plus className="w-3 h-3" />
-                                        </button>
-                                    </div>
-                                    <button
-                                        title="Eliminar"
-                                        onClick={() => removeFromCart(item.id, item.variationLabel)}
-                                        className="p-2.5 text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
-                                    >
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                        {cart.length === 0 && (
-                            <div className="flex flex-col items-center justify-center py-10 opacity-30 dark:text-white text-center">
-                                <ShoppingBag className="w-16 h-16 mb-4 text-gray-200 dark:text-gray-800" />
-                                <p className="font-black uppercase tracking-[0.2em] text-[10px] text-gray-400">Sin platillos elegidos</p>
-                            </div>
-                        )}
+                        {/* General Order Comment Field */}
+                        <div className="space-y-1.5 pt-1">
+                            <label
+                                htmlFor="tpv-order-notes"
+                                className="flex items-center gap-1.5 text-xs font-bold text-gray-600 dark:text-gray-300"
+                            >
+                                <MessageSquare className="w-3.5 h-3.5 text-primary-500" />
+                                <span>Comentario del pedido (opcional)</span>
+                            </label>
+                            <textarea
+                                id="tpv-order-notes"
+                                rows={2}
+                                value={orderNotes}
+                                onChange={(e) => setOrderNotes(e.target.value)}
+                                placeholder="Indicaciones para cocina o servicio (ej. todo junto, servilletas extra)..."
+                                className="w-full bg-gray-50 dark:bg-white/5 border border-gray-200/80 dark:border-white/10 focus:border-primary-500 rounded-2xl px-3.5 py-2.5 text-xs text-gray-800 dark:text-white outline-none transition-all resize-none"
+                            />
+                        </div>
                     </div>
 
-                    <div className="px-6 lg:px-10 pb-24 lg:pb-10 border-t border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 backdrop-blur-sm">
-                        <div className="space-y-3 mb-8 pt-6">
-                            <div className="flex justify-between items-center text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest text-[10px]">
+                    {/* Comanda Sticky Summary & CTA */}
+                    <div className="shrink-0 px-4 sm:px-6 py-4 border-t border-gray-200/80 dark:border-white/10 bg-white dark:bg-[#160e15] space-y-3">
+                        <div className="space-y-1.5 text-xs">
+                            <div className="flex justify-between items-center text-gray-500 dark:text-gray-400">
                                 <span>Subtotal</span>
-                                <span>${(cartTotal * 0.84).toFixed(2)}</span>
+                                <span className="font-semibold tabular-nums">${(cartTotal * 0.84).toFixed(2)}</span>
                             </div>
-                            <div className="flex justify-between items-center text-gray-400 dark:text-gray-500 font-bold uppercase tracking-widest text-[10px]">
+                            <div className="flex justify-between items-center text-gray-500 dark:text-gray-400">
                                 <span>IVA (16%)</span>
-                                <span>${(cartTotal * 0.16).toFixed(2)}</span>
+                                <span className="font-semibold tabular-nums">${(cartTotal * 0.16).toFixed(2)}</span>
                             </div>
-                            <div className="flex justify-between items-center pt-3 border-t border-gray-100 dark:border-gray-800">
-                                <span className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tighter">Total a Pagar</span>
-                                <span className="text-3xl font-black text-primary-500 tracking-tighter">${cartTotal.toFixed(2)}</span>
+                            <div className="flex justify-between items-center pt-2 border-t border-gray-100 dark:border-white/10">
+                                <span className="text-sm font-extrabold text-gray-900 dark:text-white">Total a Pagar</span>
+                                <span className="text-2xl font-black text-primary-500 tabular-nums">${cartTotal.toFixed(2)}</span>
                             </div>
                         </div>
 
                         <button
+                            type="button"
                             onClick={handleFinalizeOrder}
-                            disabled={cart.length === 0 || !customerName.trim()}
-                            className={`w-full py-6 rounded-[32px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 transition-all shadow-2xl ${cart.length > 0 && customerName.trim()
-                                ? 'bg-gray-900 dark:bg-primary-500 text-white shadow-primary-500/20 hover:scale-[1.02] active:scale-95'
-                                : 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed opacity-50'
-                                }`}
+                            disabled={cart.length === 0}
+                            className={`w-full min-h-[52px] rounded-2xl font-bold text-xs sm:text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all ${
+                                cart.length > 0
+                                    ? 'bg-primary-500 hover:bg-primary-600 text-white shadow-lg shadow-primary-500/25 active:scale-[0.98] cursor-pointer'
+                                    : 'bg-gray-100 dark:bg-white/5 text-gray-400 cursor-not-allowed'
+                            }`}
                         >
-                            <CheckCircle className="w-6 h-6" />
-                            Finalizar Pedido
+                            <CheckCircle className="w-5 h-5" />
+                            <span>
+                                {selectedTable === 'Mostrador' && !selectedAddress
+                                    ? 'Cobrar y Finalizar'
+                                    : `Enviar a Cocina · ${locationSummaryLabel}`}
+                            </span>
                         </button>
                     </div>
                 </div>
             </div>
 
+            {/* Mobile Bottom Navigation Bar (shrink-0 inside 100dvh, zero overlap with scroll or CTA) */}
+            <nav
+                aria-label="Navegación TPV"
+                className="lg:hidden shrink-0 h-16 grid grid-cols-2 border-t border-gray-200/80 dark:border-white/10 bg-[#FDFBFC]/95 dark:bg-[#110a10]/95 backdrop-blur-xl"
+            >
+                <button
+                    type="button"
+                    onClick={() => setActivePosView('menu')}
+                    className={`flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${
+                        activePosView === 'menu' ? 'text-primary-500' : 'text-gray-500 dark:text-gray-400'
+                    }`}
+                >
+                    <Utensils className="w-5 h-5" />
+                    <span className="text-[11px] font-bold">Menú</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setActivePosView('cart')}
+                    className={`flex flex-col items-center justify-center gap-1 relative cursor-pointer transition-colors ${
+                        activePosView === 'cart' ? 'text-primary-500' : 'text-gray-500 dark:text-gray-400'
+                    }`}
+                >
+                    <div className="relative">
+                        <ShoppingBag className="w-5 h-5" />
+                        {totalPieces > 0 && (
+                            <span className="absolute -top-1.5 -right-2.5 min-w-[18px] h-[18px] px-1 bg-primary-500 text-white text-[10px] font-black rounded-full flex items-center justify-center tabular-nums">
+                                {totalPieces}
+                            </span>
+                        )}
+                    </div>
+                    <span className="text-[11px] font-bold">
+                        Comanda {cartTotal > 0 ? `($${cartTotal.toFixed(0)})` : ''}
+                    </span>
+                </button>
+            </nav>
+
             {/* Modals Container */}
             {modalType !== 'none' && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-gray-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-                    <div className="w-full max-w-md bg-white dark:bg-gray-900 rounded-[40px] shadow-2xl overflow-hidden border-4 border-white dark:border-gray-800 animate-in zoom-in-95 duration-300">
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="w-full max-w-md bg-white dark:bg-[#1a1118] rounded-3xl shadow-2xl overflow-hidden border border-gray-200/80 dark:border-white/10 animate-in zoom-in-95 duration-200">
                         {modalType === 'location' && tempCustomer && (
-                            <div className="p-10">
-                                <div className="text-center mb-8">
-                                    <div className="w-16 h-16 bg-primary-100 dark:bg-primary-900/30 rounded-2xl flex items-center justify-center text-primary-500 mx-auto mb-4">
-                                        <Map className="w-8 h-8" />
+                            <div className="p-6 sm:p-8 space-y-5">
+                                <div className="text-center">
+                                    <div className="w-12 h-12 bg-primary-500/10 rounded-2xl flex items-center justify-center text-primary-500 mx-auto mb-3">
+                                        <Map className="w-6 h-6" />
                                     </div>
-                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">¿Donde será el servicio?</h3>
-                                    <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px] mt-2">Cliente: {tempCustomer.name}</p>
+                                    <h3 className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                                        ¿Dónde será el servicio?
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Cliente: {tempCustomer.name}
+                                    </p>
                                 </div>
-                                <div className="space-y-3">
-                                    <button onClick={() => handleSelectLocation('mostrador')} className="w-full p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl flex items-center gap-4 hover:bg-primary-500 hover:text-white transition-all group">
-                                        <div className="w-10 h-10 bg-white dark:bg-gray-700 rounded-xl flex items-center justify-center group-hover:bg-primary-400 shadow-sm transition-colors">
-                                            <ShoppingBag className="w-5 h-5" />
-                                        </div>
-                                        <span className="font-black uppercase tracking-widest text-xs">Para Mostrador</span>
+                                <div className="space-y-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSelectLocation('mostrador')}
+                                        className="w-full min-h-[52px] px-4 bg-gray-50 dark:bg-white/5 rounded-2xl flex items-center gap-3 hover:bg-primary-500 hover:text-white transition-colors cursor-pointer"
+                                    >
+                                        <ShoppingBag className="w-5 h-5 shrink-0" />
+                                        <span className="font-bold text-xs uppercase tracking-wider">Para Mostrador</span>
                                     </button>
-                                    <button onClick={() => handleSelectLocation('mesa', '1')} className="w-full p-6 bg-gray-50 dark:bg-gray-800 rounded-3xl flex items-center gap-4 hover:bg-primary-500 hover:text-white transition-all group">
-                                        <div className="w-10 h-10 bg-white dark:bg-gray-700 rounded-xl flex items-center justify-center group-hover:bg-primary-400 shadow-sm transition-colors">
-                                            <Utensils className="w-5 h-5" />
-                                        </div>
-                                        <span className="font-black uppercase tracking-widest text-xs">Para Mesa (Comedor)</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSelectLocation('mesa', '1')}
+                                        className="w-full min-h-[52px] px-4 bg-gray-50 dark:bg-white/5 rounded-2xl flex items-center gap-3 hover:bg-primary-500 hover:text-white transition-colors cursor-pointer"
+                                    >
+                                        <Utensils className="w-5 h-5 shrink-0" />
+                                        <span className="font-bold text-xs uppercase tracking-wider">Para Mesa (Comedor)</span>
                                     </button>
                                     {tempCustomer.addresses && tempCustomer.addresses.length > 0 && (
-                                        <div className="space-y-2 mt-4 pt-4 border-t border-gray-100 dark:border-gray-800">
-                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Direcciones Registradas</p>
+                                        <div className="space-y-2 pt-3 border-t border-gray-100 dark:border-white/10">
+                                            <p className="text-xs font-bold text-gray-400">Direcciones Registradas</p>
                                             {tempCustomer.addresses.map((addr, i) => (
-                                                <button key={i} onClick={() => handleSelectLocation('address', addr)} className="w-full p-4 bg-primary-50 dark:bg-primary-900/20 text-primary-600 dark:text-primary-400 rounded-2xl flex items-center gap-3 hover:bg-primary-500 hover:text-white transition-all group overflow-hidden">
+                                                <button
+                                                    key={i}
+                                                    type="button"
+                                                    onClick={() => handleSelectLocation('address', addr)}
+                                                    className="w-full min-h-[44px] px-4 bg-primary-500/10 text-primary-600 dark:text-primary-400 rounded-2xl flex items-center gap-3 hover:bg-primary-500 hover:text-white transition-colors cursor-pointer overflow-hidden"
+                                                >
                                                     <MapPin className="w-4 h-4 shrink-0" />
-                                                    <span className="font-bold text-[10px] uppercase truncate">{addr}</span>
+                                                    <span className="font-bold text-xs truncate">{addr}</span>
                                                 </button>
                                             ))}
                                         </div>
@@ -866,42 +1217,57 @@ export default function TPVView({
                         )}
 
                         {modalType === 'onboarding' && (
-                            <div className="p-10 text-center">
-                                <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center text-red-500 mx-auto mb-4">
-                                    <User className="w-8 h-8" />
+                            <div className="p-6 sm:p-8 text-center space-y-5">
+                                <div>
+                                    <div className="w-12 h-12 bg-red-500/10 rounded-2xl flex items-center justify-center text-red-500 mx-auto mb-3">
+                                        <User className="w-6 h-6" />
+                                    </div>
+                                    <h3 className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                                        Cliente no encontrado
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        El teléfono {customerPhone} no está registrado
+                                    </p>
                                 </div>
-                                <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Cliente no encontrado</h3>
-                                <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px] mt-2 mb-8">El teléfono {customerPhone} no está en la base de datos</p>
 
-                                <div className="grid grid-cols-1 gap-3">
-                                    <button onClick={() => { setModalType('registration'); setRegName(''); setRegAddress(''); }} className="w-full py-5 bg-primary-500 text-white rounded-3xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary-500/20 hover:scale-[1.02] active:scale-95 transition-all">
+                                <div className="grid grid-cols-1 gap-2.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setModalType('registration'); setRegName(''); setRegAddress(''); }}
+                                        className="w-full min-h-[48px] bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-bold text-xs uppercase tracking-wider shadow-md shadow-primary-500/20 transition-all cursor-pointer"
+                                    >
                                         Registrar Nuevo Cliente
                                     </button>
-                                    <div className="relative py-4 flex items-center gap-4">
-                                        <div className="flex-1 h-px bg-gray-100 dark:bg-gray-800"></div>
-                                        <span className="text-[9px] font-black text-gray-400 uppercase">o también</span>
-                                        <div className="flex-1 h-px bg-gray-100 dark:bg-gray-800"></div>
-                                    </div>
-                                    <button onClick={handleQuickSale} className="w-full py-5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-3xl font-black uppercase tracking-widest text-xs hover:scale-[1.02] active:scale-95 transition-all">
-                                        Venta Rápida (Público General)
+                                    <button
+                                        type="button"
+                                        onClick={handleQuickSale}
+                                        className="w-full min-h-[48px] bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-2xl font-bold text-xs uppercase tracking-wider transition-all cursor-pointer"
+                                    >
+                                        Venta Rápida ({selectedTable === 'Mostrador' ? 'Público General' : `Mesa ${selectedTable}`})
                                     </button>
                                 </div>
                             </div>
                         )}
 
                         {modalType === 'registration' && (
-                            <div className="p-10">
-                                <div className="text-center mb-8">
-                                    <div className="w-16 h-16 bg-primary-500 rounded-2xl flex items-center justify-center text-white mx-auto mb-4">
-                                        <Clipboard className="w-8 h-8" />
+                            <div className="p-6 sm:p-8 space-y-5">
+                                <div className="text-center">
+                                    <div className="w-12 h-12 bg-primary-500 rounded-2xl flex items-center justify-center text-white mx-auto mb-3">
+                                        <Clipboard className="w-6 h-6" />
                                     </div>
-                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Alta de Cliente</h3>
-                                    <p className="text-gray-500 font-bold uppercase tracking-widest text-[10px] mt-2">Tel: {customerPhone}</p>
+                                    <h3 className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                                        Alta de Cliente
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        Tel: {customerPhone}
+                                    </p>
                                 </div>
 
                                 <form onSubmit={handleRegisterCustomer} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-2">Nombre Completo</label>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block">
+                                            Nombre Completo
+                                        </label>
                                         <input
                                             autoFocus
                                             type="text"
@@ -909,53 +1275,62 @@ export default function TPVView({
                                             onChange={(e) => setRegName(e.target.value)}
                                             placeholder="Ej. Juan Pérez"
                                             required
-                                            className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl px-6 py-4 font-bold text-sm outline-none transition-all uppercase"
+                                            className="w-full min-h-[48px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-primary-500 rounded-2xl px-4 font-semibold text-sm outline-none transition-all text-gray-900 dark:text-white"
                                         />
                                     </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest ml-2">Dirección (Opcional)</label>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block">
+                                            Dirección (Opcional)
+                                        </label>
                                         <input
                                             type="text"
                                             value={regAddress}
                                             onChange={(e) => setRegAddress(e.target.value)}
                                             placeholder="Calle, Número, Colonia"
-                                            className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl px-6 py-4 font-bold text-sm outline-none transition-all uppercase"
+                                            className="w-full min-h-[48px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-primary-500 rounded-2xl px-4 font-semibold text-sm outline-none transition-all text-gray-900 dark:text-white"
                                         />
                                     </div>
                                     <button
                                         type="submit"
                                         disabled={!regName.trim()}
-                                        className="w-full mt-4 py-5 bg-primary-500 text-white rounded-3xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary-500/20 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="w-full min-h-[48px] bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-bold text-xs uppercase tracking-wider shadow-md shadow-primary-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                                     >
                                         Guardar y Continuar
                                     </button>
                                 </form>
                             </div>
                         )}
+
                         {modalType === 'payment' && (
-                            <div className="p-10">
-                                <div className="text-center mb-8">
-                                    <div className="w-16 h-16 bg-emerald-500 rounded-2xl flex items-center justify-center text-white mx-auto mb-4">
-                                        <CheckCircle className="w-8 h-8" />
+                            <div className="p-6 sm:p-8 space-y-5">
+                                <div className="text-center">
+                                    <div className="w-12 h-12 bg-emerald-500 rounded-2xl flex items-center justify-center text-white mx-auto mb-3">
+                                        <CheckCircle className="w-6 h-6" />
                                     </div>
-                                    <h3 className="text-2xl font-black text-gray-900 dark:text-white uppercase tracking-tight">Confirmar Cobro</h3>
-                                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-2">{customerName}</p>
+                                    <h3 className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                                        Confirmar Cobro
+                                    </h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        {resolvedCustomerName}
+                                    </p>
                                 </div>
 
-                                <div className="bg-gray-50 dark:bg-gray-800 rounded-3xl p-6 mb-8">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <span className="text-[10px] font-black text-gray-400 uppercase">Total a Pagar</span>
-                                        <span className="text-2xl font-black text-primary-500">${cartTotal.toFixed(2)}</span>
+                                <div className="bg-gray-50 dark:bg-white/[0.04] border border-gray-200/60 dark:border-white/10 rounded-2xl p-5">
+                                    <div className="flex justify-between items-center mb-3">
+                                        <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Total a Pagar</span>
+                                        <span className="text-2xl font-black text-primary-500 tabular-nums">${cartTotal.toFixed(2)}</span>
                                     </div>
-                                    <div className="grid grid-cols-3 gap-2 mt-4">
+                                    <div className="grid grid-cols-3 gap-2">
                                         {(['efectivo', 'tarjeta', 'transferencia'] as PaymentMethod[]).map(m => (
                                             <button
                                                 key={m}
+                                                type="button"
                                                 onClick={() => setTpvPaymentMethod(m)}
-                                                className={`py-3 rounded-2xl text-[9px] font-black uppercase tracking-tighter border-2 transition-all ${tpvPaymentMethod === m
-                                                    ? 'bg-primary-500 border-primary-500 text-white shadow-md'
-                                                    : 'bg-white dark:bg-gray-900 border-gray-100 dark:border-gray-700 text-gray-400'
-                                                    }`}
+                                                className={`min-h-[44px] rounded-xl text-xs font-bold capitalize border transition-all cursor-pointer ${
+                                                    tpvPaymentMethod === m
+                                                        ? 'bg-primary-500 border-primary-500 text-white shadow-sm'
+                                                        : 'bg-white dark:bg-[#1a1118] border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300'
+                                                }`}
                                             >
                                                 {m}
                                             </button>
@@ -964,48 +1339,56 @@ export default function TPVView({
                                 </div>
 
                                 {tpvPaymentMethod === 'efectivo' && (
-                                    <div className="space-y-4 mb-8 animate-in slide-in-from-top-4 duration-300">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-2">Monto Recibido</label>
-                                            <div className="relative">
-                                                <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-gray-400">$</span>
-                                                <input
-                                                    autoFocus
-                                                    type="number"
-                                                    value={cashReceived}
-                                                    onChange={(e) => setCashReceived(e.target.value)}
-                                                    placeholder="0.00"
-                                                    className="w-full bg-gray-50 dark:bg-gray-800 border-2 border-transparent focus:border-primary-500 rounded-2xl pl-12 pr-6 py-4 font-black text-lg outline-none transition-all"
-                                                />
-                                            </div>
+                                    <div className="space-y-3">
+                                        <label className="text-xs font-bold text-gray-600 dark:text-gray-300 block">
+                                            Monto Recibido
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400">$</span>
+                                            <input
+                                                autoFocus
+                                                type="number"
+                                                inputMode="decimal"
+                                                value={cashReceived}
+                                                onChange={(e) => {
+                                                    setCashReceived(e.target.value);
+                                                    if (paymentError) setPaymentError(null);
+                                                }}
+                                                placeholder="0.00"
+                                                className="w-full min-h-[48px] bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-primary-500 rounded-2xl pl-9 pr-4 font-black text-lg tabular-nums outline-none transition-all text-gray-900 dark:text-white"
+                                            />
                                         </div>
 
                                         {(parseFloat(cashReceived) >= cartTotal) && (
-                                            <div className="p-5 bg-emerald-50 dark:bg-emerald-900/20 rounded-3xl flex justify-between items-center border-2 border-emerald-100 dark:border-emerald-900/50 animate-in zoom-in-95">
-                                                <span className="text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">Su Cambio:</span>
-                                                <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">${(parseFloat(cashReceived) - cartTotal).toFixed(2)}</span>
+                                            <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 rounded-2xl flex justify-between items-center text-emerald-700 dark:text-emerald-300">
+                                                <span className="text-xs font-bold uppercase tracking-wider">Su Cambio:</span>
+                                                <span className="text-lg font-black tabular-nums">
+                                                    ${(parseFloat(cashReceived) - cartTotal).toFixed(2)}
+                                                </span>
                                             </div>
                                         )}
                                     </div>
                                 )}
 
                                 {paymentError && (
-                                    <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 text-red-500 text-[10px] font-black uppercase tracking-widest rounded-2xl flex items-center gap-3">
-                                        <AlertCircle className="w-4 h-4" />
-                                        {paymentError}
+                                    <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-600 dark:text-red-400 text-xs font-bold rounded-2xl flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4 shrink-0" />
+                                        <span>{paymentError}</span>
                                     </div>
                                 )}
 
-                                <div className="grid grid-cols-1 gap-3">
+                                <div className="grid grid-cols-1 gap-2.5">
                                     <button
+                                        type="button"
                                         onClick={() => handleConfirmPayment('paid')}
-                                        className="w-full py-5 bg-primary-500 text-white rounded-3xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary-500/20 hover:scale-[1.02] active:scale-95 transition-all"
+                                        className="w-full min-h-[48px] bg-primary-500 hover:bg-primary-600 text-white rounded-2xl font-bold text-xs uppercase tracking-wider shadow-md shadow-primary-500/20 transition-all cursor-pointer"
                                     >
                                         Confirmar y Generar Ticket
                                     </button>
                                     <button
+                                        type="button"
                                         onClick={() => handleConfirmPayment('pending')}
-                                        className="w-full py-4 text-gray-400 font-black uppercase tracking-widest text-[9px] hover:text-gray-600 transition-all"
+                                        className="w-full min-h-[44px] text-gray-500 dark:text-gray-400 font-semibold text-xs hover:text-gray-800 dark:hover:text-white transition-colors cursor-pointer"
                                     >
                                         Dejar Pago Pendiente
                                     </button>
@@ -1013,8 +1396,14 @@ export default function TPVView({
                             </div>
                         )}
 
-                        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 flex justify-center border-t border-gray-100 dark:border-gray-800">
-                            <button onClick={() => setModalType('none')} className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] hover:text-gray-600 transition-colors">Volver / Cancelar</button>
+                        <div className="p-3.5 bg-gray-50 dark:bg-white/[0.03] flex justify-center border-t border-gray-100 dark:border-white/10">
+                            <button
+                                type="button"
+                                onClick={() => setModalType('none')}
+                                className="min-h-[36px] px-4 text-xs font-bold text-gray-500 hover:text-gray-800 dark:hover:text-white transition-colors cursor-pointer"
+                            >
+                                Volver / Cancelar
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1024,7 +1413,6 @@ export default function TPVView({
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
                 .animate-shake { animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
-                [style*="--delay"] { animation-delay: var(--delay); }
                 @keyframes shake {
                     10%, 90% { transform: translate3d(-1px, 0, 0); }
                     20%, 80% { transform: translate3d(2px, 0, 0); }
@@ -1035,4 +1423,3 @@ export default function TPVView({
         </div>
     );
 }
-
