@@ -13,6 +13,7 @@ import {
   VolumeX,
   Film
 } from 'lucide-react';
+import { AnimatedSlogan } from './AnimatedSlogan';
 
 const FACEBOOK_PAGE_URL = 'https://www.facebook.com/tlayoyos3marias/';
 const FACEBOOK_VIDEO_URL = 'https://www.facebook.com/watch/?v=1409135404346666';
@@ -273,7 +274,7 @@ export const FacebookChannelSection: React.FC<FacebookChannelSectionProps> = ({ 
                   Los tradicionales Tlayoyos de Teziutlán, Puebla. Más de 50 años compartiendo sabor artesanal desde el Mercado Victoria hasta nuestra cocina en Av. Cuauhtémoc #311 - 313.
                 </p>
                 <p className="text-sm font-black text-primary-600 dark:text-primary-400 italic">
-                  ¡Todo bien, todo rico!
+                  <AnimatedSlogan />
                 </p>
               </div>
 

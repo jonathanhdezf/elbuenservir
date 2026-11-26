@@ -8,6 +8,7 @@ import { usePwaInstall } from '../hooks/usePwaInstall';
 import { InstallPwaModal } from '../components/InstallPwaModal';
 import LegalModal, { LegalDocType } from '../components/LegalModal';
 import { TlayoyosVideoModal } from '../components/TlayoyosVideoModal';
+import { AnimatedSlogan } from '../components/AnimatedSlogan';
 import { CustomerAuthModal } from '../components/CustomerAuthModal';
 import { CustomerProfileModal } from '../components/CustomerProfileModal';
 import { CustomerAvatar } from '../components/CustomerAvatar';
@@ -1586,7 +1587,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                     <span className="text-2xl font-black tracking-tighter dark:text-white uppercase">Tlayoyos 3 Marías</span>
                   </div>
                   <p className="text-gray-500 dark:text-gray-400 leading-relaxed mb-10 italic">
-                    "¡Todo bien, todo rico!"
+                    <AnimatedSlogan withQuotes />
                   </p>
                   <div className="flex space-x-3">
                     <a
