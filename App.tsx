@@ -30,6 +30,18 @@ const INITIAL_CATEGORIES: Category[] = [
 const RAW_INITIAL_ITEMS: MenuItem[] = [
   // MENÚ DEL DÍA
   {
+    id: 'm-tlayoyos-salsa',
+    categoryId: 'cat-desayunos',
+    name: 'Tlayoyo Tradicional',
+    description: 'Tradicional tlayoyo de Teziutlán por pieza. Elige salsa(s) (Verde, Roja, Chipotle, aparte o sin salsa) y queso (con queso, aparte o sin queso). (Sin guarnición)',
+    isActive: true,
+    allowAccompaniments: true,
+    allowSides: false,
+    variations: [
+      { id: 'm-tlayoyos-v1', label: 'Por pieza', price: 10 }
+    ]
+  },
+  {
     id: 'm1', categoryId: 'cat-1', name: 'Fresas con crema',
     description: 'Fresas frescas con crema especial de la casa.',
     isActive: true,
@@ -917,6 +929,20 @@ export default function App() {
             setView('public');
           }}
           isDarkMode={isDarkMode}
+          setIsDarkMode={setIsDarkMode}
+          onGoToPublicSite={() => {
+            try {
+              if (isAdminRoutePath(window.location.pathname)) {
+                window.history.replaceState({}, '', '/');
+              }
+            } catch {
+              // ignore
+            }
+            setView('public');
+          }}
+          activeOrdersCount={orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled').length}
+          menuItemsCount={menuItems.length}
+          activeDriversCount={drivers.filter(d => d.status !== 'offline').length}
           systemBgColor={systemBgColor}
           setSystemBgColor={setSystemBgColor}
           systemBgEffect={systemBgEffect}

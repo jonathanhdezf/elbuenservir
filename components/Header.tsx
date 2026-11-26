@@ -105,8 +105,14 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border-b border-gray-200 dark:border-gray-800 h-20 flex items-center justify-between px-4 md:px-8 sticky top-0 z-30 transition-colors">
-      <div className="flex items-center gap-2 sm:gap-3">
+    <header
+      className={`backdrop-blur-xl border-b flex items-center justify-between px-3.5 sm:px-4 md:px-8 sticky top-0 z-30 transition-colors ${
+        hideMenuButton
+          ? 'bg-[#FDFBFC]/95 dark:bg-[#110a10]/95 border-gray-200/80 dark:border-white/10 h-16 md:h-20'
+          : 'bg-white/80 dark:bg-gray-900/80 border-gray-200 dark:border-gray-800 h-20'
+      }`}
+    >
+      <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
         {!hideMenuButton && (
           <button
             title="Abrir menú"
@@ -120,36 +126,33 @@ const Header: React.FC<HeaderProps> = ({
         {onBackToPanel && (
           <button
             onClick={onBackToPanel}
-            title={backButtonText ? `${backButtonText} (Vista Básica)` : "Volver al Panel de Control"}
-            className={`flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl transition-all cursor-pointer shadow-sm active:scale-95 ${
+            title={backButtonText || 'Volver al Panel de Control'}
+            className={`flex items-center gap-1.5 min-h-[42px] px-3 sm:px-4 rounded-2xl transition-all cursor-pointer active:scale-95 shrink-0 ${
               hideMenuButton
-                ? 'bg-primary-600 hover:bg-primary-700 text-white font-black shadow-primary-500/25 ring-2 ring-primary-500/30'
+                ? 'bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/15 text-gray-800 dark:text-white font-bold'
                 : 'text-xs font-bold text-gray-700 dark:text-gray-200 bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700'
             }`}
           >
             {hideMenuButton ? (
-              <ArrowLeft className="w-4 h-4 text-white" />
+              <ArrowLeft className="w-4 h-4 text-primary-500" />
             ) : (
               <LayoutDashboard className="w-3.5 h-3.5 text-primary-500" />
             )}
-            <span className={hideMenuButton ? "text-xs sm:text-sm font-black" : "hidden sm:inline"}>
-              {backButtonText || 'Panel de Control'}
+            <span className={hideMenuButton ? 'text-xs sm:text-sm font-bold' : 'hidden sm:inline'}>
+              {backButtonText ? 'Panel' : 'Panel de Control'}
             </span>
             {!hideMenuButton && <span className="sm:hidden text-[10px]">Panel</span>}
-            {backButtonBadge && (
-              <span className="hidden sm:inline-block text-[9px] bg-black/25 px-1.5 py-0.5 rounded text-white font-black uppercase tracking-wider">
-                {backButtonBadge}
-              </span>
-            )}
           </button>
         )}
 
-        <div className="flex items-center gap-2">
-          <h2 className="text-lg md:text-2xl font-extrabold text-gray-800 dark:text-white tracking-tight">{title}</h2>
+        <div className="min-w-0">
+          <h2 className="text-base sm:text-lg md:text-xl font-extrabold text-gray-900 dark:text-white tracking-tight truncate">
+            {title}
+          </h2>
           {hideMenuButton && (
-            <span className="hidden md:inline-flex items-center px-2.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 text-[10px] font-black uppercase tracking-wider">
-              {sectionBadge || (title === 'Editor de Menú' ? 'Catálogo & Precios' : 'Control de Pedidos')}
-            </span>
+            <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 font-medium truncate">
+              {sectionBadge || (title === 'Editor de Menú' ? 'Catálogo y precios' : 'Control de pedidos')}
+            </p>
           )}
         </div>
       </div>

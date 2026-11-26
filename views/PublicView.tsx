@@ -14,6 +14,17 @@ import { CustomerOnboardingTooltip } from '../components/CustomerOnboardingToolt
 import { PromoBannerModal, PromoTopBanner, PromoFloatingButton } from '../components/PromoBannerModal';
 import { TestimonialsCarousel } from '../components/TestimonialsCarousel';
 import { FacebookChannelSection } from '../components/FacebookChannelSection';
+import {
+  TLAYOYO_SALSAS,
+  TLAYOYO_CHEESE_OPTIONS,
+  DEFAULT_TLAYOYO_SELECTION,
+  TlayoyoSelection,
+  isTlayoyoDish,
+  toggleTlayoyoSalsa,
+  toggleTlayoyoSalsaAparte,
+  setTlayoyoSinSalsa,
+  formatTlayoyoVariationLabel
+} from '../utils/tlayoyoConfig';
 
 interface PublicViewProps {
   categories: Category[];
@@ -145,6 +156,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   const [pendingDishSides, setPendingDishSides] = useState<Record<string, string[]>>({});
   const [pendingDishVariation, setPendingDishVariation] = useState<Record<string, any>>({});
   const [selectedVariationsByDish, setSelectedVariationsByDish] = useState<Record<string, any>>({});
+  const [pendingTlayoyoSel, setPendingTlayoyoSel] = useState<Record<string, TlayoyoSelection>>({});
   const [pendingDishQty, setPendingDishQty] = useState<Record<string, number>>({});
   const [pendingDishComments, setPendingDishComments] = useState<Record<string, string>>({});
   const [editingCartItemId, setEditingCartItemId] = useState<string | null>(null);
@@ -237,6 +249,9 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     commentsOverride?: string
   ) => {
     const chosenVar = variationOverride || pendingDishVariation[item.id] || item.variations[0];
+    const resolvedVarLabel = isTlayoyoDish(item) && !variationOverride?.label
+      ? formatTlayoyoVariationLabel(pendingTlayoyoSel[item.id])
+      : chosenVar.label;
     const qty = qtyOverride || pendingDishQty[item.id] || 1;
     const sidesAllowed = isDishSidesEnabled(item);
     const commentsAllowed = isDishAccompanimentEnabled(item);
@@ -246,7 +261,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     setCartItems(prev => {
       const existingIdx = prev.findIndex(ci =>
         ci.dishId === item.id &&
-        ci.variationLabel === chosenVar.label &&
+        ci.variationLabel === resolvedVarLabel &&
         (ci.comments || '') === (comments.trim() || '') &&
         JSON.stringify([...(ci.sides || [])].sort()) === JSON.stringify([...sides].sort())
       );
@@ -261,7 +276,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
         id: `${item.id}-${chosenVar.id || 'v0'}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
         dishId: item.id,
         name: item.name,
-        variationLabel: chosenVar.label,
+        variationLabel: resolvedVarLabel,
         price: chosenVar.price,
         quantity: qty,
         sides: [...sides],
@@ -1198,7 +1213,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
             </h2>
             <div className="space-y-4">
               <p className="text-xl font-black text-primary-500 italic tracking-tight">
-                ¡¡¡Donde todo, bien todo rico!!!
+                ¡Donde todo, bien, todo rico!
               </p>
               <p className="text-base text-gray-500 dark:text-gray-400 leading-relaxed">
                 En Tlayoyos 3 Marías, cada ingrediente es seleccionado cuidadosamente de productores locales para garantizar la frescura y el sabor auténtico que nos ha caracterizado por generaciones.
@@ -1283,57 +1298,167 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                         </p>
 
                         {/* Interactive Variation Selector */}
-                        <div className="space-y-2 mb-6">
-                          <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400">
-                            <span>Variantes:</span>
-                            {activeVariation && (
-                              <span className="text-primary-600 dark:text-primary-400 font-bold">
-                                Seleccionada: {activeVariation.label}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {item.variations.map(v => {
-                              const isSelected = activeVariation?.id === v.id;
-                              return (
-                                <button
-                                  key={v.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedVariationsByDish(prev => ({ ...prev, [item.id]: v }));
-                                    soundManager.play('click');
-                                  }}
-                                  title={`Seleccionar variante ${v.label} ($${v.price})`}
-                                  className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer border ${isSelected
-                                    ? 'bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/25 ring-2 ring-primary-500/30 dark:ring-primary-400/40 scale-105'
-                                    : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-primary-400 dark:hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-300'
+                        {isTlayoyoDish(item) ? (() => {
+                          const sel = pendingTlayoyoSel[item.id] || DEFAULT_TLAYOYO_SELECTION;
+                          return (
+                            <div className="space-y-3 mb-6">
+                              <div className="space-y-1.5">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400 block">
+                                  Salsa(s):
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {TLAYOYO_SALSAS.map((salsa) => {
+                                    const isSelected = sel.salsaMode !== 'sin' && sel.salsas.includes(salsa);
+                                    return (
+                                      <button
+                                        key={salsa}
+                                        type="button"
+                                        onClick={() => {
+                                          setPendingTlayoyoSel(prev => ({
+                                            ...prev,
+                                            [item.id]: toggleTlayoyoSalsa(prev[item.id], salsa)
+                                          }));
+                                          soundManager.play('click');
+                                        }}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border ${isSelected
+                                          ? 'bg-primary-500 text-white border-primary-500 shadow-sm'
+                                          : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-primary-400'
+                                        }`}
+                                      >
+                                        <span>{salsa}</span>
+                                        {isSelected && <Check className="w-3 h-3 text-white stroke-[3]" />}
+                                      </button>
+                                    );
+                                  })}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPendingTlayoyoSel(prev => ({
+                                        ...prev,
+                                        [item.id]: toggleTlayoyoSalsaAparte(prev[item.id])
+                                      }));
+                                      soundManager.play('click');
+                                    }}
+                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border ${sel.salsaMode === 'aparte'
+                                      ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                                      : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-amber-400'
                                     }`}
-                                >
-                                  <span className={`text-[10px] font-black uppercase tracking-wider ${isSelected ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`}>
-                                    {v.label}
-                                  </span>
-                                  <span className={`font-black ${isSelected ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
-                                    ${v.price.toFixed(2)}
-                                  </span>
-                                  {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
-                                </button>
-                              );
-                            })}
+                                  >
+                                    <span>Aparte</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPendingTlayoyoSel(prev => ({
+                                        ...prev,
+                                        [item.id]: setTlayoyoSinSalsa(prev[item.id])
+                                      }));
+                                      soundManager.play('click');
+                                    }}
+                                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border ${sel.salsaMode === 'sin'
+                                      ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white shadow-sm'
+                                      : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-gray-400'
+                                    }`}
+                                  >
+                                    <span>Sin salsa</span>
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400 block">
+                                  Queso:
+                                </span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {TLAYOYO_CHEESE_OPTIONS.map((cheeseOpt) => {
+                                    const isSelected = sel.cheese === cheeseOpt;
+                                    return (
+                                      <button
+                                        key={cheeseOpt}
+                                        type="button"
+                                        onClick={() => {
+                                          setPendingTlayoyoSel(prev => ({
+                                            ...prev,
+                                            [item.id]: { ...(prev[item.id] || DEFAULT_TLAYOYO_SELECTION), cheese: cheeseOpt }
+                                          }));
+                                          soundManager.play('click');
+                                        }}
+                                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border ${isSelected
+                                          ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white shadow-sm'
+                                          : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-primary-400'
+                                        }`}
+                                      >
+                                        <span>{cheeseOpt}</span>
+                                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })() : (
+                          <div className="space-y-2 mb-6">
+                            <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400">
+                              <span>Variantes:</span>
+                              {activeVariation && (
+                                <span className="text-primary-600 dark:text-primary-400 font-bold">
+                                  Seleccionada: {activeVariation.label}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {item.variations.map(v => {
+                                const isSelected = activeVariation?.id === v.id;
+                                return (
+                                  <button
+                                    key={v.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedVariationsByDish(prev => ({ ...prev, [item.id]: v }));
+                                      soundManager.play('click');
+                                    }}
+                                    title={`Seleccionar variante ${v.label} ($${v.price})`}
+                                    className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all duration-200 cursor-pointer border ${isSelected
+                                      ? 'bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/25 ring-2 ring-primary-500/30 dark:ring-primary-400/40 scale-105'
+                                      : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-primary-400 dark:hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-300'
+                                      }`}
+                                  >
+                                    <span className={`text-[10px] font-black uppercase tracking-wider ${isSelected ? 'text-white' : 'text-gray-500 dark:text-gray-400'}`}>
+                                      {v.label}
+                                    </span>
+                                    <span className={`font-black ${isSelected ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
+                                      ${v.price.toFixed(2)}
+                                    </span>
+                                    {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
 
                       <button
                         onClick={() => {
                           const chosenVar = activeVariation || item.variations[0];
-                          handleAddDishToCart(item, chosenVar);
+                          const resolvedVar = isTlayoyoDish(item)
+                            ? { ...chosenVar, label: formatTlayoyoVariationLabel(pendingTlayoyoSel[item.id]) }
+                            : chosenVar;
+                          handleAddDishToCart(item, resolvedVar);
                           setOrderStep(1);
                           setIsOrderModalOpen(true);
                         }}
                         className="w-full py-3.5 sm:py-4 bg-gray-50 dark:bg-gray-800 hover:bg-primary-500 hover:text-white dark:hover:bg-primary-500 text-gray-700 dark:text-gray-200 rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 hover:border-primary-500 dark:hover:border-primary-500 cursor-pointer shadow-sm active:scale-98 group/btn"
                       >
                         <Plus className="w-4 h-4 text-primary-500 dark:text-primary-400 group-hover/btn:text-white transition-colors" />
-                        <span>Ordenar {activeVariation ? `(${activeVariation.label})` : 'Ahora'}</span>
+                        <span>
+                          {isTlayoyoDish(item)
+                            ? `Ordenar (${formatTlayoyoVariationLabel(pendingTlayoyoSel[item.id])})`
+                            : `Ordenar ${activeVariation ? `(${activeVariation.label})` : 'Ahora'}`}
+                        </span>
                       </button>
                     </div>
                   );
@@ -1863,32 +1988,132 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                               </div>
 
                               {/* Variations */}
-                              <div className="space-y-1.5">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400 block">
-                                  Variante:
-                                </span>
-                                <div className="flex flex-wrap gap-2">
-                                  {item.variations.map(v => {
-                                    const isSelected = currentVar?.id === v.id;
-                                    return (
-                                      <button
-                                        key={v.id}
-                                        type="button"
-                                        onClick={() => setPendingDishVariation(prev => ({ ...prev, [item.id]: v }))}
-                                        className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all cursor-pointer ${
-                                          isSelected
-                                            ? 'bg-primary-500 text-white border-primary-500 shadow-sm ring-2 ring-primary-500/30'
-                                            : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-primary-400'
-                                        }`}
-                                      >
-                                        <span>{v.label}</span>
-                                        <span className={isSelected ? 'text-white' : 'text-gray-900 dark:text-white'}>${v.price}</span>
-                                        {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
-                                      </button>
-                                    );
-                                  })}
+                              {isTlayoyoDish(item) ? (() => {
+                                const sel = pendingTlayoyoSel[item.id] || DEFAULT_TLAYOYO_SELECTION;
+                                return (
+                                  <div className="space-y-3">
+                                    <div className="space-y-1.5">
+                                      <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400 block">
+                                        1. Salsa(s):
+                                      </span>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {TLAYOYO_SALSAS.map((salsa) => {
+                                          const isSelected = sel.salsaMode !== 'sin' && sel.salsas.includes(salsa);
+                                          return (
+                                            <button
+                                              key={salsa}
+                                              type="button"
+                                              onClick={() => setPendingTlayoyoSel(prev => ({
+                                                ...prev,
+                                                [item.id]: toggleTlayoyoSalsa(prev[item.id], salsa)
+                                              }))}
+                                              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all cursor-pointer ${
+                                                isSelected
+                                                  ? 'bg-primary-500 text-white border-primary-500 shadow-sm'
+                                                  : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-primary-400'
+                                              }`}
+                                            >
+                                              <span>{salsa}</span>
+                                              {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                                            </button>
+                                          );
+                                        })}
+
+                                        <button
+                                          type="button"
+                                          onClick={() => setPendingTlayoyoSel(prev => ({
+                                            ...prev,
+                                            [item.id]: toggleTlayoyoSalsaAparte(prev[item.id])
+                                          }))}
+                                          className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all cursor-pointer ${
+                                            sel.salsaMode === 'aparte'
+                                              ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                                              : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-amber-400'
+                                          }`}
+                                        >
+                                          <span>Aparte</span>
+                                        </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => setPendingTlayoyoSel(prev => ({
+                                            ...prev,
+                                            [item.id]: setTlayoyoSinSalsa(prev[item.id])
+                                          }))}
+                                          className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all cursor-pointer ${
+                                            sel.salsaMode === 'sin'
+                                              ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white shadow-sm'
+                                              : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-gray-400'
+                                          }`}
+                                        >
+                                          <span>Sin salsa</span>
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400">
+                                          2. Queso:
+                                        </span>
+                                        <span className="text-xs font-black text-primary-500 tabular-nums">
+                                          ${(currentVar?.price ?? 10).toFixed(2)} c/u
+                                        </span>
+                                      </div>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {TLAYOYO_CHEESE_OPTIONS.map((cheeseOpt) => {
+                                          const isSelected = sel.cheese === cheeseOpt;
+                                          return (
+                                            <button
+                                              key={cheeseOpt}
+                                              type="button"
+                                              onClick={() => setPendingTlayoyoSel(prev => ({
+                                                ...prev,
+                                                [item.id]: { ...(prev[item.id] || DEFAULT_TLAYOYO_SELECTION), cheese: cheeseOpt }
+                                              }))}
+                                              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all cursor-pointer ${
+                                                isSelected
+                                                  ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white shadow-sm'
+                                                  : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-primary-400'
+                                              }`}
+                                            >
+                                              <span>{cheeseOpt}</span>
+                                              {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })() : (
+                                <div className="space-y-1.5">
+                                  <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400 block">
+                                    Variante:
+                                  </span>
+                                  <div className="flex flex-wrap gap-2">
+                                    {item.variations.map(v => {
+                                      const isSelected = currentVar?.id === v.id;
+                                      return (
+                                        <button
+                                          key={v.id}
+                                          type="button"
+                                          onClick={() => setPendingDishVariation(prev => ({ ...prev, [item.id]: v }))}
+                                          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all cursor-pointer ${
+                                            isSelected
+                                              ? 'bg-primary-500 text-white border-primary-500 shadow-sm ring-2 ring-primary-500/30'
+                                              : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-primary-400'
+                                          }`}
+                                        >
+                                          <span>{v.label}</span>
+                                          <span className={isSelected ? 'text-white' : 'text-gray-900 dark:text-white'}>${v.price}</span>
+                                          {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
-                              </div>
+                              )}
 
                               {/* Free Sides */}
                               {availableSides.length > 0 && isDishSidesEnabled(item) && (

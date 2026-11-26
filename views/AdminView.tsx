@@ -12,7 +12,7 @@ import {
   Monitor, Maximize2, Bell, Truck, UserMinus, Navigation, ShieldCheck, Layers,
   History, Wallet, ArrowUpRight, Store, Utensils, Zap, Save, UserCheck, Scan, Shield, Sun, Moon,
   ArrowUp, ArrowDown, Move, MessageCircle, Copy,
-  Landmark, HandCoins, FileText, BadgePercent
+  Landmark, HandCoins, FileText, BadgePercent, Eye, UtensilsCrossed
 } from 'lucide-react';
 import { MenuItem, Category, TabId, Order, OrderItem, OrderStatus, Customer, CustomerCreditMovement, AdminSection, DeliveryDriver, VehicleType, PaymentMethod, PaymentStatus, TransferStatus, Staff, StaffRole, SiteLog, PayrollEntry, Loan, EnabledModules } from '../types';
 import { soundManager, AudioAction } from '../utils/soundManager';
@@ -29,6 +29,17 @@ import { PayrollSection } from '../components/PayrollSection';
 import { useMobileBack } from '../hooks/useMobileBack';
 import { notificationService } from '../services/notificationService';
 import { CustomerAvatar } from '../components/CustomerAvatar';
+import {
+  TLAYOYO_SALSAS,
+  TLAYOYO_CHEESE_OPTIONS,
+  DEFAULT_TLAYOYO_SELECTION,
+  TlayoyoSelection,
+  isTlayoyoDish,
+  toggleTlayoyoSalsa,
+  toggleTlayoyoSalsaAparte,
+  setTlayoyoSinSalsa,
+  formatTlayoyoVariationLabel
+} from '../utils/tlayoyoConfig';
 
 interface AdminViewProps {
   categories: Category[];
@@ -188,6 +199,7 @@ export default function AdminView({
   const [tpvAddress, setTpvAddress] = useState('');
   const [tpvDeliveryType, setTpvDeliveryType] = useState<'store' | 'table' | 'delivery'>('store');
   const [tpvWaiterId, setTpvWaiterId] = useState<string | null>(null);
+  const [tpvTlayoyoSel, setTpvTlayoyoSel] = useState<Record<string, TlayoyoSelection>>({});
   const [visibleItemsCount, setVisibleItemsCount] = useState(6);
 
   // Orders Management & Search / Filter States
@@ -284,8 +296,15 @@ export default function AdminView({
   const [cargoAmount, setCargoAmount] = useState('');
   const [cargoReason, setCargoReason] = useState('');
 
-  // Reordering State
+  // Reordering & Menu Editor UI State
   const [isReordering, setIsReordering] = useState(false);
+  const [menuSearch, setMenuSearch] = useState('');
+  const [menuStatusFilter, setMenuStatusFilter] = useState<'all' | 'active' | 'hidden'>('all');
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null);
+  const [newlyCreatedItemId, setNewlyCreatedItemId] = useState<string | null>(null);
+  const [menuExpandSignal, setMenuExpandSignal] = useState<{ expanded: boolean; nonce: number } | null>(null);
 
   // Sounds & Real-time Badges logic
   const prevCounts = React.useRef({ kds: 0, dds: 0, local: 0 });
@@ -623,6 +642,9 @@ export default function AdminView({
       allowSides: !isSidesCategory && !isDrinkOrDessert && !isCaldos
     };
     setMenuItems(prev => [...prev, newItem]);
+    setNewlyCreatedItemId(newItem.id);
+    setMenuSearch('');
+    setMenuStatusFilter('all');
     addNotification('Nuevo platillo añadido');
     recordLog('Menú Modificado', `Se añadió el producto "${newItem.name}" a la categoría ${activeCategoryName}`, 'info');
   };
@@ -4570,9 +4592,10 @@ export default function AdminView({
 
     const cartTotal = tpvCart.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
 
-    const addToCart = (item: MenuItem, variationIdx: number) => {
+    const addToCart = (item: MenuItem, variationIdx: number, customLabel?: string) => {
       const variation = item.variations[variationIdx];
-      const cartItemId = `${item.id}-${variation.id}`;
+      const finalLabel = customLabel || variation.label;
+      const cartItemId = customLabel ? `${item.id}-${variation.id}-${customLabel}` : `${item.id}-${variation.id}`;
 
       setTpvCart(prev => {
         const existing = prev.find(i => i.id === cartItemId);
@@ -4582,13 +4605,13 @@ export default function AdminView({
         return [...prev, {
           id: cartItemId,
           name: item.name,
-          variationLabel: variation.label,
+          variationLabel: finalLabel,
           price: variation.price,
           quantity: 1
         }];
       });
       playUISound('click');
-      addNotification(`${item.name} (${variation.label}) añadido`, 'success');
+      addNotification(`${item.name} (${finalLabel}) añadido`, 'success');
     };
 
     const createTPVOrder = () => {
@@ -4722,25 +4745,132 @@ export default function AdminView({
                   return i.categoryId !== 'cat-1' && i.categoryId !== 'cat-2' && i.categoryId !== 'cat-desayunos';
                 }
                 return i.categoryId === activeTab;
-              }).slice(0, visibleItemsCount).map(item => (
-                <div key={item.id} className="bg-gray-50 dark:bg-gray-900/50 rounded-[32px] p-6 border border-transparent hover:border-primary-500 transition-all group">
-                  <h5 className="font-black text-gray-900 dark:text-white uppercase tracking-tight mb-2 truncate">{item.name}</h5>
-                  <p className="text-[10px] text-gray-400 font-bold uppercase line-clamp-2 mb-4 h-8">{item.description}</p>
+              }).slice(0, visibleItemsCount).map(item => {
+                if (isTlayoyoDish(item)) {
+                  const sel = tpvTlayoyoSel[item.id] || DEFAULT_TLAYOYO_SELECTION;
+                  const basePrice = item.variations[0]?.price ?? 10;
+                  return (
+                    <div key={item.id} className="bg-gray-50 dark:bg-gray-900/50 rounded-[32px] p-6 border border-transparent hover:border-primary-500 transition-all group space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <h5 className="font-black text-gray-900 dark:text-white uppercase tracking-tight truncate">{item.name}</h5>
+                        <span className="text-xs font-black text-primary-500 shrink-0">${basePrice.toFixed(2)}</span>
+                      </div>
 
-                  <div className="space-y-2">
-                    {item.variations.map((v, idx) => (
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1.5">Salsa(s):</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {TLAYOYO_SALSAS.map(salsa => {
+                            const isSelected = sel.salsaMode !== 'sin' && sel.salsas.includes(salsa);
+                            return (
+                              <button
+                                key={salsa}
+                                type="button"
+                                onClick={() => setTpvTlayoyoSel(prev => ({
+                                  ...prev,
+                                  [item.id]: toggleTlayoyoSalsa(prev[item.id], salsa)
+                                }))}
+                                className={`py-1.5 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-primary-500 text-white shadow-sm'
+                                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                                }`}
+                              >
+                                {salsa}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => setTpvTlayoyoSel(prev => ({
+                              ...prev,
+                              [item.id]: toggleTlayoyoSalsaAparte(prev[item.id])
+                            }))}
+                            className={`py-1.5 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                              sel.salsaMode === 'aparte'
+                                ? 'bg-amber-500 text-white shadow-sm'
+                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                            }`}
+                          >
+                            Aparte
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTpvTlayoyoSel(prev => ({
+                              ...prev,
+                              [item.id]: setTlayoyoSinSalsa(prev[item.id])
+                            }))}
+                            className={`py-1.5 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                              sel.salsaMode === 'sin'
+                                ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
+                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                            }`}
+                          >
+                            Sin salsa
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1.5">Queso:</span>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {TLAYOYO_CHEESE_OPTIONS.map(opt => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => setTpvTlayoyoSel(prev => ({
+                                ...prev,
+                                [item.id]: { ...(prev[item.id] || DEFAULT_TLAYOYO_SELECTION), cheese: opt }
+                              }))}
+                              className={`py-1.5 px-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer truncate ${
+                                sel.cheese === opt
+                                  ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
+                                  : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                              }`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       <button
-                        key={v.id}
-                        onClick={() => { playUISound('click'); addToCart(item, idx); }}
-                        className="w-full flex justify-between items-center p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 hover:bg-primary-500 dark:hover:bg-primary-500 hover:text-white dark:hover:text-white hover:border-primary-500 dark:hover:border-primary-500 transition-all group"
+                        type="button"
+                        onClick={() => {
+                          playUISound('click');
+                          addToCart(item, 0, formatTlayoyoVariationLabel(sel));
+                        }}
+                        className="w-full flex justify-between items-center p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 hover:bg-primary-500 dark:hover:bg-primary-500 hover:text-white dark:hover:text-white hover:border-primary-500 dark:hover:border-primary-500 transition-all group cursor-pointer"
                       >
-                        <span className="text-[10px] font-black uppercase tracking-widest">{v.label}</span>
-                        <span className="text-xs font-black">${v.price.toFixed(2)}</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest">+ Agregar pieza</span>
+                        <span className="text-xs font-black">${basePrice.toFixed(2)}</span>
                       </button>
-                    ))}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={item.id} className="bg-gray-50 dark:bg-gray-900/50 rounded-[32px] p-6 border border-transparent hover:border-primary-500 transition-all group">
+                    <h5 className="font-black text-gray-900 dark:text-white uppercase tracking-tight mb-2 truncate">{item.name}</h5>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase line-clamp-2 mb-4 h-8">{item.description}</p>
+
+                    <div className="space-y-2">
+                      {item.variations.map((v, idx) => (
+                        <button
+                          key={v.id}
+                          onClick={() => {
+                            playUISound('click');
+                            addToCart(item, idx);
+                          }}
+                          className="w-full flex justify-between items-center p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 hover:bg-primary-500 dark:hover:bg-primary-500 hover:text-white dark:hover:text-white hover:border-primary-500 dark:hover:border-primary-500 transition-all group cursor-pointer"
+                        >
+                          <span className="text-[10px] font-black uppercase tracking-widest">{v.label}</span>
+                          <span className="text-xs font-black">${v.price.toFixed(2)}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {filteredItems.filter(i => {
@@ -4941,7 +5071,11 @@ export default function AdminView({
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F8FAFC] dark:bg-[#020617] transition-colors duration-300 font-sans">
+    <div className={`flex h-screen overflow-hidden transition-colors duration-300 font-sans ${
+      activeSection === 'menu'
+        ? 'bg-[#FDFBFC] dark:bg-[#110a10]'
+        : 'bg-[#F8FAFC] dark:bg-[#020617]'
+    }`}>
       <div className="fixed top-8 right-8 z-[500] flex flex-col gap-4 pointer-events-none">
         {notifications.map(n => (
           <div key={n.id} className="pointer-events-auto flex items-center gap-4 px-6 py-5 rounded-3xl bg-white dark:bg-gray-800 shadow-2xl border border-gray-100 dark:border-gray-700 animate-in slide-in-from-right fade-in duration-500 min-w-[320px]">
@@ -4991,7 +5125,7 @@ export default function AdminView({
           backButtonBadge={(activeSection === 'orders' || activeSection === 'menu') ? 'Vista Básica' : undefined}
           sectionBadge={
             activeSection === 'orders' ? 'Control de Pedidos' :
-            activeSection === 'menu' ? 'Catálogo & Precios' : undefined
+            activeSection === 'menu' ? 'Catálogo y precios' : undefined
           }
           isDarkMode={isDarkMode}
           toggleDarkMode={() => setIsDarkMode(!isDarkMode)}
@@ -5011,7 +5145,11 @@ export default function AdminView({
           }
         />
 
-        <div className="flex-1 overflow-y-auto p-3 sm:p-6 md:p-10 custom-scrollbar bg-[#F8FAFC] dark:bg-gray-950/20 relative">
+        <div className={`flex-1 overflow-y-auto custom-scrollbar relative ${
+          activeSection === 'menu'
+            ? 'p-4 sm:p-6 md:p-8 bg-[#FDFBFC] dark:bg-[#110a10]'
+            : 'p-3 sm:p-6 md:p-10 bg-[#F8FAFC] dark:bg-gray-950/20'
+        }`}>
           <div className="mx-auto h-full">
             {activeSection === 'dashboard' && renderDashboard()}
             {activeSection === 'tpv' && renderTPVSection()}
@@ -5059,89 +5197,428 @@ export default function AdminView({
             {renderFoundCustomerModal()}
             {renderDeleteCustomerConfirmModal()}
             {renderCustomerOrdersModal()}
-            {activeSection === 'menu' && (
-              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex items-center justify-between mb-4 gap-2">
-                  <button
-                    type="button"
-                    onClick={onExit}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary-50 hover:bg-primary-100 dark:bg-primary-950/40 dark:hover:bg-primary-900/50 text-primary-700 dark:text-primary-300 text-xs font-bold transition-all cursor-pointer shadow-sm active:scale-95 border border-primary-200/50 dark:border-primary-800/40"
-                    title="Regresar al Panel de Control (Vista Básica)"
-                  >
-                    <ArrowLeft className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" />
-                    <span>Volver al Panel</span>
-                  </button>
+            {activeSection === 'menu' && (() => {
+              const categoryCounts = categories.reduce<Record<string, number>>((acc, cat) => {
+                acc[cat.id] = menuItems.filter((item) =>
+                  cat.id === 'cat-3'
+                    ? item.categoryId !== 'cat-1' && item.categoryId !== 'cat-2'
+                    : item.categoryId === cat.id
+                ).length;
+                return acc;
+              }, {});
 
-                  <button
-                    onClick={() => { setIsReordering(!isReordering); playUISound(isReordering ? 'click' : 'navigation'); }}
-                    className={`flex items-center gap-2 px-4 sm:px-6 py-2 sm:py-3 rounded-full font-bold uppercase text-[10px] tracking-widest transition-all cursor-pointer ${isReordering ? 'bg-primary-500 text-white shadow-lg shadow-primary-500/30 ring-2 ring-offset-2 ring-primary-500' : 'bg-white dark:bg-gray-800 text-gray-500 hover:bg-gray-100 hover:text-primary-500'}`}
-                  >
-                    <Move className="w-4 h-4" />
-                    {isReordering ? 'Terminar Orden' : 'Organizar Menú'}
-                  </button>
-                </div>
+              const categoryItems = menuItems.filter((item) => {
+                if (activeTab === 'cat-3') {
+                  return item.categoryId !== 'cat-1' && item.categoryId !== 'cat-2';
+                }
+                return item.categoryId === activeTab;
+              });
 
-                <CategoryTabs
-                  activeTab={activeTab}
-                  setActiveTab={setActiveTab}
-                  categories={categories}
-                  onAddCategory={() => {
-                    const name = prompt('Nueva categoría:');
-                    if (name) { setCategories([...categories, { id: `cat-${Date.now()}`, name }]); addNotification(`Categoría creada`); }
-                  }}
-                  isReordering={isReordering}
-                  onMoveCategory={moveCategory}
-                  onDeleteCategory={(id) => {
-                    if (confirm('¿Eliminar categoría? Los productos no se borrarán pero quedarán sin categoría visible.')) {
-                      setCategories(prev => prev.filter(c => c.id !== id));
-                      addNotification('Categoría eliminada');
-                    }
-                  }}
-                />
+              const normalizedQuery = menuSearch.trim().toLowerCase();
+              const isFiltering = Boolean(normalizedQuery) || menuStatusFilter !== 'all';
 
-                <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
-                  <h3 className="text-4xl font-black text-gray-900 dark:text-white tracking-tighter uppercase">{activeCategoryName}</h3>
-                  <button onClick={addItem} disabled={isReordering} className="flex items-center justify-center bg-gray-900 dark:bg-primary-500 text-white px-8 py-4 rounded-3xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl disabled:opacity-50 disabled:scale-100">
-                    <Plus className="w-5 h-5 mr-3" /> Nuevo Platillo
-                  </button>
-                </div>
-                <div className="space-y-8 pb-32">
-                  {menuItems.filter(item => {
-                    if (activeTab === 'cat-3') {
-                      return item.categoryId !== 'cat-1' && item.categoryId !== 'cat-2';
-                    }
-                    return item.categoryId === activeTab;
-                  }).map((item, idx, arr) => (
-                    <div key={item.id} className={`relative transition-all duration-300 ${isReordering ? 'scale-[0.98] ring-2 ring-primary-500/30 rounded-[32px]' : ''}`}>
-                      <MenuItemCard item={item} onUpdate={it => setMenuItems(prev => prev.map(m => m.id === it.id ? it : m))} onDelete={() => { if (confirm('¿Eliminar?')) { setMenuItems(prev => prev.filter(m => m.id !== item.id)); addNotification('Eliminado'); } }} />
+              const displayedItems = categoryItems.filter((item) => {
+                const matchesStatus =
+                  menuStatusFilter === 'all' ||
+                  (menuStatusFilter === 'active' && item.isActive) ||
+                  (menuStatusFilter === 'hidden' && !item.isActive);
+                const matchesSearch =
+                  !normalizedQuery ||
+                  item.name.toLowerCase().includes(normalizedQuery) ||
+                  (item.description || '').toLowerCase().includes(normalizedQuery) ||
+                  item.variations.some((v) => v.label.toLowerCase().includes(normalizedQuery));
+                return matchesStatus && matchesSearch;
+              });
 
-                      {isReordering && (
-                        <div className="absolute -right-4 top-1/2 -translate-y-1/2 flex flex-col gap-2 z-20">
-                          <button
-                            onClick={() => moveMenuItem(item.id, 'up')}
-                            disabled={idx === 0}
-                            title="Mover arriba"
-                            aria-label="Mover platillo arriba"
-                            className="w-12 h-12 flex items-center justify-center bg-white dark:bg-gray-800 text-gray-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-full shadow-lg border border-gray-100 dark:border-gray-700 transition-all disabled:opacity-30 disabled:scale-90"
-                          >
-                            <ArrowUp className="w-6 h-6" />
-                          </button>
-                          <button
-                            onClick={() => moveMenuItem(item.id, 'down')}
-                            disabled={idx === arr.length - 1}
-                            title="Mover abajo"
-                            aria-label="Mover platillo abajo"
-                            className="w-12 h-12 flex items-center justify-center bg-white dark:bg-gray-800 text-gray-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 rounded-full shadow-lg border border-gray-100 dark:border-gray-700 transition-all disabled:opacity-30 disabled:scale-90"
-                          >
-                            <ArrowDown className="w-6 h-6" />
-                          </button>
-                        </div>
+              const visibleTotalCount = menuItems.filter((m) => m.isActive).length;
+              const categoryVisibleCount = categoryItems.filter((m) => m.isActive).length;
+
+              const handleCreateCategory = (e: React.FormEvent) => {
+                e.preventDefault();
+                const trimmed = newCategoryName.trim();
+                if (!trimmed) return;
+                const newCatId = `cat-${Date.now()}`;
+                setCategories((prev) => [...prev, { id: newCatId, name: trimmed }]);
+                setActiveTab(newCatId);
+                setNewCategoryName('');
+                setIsAddingCategory(false);
+                playUISound('click');
+                addNotification(`Categoría "${trimmed}" creada`);
+                recordLog('Menú Modificado', `Se creó la categoría "${trimmed}"`, 'success');
+              };
+
+              return (
+                <div className="max-w-6xl mx-auto animate-in fade-in duration-300 pb-28 md:pb-14">
+                  {/* Editorial Intro & Primary Desktop Actions */}
+                  <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-5 mb-6">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-600 dark:text-primary-400">
+                        Carta y precios
+                      </p>
+                      <h3 className="text-3xl sm:text-4xl font-black text-gray-900 dark:text-white tracking-tight mt-1">
+                        Editor de <span className="font-serif italic font-medium text-primary-500">Menú</span>
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1.5 tabular-nums">
+                        {menuItems.length} platillos en total · {visibleTotalCount} visibles · {categories.length} categorías
+                      </p>
+                    </div>
+
+                    <div className="hidden md:flex items-center gap-2.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuExpandSignal((prev) => ({
+                            expanded: prev ? !prev.expanded : false,
+                            nonce: Date.now()
+                          }));
+                          playUISound('click');
+                        }}
+                        className="min-h-[44px] px-4 rounded-2xl bg-white dark:bg-[#1a1118] border border-gray-200/80 dark:border-white/10 text-gray-700 dark:text-gray-200 hover:border-gray-300 dark:hover:border-white/20 text-xs font-bold inline-flex items-center gap-2 transition-colors cursor-pointer"
+                      >
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                        <span>{menuExpandSignal?.expanded === false ? 'Expandir todo' : 'Contraer todo'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsReordering(!isReordering);
+                          playUISound(isReordering ? 'click' : 'navigation');
+                        }}
+                        className={`min-h-[44px] px-4 rounded-2xl text-xs font-bold inline-flex items-center gap-2 transition-all cursor-pointer active:scale-95 ${
+                          isReordering
+                            ? 'bg-primary-50 dark:bg-primary-950/40 text-primary-700 dark:text-primary-300 border border-primary-400 dark:border-primary-600'
+                            : 'bg-white dark:bg-[#1a1118] border border-gray-200/80 dark:border-white/10 text-gray-700 dark:text-gray-200 hover:border-primary-300 dark:hover:border-primary-500/40'
+                        }`}
+                      >
+                        <Move className="w-4 h-4" />
+                        <span>{isReordering ? 'Terminar orden' : 'Organizar'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={addItem}
+                        disabled={isReordering}
+                        className="min-h-[44px] px-5 rounded-2xl bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold inline-flex items-center gap-2 shadow-md shadow-primary-500/20 transition-all cursor-pointer active:scale-95 disabled:opacity-50 disabled:pointer-events-none"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>Nuevo Platillo</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Unified Search & Visibility Filter Bar */}
+                  <div className="flex flex-col sm:flex-row gap-3 mb-5">
+                    <div className="relative flex-1">
+                      <Search className="w-4 h-4 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={menuSearch}
+                        onChange={(e) => setMenuSearch(e.target.value)}
+                        placeholder={`Buscar en ${activeCategoryName}...`}
+                        className="w-full min-h-[46px] pl-11 pr-10 rounded-2xl bg-white dark:bg-[#1a1118] border border-gray-200/80 dark:border-white/10 text-sm text-gray-900 dark:text-white placeholder:text-gray-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/15 outline-none transition-all"
+                      />
+                      {menuSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setMenuSearch('')}
+                          aria-label="Limpiar búsqueda"
+                          className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 absolute right-1.5 top-1/2 -translate-y-1/2 cursor-pointer"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
                       )}
                     </div>
-                  ))}
+
+                    <div
+                      className="inline-flex p-1 rounded-2xl bg-gray-100/90 dark:bg-[#1a1118] border border-gray-200/70 dark:border-white/10 shrink-0"
+                      role="group"
+                      aria-label="Filtrar platillos por visibilidad"
+                    >
+                      {([
+                        { id: 'all', label: 'Todos' },
+                        { id: 'active', label: 'Visibles' },
+                        { id: 'hidden', label: 'Ocultos' }
+                      ] as const).map((filterOption) => {
+                        const isSelected = menuStatusFilter === filterOption.id;
+                        return (
+                          <button
+                            key={filterOption.id}
+                            type="button"
+                            onClick={() => {
+                              setMenuStatusFilter(filterOption.id);
+                              playUISound('click');
+                            }}
+                            className={`flex-1 sm:flex-initial min-h-[38px] px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              isSelected
+                                ? 'bg-white dark:bg-[#2a1c26] text-gray-900 dark:text-white shadow-sm'
+                                : 'text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                            }`}
+                          >
+                            {filterOption.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Category Tabs Rail */}
+                  <div className="mb-5">
+                    <CategoryTabs
+                      activeTab={activeTab}
+                      setActiveTab={(id) => {
+                        setActiveTab(id);
+                        setCategoryToDelete(null);
+                      }}
+                      categories={categories}
+                      categoryCounts={categoryCounts}
+                      onAddCategory={() => {
+                        setIsAddingCategory((prev) => !prev);
+                        setCategoryToDelete(null);
+                      }}
+                      isReordering={isReordering}
+                      onMoveCategory={moveCategory}
+                      onDeleteCategory={(id) => {
+                        const found = categories.find((c) => c.id === id);
+                        if (found) setCategoryToDelete(found);
+                      }}
+                    />
+
+                    {/* Inline New Category Creator (no browser prompt) */}
+                    {isAddingCategory && (
+                      <form
+                        onSubmit={handleCreateCategory}
+                        className="mt-3 p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-[#1a1118] border border-primary-300/70 dark:border-primary-800/50 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 animate-in fade-in slide-in-from-top-2 duration-200"
+                      >
+                        <input
+                          type="text"
+                          autoFocus
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          placeholder="Nombre de la nueva categoría (ej. Antojitos)"
+                          className="flex-1 min-h-[44px] px-4 rounded-xl bg-[#FDFBFC] dark:bg-[#110a10] border border-gray-200 dark:border-white/10 text-sm font-medium text-gray-900 dark:text-white focus:border-primary-500 outline-none"
+                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsAddingCategory(false);
+                              setNewCategoryName('');
+                            }}
+                            className="flex-1 sm:flex-initial min-h-[44px] px-4 rounded-xl bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-gray-200 text-xs font-bold cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="submit"
+                            disabled={!newCategoryName.trim()}
+                            className="flex-1 sm:flex-initial min-h-[44px] px-5 rounded-xl bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold disabled:opacity-40 cursor-pointer"
+                          >
+                            Guardar categoría
+                          </button>
+                        </div>
+                      </form>
+                    )}
+
+                    {/* Inline Delete Category Confirmation (no browser confirm) */}
+                    {categoryToDelete && (
+                      <div className="mt-3 p-4 rounded-2xl bg-red-50/90 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
+                        <div className="text-sm text-red-900 dark:text-red-200">
+                          <p className="font-bold">
+                            ¿Eliminar la categoría «{categoryToDelete.name}»?
+                          </p>
+                          <p className="text-xs opacity-80 mt-0.5">
+                            Los platillos se conservarán en el catálogo general.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setCategoryToDelete(null)}
+                            className="min-h-[42px] px-4 rounded-xl bg-white dark:bg-[#1a1118] border border-gray-200 dark:border-white/10 text-xs font-bold text-gray-700 dark:text-gray-200 cursor-pointer"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const removedId = categoryToDelete.id;
+                              const removedName = categoryToDelete.name;
+                              setCategories((prev) => {
+                                const next = prev.filter((c) => c.id !== removedId);
+                                if (activeTab === removedId && next[0]) {
+                                  setActiveTab(next[0].id);
+                                }
+                                return next;
+                              });
+                              setCategoryToDelete(null);
+                              addNotification(`Categoría "${removedName}" eliminada`);
+                            }}
+                            className="min-h-[42px] px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold cursor-pointer"
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Active Category Subheader */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-4 px-1">
+                    <div>
+                      <h4 className="text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+                        {activeCategoryName}
+                      </h4>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 tabular-nums mt-0.5">
+                        {isFiltering
+                          ? `Mostrando ${displayedItems.length} de ${categoryItems.length} platillos`
+                          : `${categoryItems.length} platillos · ${categoryVisibleCount} visibles`}
+                      </p>
+                    </div>
+
+                    {isReordering && (
+                      <p className="text-xs font-semibold text-primary-600 dark:text-primary-400">
+                        Usa las flechas para ordenar categorías y platillos
+                      </p>
+                    )}
+
+                    {!isReordering && categoryItems.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMenuExpandSignal((prev) => ({
+                            expanded: prev ? !prev.expanded : true,
+                            nonce: Date.now()
+                          }));
+                          playUISound('click');
+                        }}
+                        className="md:hidden min-h-[38px] px-3 rounded-xl text-xs font-bold text-primary-600 dark:text-primary-400 bg-primary-50/70 dark:bg-primary-950/30 cursor-pointer"
+                      >
+                        {menuExpandSignal?.expanded ? 'Contraer' : 'Expandir'}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dish List */}
+                  {displayedItems.length === 0 ? (
+                    <div className="bg-white dark:bg-[#1a1118] rounded-[28px] border border-gray-200/80 dark:border-white/10 p-10 text-center">
+                      <div className="w-14 h-14 rounded-2xl bg-primary-50 dark:bg-primary-950/40 text-primary-500 flex items-center justify-center mx-auto mb-3">
+                        <UtensilsCrossed className="w-6 h-6" />
+                      </div>
+                      <h5 className="text-base font-bold text-gray-900 dark:text-white">
+                        {isFiltering ? 'No se encontraron platillos' : 'Esta categoría aún no tiene platillos'}
+                      </h5>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 max-w-sm mx-auto">
+                        {isFiltering
+                          ? 'Prueba con otro nombre o limpia los filtros de visibilidad.'
+                          : 'Agrega el primer platillo para que aparezca en tu carta digital.'}
+                      </p>
+                      <div className="mt-5 flex items-center justify-center gap-2.5">
+                        {isFiltering ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuSearch('');
+                              setMenuStatusFilter('all');
+                            }}
+                            className="min-h-[44px] px-5 rounded-2xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-xs font-bold cursor-pointer"
+                          >
+                            Limpiar filtros
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={addItem}
+                            className="min-h-[44px] px-5 rounded-2xl bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold inline-flex items-center gap-2 cursor-pointer"
+                          >
+                            <Plus className="w-4 h-4" />
+                            <span>Nuevo Platillo</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 sm:space-y-4">
+                      {displayedItems.map((item) => {
+                        const categoryIdx = categoryItems.findIndex((c) => c.id === item.id);
+                        return (
+                          <MenuItemCard
+                            key={item.id}
+                            item={item}
+                            isReordering={isReordering}
+                            canMoveUp={categoryIdx > 0}
+                            canMoveDown={categoryIdx < categoryItems.length - 1}
+                            onMoveUp={() => moveMenuItem(item.id, 'up')}
+                            onMoveDown={() => moveMenuItem(item.id, 'down')}
+                            defaultExpanded={newlyCreatedItemId === item.id}
+                            expandSignal={menuExpandSignal}
+                            onUpdate={(it) =>
+                              setMenuItems((prev) => prev.map((m) => (m.id === it.id ? it : m)))
+                            }
+                            onDelete={() => {
+                              setMenuItems((prev) => prev.filter((m) => m.id !== item.id));
+                              addNotification(`"${item.name || 'Platillo'}" eliminado`);
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Android Material-3 Mobile Bottom Dock (Thumb Zone) */}
+                  <nav
+                    aria-label="Acciones rápidas del editor"
+                    className="md:hidden fixed bottom-0 inset-x-0 z-30 h-16 bg-white/95 dark:bg-[#181016]/95 backdrop-blur-xl border-t border-gray-200/80 dark:border-white/10 px-2 flex items-center justify-around"
+                  >
+                    <button
+                      type="button"
+                      onClick={onExit}
+                      className="flex flex-col items-center justify-center gap-0.5 min-w-[64px] min-h-[44px] rounded-2xl text-gray-500 dark:text-gray-400 active:scale-95 transition-transform cursor-pointer"
+                    >
+                      <ArrowLeft className="w-5 h-5" />
+                      <span className="text-[11px] font-semibold">Panel</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsReordering(!isReordering);
+                        playUISound(isReordering ? 'click' : 'navigation');
+                      }}
+                      className={`flex flex-col items-center justify-center gap-0.5 min-w-[64px] min-h-[44px] rounded-2xl px-3 active:scale-95 transition-all cursor-pointer ${
+                        isReordering
+                          ? 'bg-primary-50 dark:bg-primary-950/50 text-primary-600 dark:text-primary-400'
+                          : 'text-gray-500 dark:text-gray-400'
+                      }`}
+                    >
+                      <Move className="w-5 h-5" />
+                      <span className="text-[11px] font-semibold">
+                        {isReordering ? 'Listo' : 'Ordenar'}
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowPreview(true)}
+                      className="flex flex-col items-center justify-center gap-0.5 min-w-[64px] min-h-[44px] rounded-2xl text-gray-500 dark:text-gray-400 active:scale-95 transition-transform cursor-pointer"
+                    >
+                      <Eye className="w-5 h-5" />
+                      <span className="text-[11px] font-semibold">Vista</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      disabled={isReordering}
+                      className="flex items-center justify-center gap-1.5 min-h-[44px] px-4 rounded-2xl bg-primary-500 hover:bg-primary-600 text-white text-xs font-bold shadow-md shadow-primary-500/25 active:scale-95 transition-all disabled:opacity-40 cursor-pointer"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>Nuevo</span>
+                    </button>
+                  </nav>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </div>
         </div>
       </main>

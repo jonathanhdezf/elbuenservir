@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Plus, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { Category, TabId } from '../types';
@@ -7,6 +6,7 @@ interface CategoryTabsProps {
   activeTab: TabId;
   setActiveTab: (id: TabId) => void;
   categories: Category[];
+  categoryCounts?: Record<string, number>;
   onAddCategory?: () => void;
   isReordering?: boolean;
   onMoveCategory?: (index: number, direction: 'left' | 'right') => void;
@@ -17,74 +17,122 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({
   activeTab,
   setActiveTab,
   categories,
+  categoryCounts,
   onAddCategory,
   isReordering = false,
   onMoveCategory,
   onDeleteCategory
 }) => {
   return (
-    <div className="flex items-center space-x-3 mb-10 overflow-x-auto pb-4 scrollbar-hide no-scrollbar -mx-4 px-4 md:mx-0 md:px-0">
-      {categories.map((cat, index) => (
-        <div key={cat.id} className="relative group">
+    <div
+      className="flex items-center gap-2.5 overflow-x-auto pb-2 pt-1 scrollbar-hide no-scrollbar -mx-3 px-3 sm:mx-0 sm:px-0"
+      role="tablist"
+      aria-label="Categorías del menú"
+    >
+      {categories.map((cat, index) => {
+        const isActive = activeTab === cat.id;
+        const count = categoryCounts?.[cat.id];
+
+        return (
           <div
-            onClick={() => !isReordering && setActiveTab(cat.id)}
+            key={cat.id}
             className={`
-              px-6 py-3 rounded-2xl whitespace-nowrap font-semibold transition-all duration-200 border relative overflow-hidden select-none
-              ${activeTab === cat.id
-                ? 'bg-primary-500 text-white border-primary-500 shadow-lg shadow-primary-200 dark:shadow-primary-900/50'
-                : 'bg-white dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:border-primary-300 dark:hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+              shrink-0 flex items-center gap-1.5 rounded-2xl border transition-all duration-200 select-none min-h-[44px]
+              ${isActive
+                ? 'bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/20'
+                : 'bg-white dark:bg-[#1a1118] text-gray-700 dark:text-gray-200 border-gray-200/80 dark:border-white/10 hover:border-primary-300 dark:hover:border-primary-500/40'
               }
-              ${isReordering ? 'cursor-default pr-16 min-w-[140px]' : 'cursor-pointer'}
+              ${isReordering ? 'pl-3.5 pr-1.5 py-1' : 'px-4 py-2'}
             `}
           >
-            {cat.name}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => !isReordering && setActiveTab(cat.id)}
+              className={`flex items-center gap-2 whitespace-nowrap text-sm font-semibold tracking-tight outline-none min-h-[36px] ${
+                isReordering ? 'cursor-default' : 'cursor-pointer'
+              }`}
+            >
+              <span>{cat.name}</span>
+              {typeof count === 'number' && !isReordering && (
+                <span
+                  className={`text-xs font-bold tabular-nums ${
+                    isActive ? 'text-white/85' : 'text-gray-400 dark:text-gray-500'
+                  }`}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
 
             {isReordering && (
-              <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center bg-gray-100 dark:bg-gray-900 rounded-lg p-1 backdrop-blur-sm shadow-sm border border-gray-200 dark:border-gray-700">
+              <div
+                className={`flex items-center gap-0.5 rounded-xl p-0.5 ml-1 ${
+                  isActive
+                    ? 'bg-black/15 text-white'
+                    : 'bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-400'
+                }`}
+              >
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); onMoveCategory?.(index, 'left'); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveCategory?.(index, 'left');
+                  }}
                   disabled={index === 0}
                   title="Mover a la izquierda"
-                  aria-label="Mover categoría a la izquierda"
-                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded cursor-pointer text-gray-500 dark:text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                  aria-label={`Mover ${cat.name} a la izquierda`}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                 >
-                  <ChevronLeft className="w-3 h-3" />
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
-                <div className="w-px h-3 bg-gray-300 dark:bg-gray-600 mx-1"></div>
                 <button
                   type="button"
-                  onClick={(e) => { e.stopPropagation(); onMoveCategory?.(index, 'right'); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMoveCategory?.(index, 'right');
+                  }}
                   disabled={index === categories.length - 1}
                   title="Mover a la derecha"
-                  aria-label="Mover categoría a la derecha"
-                  className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded cursor-pointer text-gray-500 dark:text-gray-400 disabled:opacity-30 disabled:cursor-not-allowed"
+                  aria-label={`Mover ${cat.name} a la derecha`}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-black/10 dark:hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition-colors"
                 >
-                  <ChevronRight className="w-3 h-3" />
+                  <ChevronRight className="w-4 h-4" />
                 </button>
+                {onDeleteCategory && categories.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteCategory(cat.id);
+                    }}
+                    title={`Eliminar categoría ${cat.name}`}
+                    aria-label={`Eliminar categoría ${cat.name}`}
+                    className={`w-8 h-8 flex items-center justify-center rounded-lg cursor-pointer transition-colors ${
+                      isActive
+                        ? 'text-white/90 hover:bg-red-600'
+                        : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40'
+                    }`}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
               </div>
             )}
           </div>
+        );
+      })}
 
-          {isReordering && onDeleteCategory && categories.length > 1 && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDeleteCategory(cat.id); }}
-              className="absolute -top-2 -right-2 bg-red-500 text-white p-1.5 rounded-full shadow-md hover:bg-red-600 z-10 transition-transform hover:scale-110 active:scale-95"
-              title="Eliminar categoría"
-            >
-              <X className="w-3 h-3" />
-            </button>
-          )}
-        </div>
-      ))}
-
-      {!isReordering && (
+      {!isReordering && onAddCategory && (
         <button
-          title="Agregar categoría"
+          type="button"
+          title="Agregar nueva categoría"
           onClick={onAddCategory}
-          className="flex items-center justify-center min-w-[50px] h-[50px] bg-white dark:bg-gray-800 text-primary-500 hover:bg-primary-50 dark:hover:bg-gray-700 border border-dashed border-primary-300 dark:border-primary-900/50 rounded-2xl transition-all"
+          className="shrink-0 inline-flex items-center gap-1.5 px-4 min-h-[44px] bg-white dark:bg-[#1a1118] text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-950/30 border border-dashed border-primary-300 dark:border-primary-800/70 rounded-2xl text-xs font-bold tracking-wide transition-all cursor-pointer active:scale-95 whitespace-nowrap"
         >
-          <Plus className="w-6 h-6" />
+          <Plus className="w-4 h-4" />
+          <span>Categoría</span>
         </button>
       )}
     </div>

@@ -233,10 +233,36 @@ export const databaseService = {
       let finalItems = initialItems;
       if (!itemsErr && dbItems && dbItems.length > 0) {
         finalItems = dbItems.map(mapMenuItemFromDb);
+        const tlayoyoItem = initialItems.find(i => i.id === 'm-tlayoyos-salsa');
+        let alreadySeeded = false;
+        try {
+          alreadySeeded = localStorage.getItem('tlayoyos_seeded_tlayoyos_salsa_v4') === 'true';
+        } catch {
+          alreadySeeded = false;
+        }
+        if (tlayoyoItem && !alreadySeeded) {
+          const existingIdx = finalItems.findIndex(i => i.id === 'm-tlayoyos-salsa');
+          if (existingIdx === -1) {
+            finalItems = [tlayoyoItem, ...finalItems];
+          } else {
+            finalItems = finalItems.map(i => (i.id === 'm-tlayoyos-salsa' ? tlayoyoItem : i));
+          }
+          await supabase.from('menu_items').upsert(mapMenuItemToDb(tlayoyoItem));
+          try {
+            localStorage.setItem('tlayoyos_seeded_tlayoyos_salsa_v4', 'true');
+          } catch {
+            // ignore storage errors
+          }
+        }
       } else if (dbItems && dbItems.length === 0) {
         // Seed initial items
         const toInsert = initialItems.map(mapMenuItemToDb);
         await supabase.from('menu_items').insert(toInsert);
+        try {
+          localStorage.setItem('tlayoyos_seeded_tlayoyos_salsa_v4', 'true');
+        } catch {
+          // ignore storage errors
+        }
       }
 
       // Orders

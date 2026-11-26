@@ -11,6 +11,17 @@ import { MenuItem, Category, Order, OrderItem, Staff, Customer, PaymentMethod } 
 import { soundManager } from '../utils/soundManager';
 import { generateTicket } from '../utils/printTicket';
 import { useMobileBack } from '../hooks/useMobileBack';
+import {
+    TLAYOYO_SALSAS,
+    TLAYOYO_CHEESE_OPTIONS,
+    DEFAULT_TLAYOYO_SELECTION,
+    TlayoyoSelection,
+    isTlayoyoDish,
+    toggleTlayoyoSalsa,
+    toggleTlayoyoSalsaAparte,
+    setTlayoyoSinSalsa,
+    formatTlayoyoVariationLabel
+} from '../utils/tlayoyoConfig';
 
 interface TPVViewProps {
     categories: Category[];
@@ -58,6 +69,7 @@ export default function TPVView({
     const [selectedAddress, setSelectedAddress] = useState<string>('');
     const [activePosView, setActivePosView] = useState<'menu' | 'cart'>('menu');
     const [showCartMobile, setShowCartMobile] = useState(false);
+    const [tlayoyoSelections, setTlayoyoSelections] = useState<Record<string, TlayoyoSelection>>({});
 
     // Modal States
     const [modalType, setModalType] = useState<'none' | 'location' | 'onboarding' | 'registration' | 'payment'>('none');
@@ -509,23 +521,124 @@ export default function TPVView({
                                 return matchesSearch && item.categoryId !== 'cat-1' && item.categoryId !== 'cat-2';
                             }
                             return matchesSearch && item.categoryId === activeTab;
-                        }).map(item => (
-                            <div key={item.id} className="bg-gray-50 dark:bg-gray-800/50 rounded-[32px] p-5 border border-transparent hover:border-primary-500/30 transition-all group">
-                                <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight mb-3 line-clamp-1">{item.name}</h3>
-                                <div className="space-y-2">
-                                    {item.variations.map(vari => (
+                        }).map(item => {
+                            if (isTlayoyoDish(item)) {
+                                const sel = tlayoyoSelections[item.id] || DEFAULT_TLAYOYO_SELECTION;
+                                const baseVar = item.variations[0] || { id: 'm-tlayoyos-v1', label: 'Por pieza', price: 10 };
+                                return (
+                                    <div key={item.id} className="bg-gray-50 dark:bg-gray-800/50 rounded-[32px] p-5 border border-transparent hover:border-primary-500/30 transition-all group space-y-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight line-clamp-1">{item.name}</h3>
+                                            <span className="text-xs font-black text-primary-500 shrink-0">${baseVar.price.toFixed(2)}</span>
+                                        </div>
+
+                                        <div>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">Salsa(s):</span>
+                                            <div className="flex flex-wrap gap-1">
+                                                {TLAYOYO_SALSAS.map(salsa => {
+                                                    const isSelected = sel.salsaMode !== 'sin' && sel.salsas.includes(salsa);
+                                                    return (
+                                                        <button
+                                                            key={salsa}
+                                                            type="button"
+                                                            onClick={() => setTlayoyoSelections(prev => ({
+                                                                ...prev,
+                                                                [item.id]: toggleTlayoyoSalsa(prev[item.id], salsa)
+                                                            }))}
+                                                            className={`py-1 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                                                                isSelected
+                                                                    ? 'bg-primary-500 text-white shadow-sm'
+                                                                    : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                                                            }`}
+                                                        >
+                                                            {salsa}
+                                                        </button>
+                                                    );
+                                                })}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTlayoyoSelections(prev => ({
+                                                        ...prev,
+                                                        [item.id]: toggleTlayoyoSalsaAparte(prev[item.id])
+                                                    }))}
+                                                    className={`py-1 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                                                        sel.salsaMode === 'aparte'
+                                                            ? 'bg-amber-500 text-white shadow-sm'
+                                                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                >
+                                                    Aparte
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setTlayoyoSelections(prev => ({
+                                                        ...prev,
+                                                        [item.id]: setTlayoyoSinSalsa(prev[item.id])
+                                                    }))}
+                                                    className={`py-1 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                                                        sel.salsaMode === 'sin'
+                                                            ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
+                                                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                                                    }`}
+                                                >
+                                                    Sin salsa
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1">Queso:</span>
+                                            <div className="grid grid-cols-3 gap-1">
+                                                {TLAYOYO_CHEESE_OPTIONS.map(opt => (
+                                                    <button
+                                                        key={opt}
+                                                        type="button"
+                                                        onClick={() => setTlayoyoSelections(prev => ({
+                                                            ...prev,
+                                                            [item.id]: { ...(prev[item.id] || DEFAULT_TLAYOYO_SELECTION), cheese: opt }
+                                                        }))}
+                                                        className={`py-1.5 px-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer truncate ${
+                                                            sel.cheese === opt
+                                                                ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
+                                                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                                                        }`}
+                                                    >
+                                                        {opt}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
                                         <button
-                                            key={vari.id}
-                                            onClick={() => addToCart(item, vari)}
-                                            className="w-full flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-2xl hover:bg-primary-500 hover:text-white transition-all shadow-sm group-hover:shadow-md"
+                                            type="button"
+                                            onClick={() => addToCart(item, { ...baseVar, label: formatTlayoyoVariationLabel(sel) })}
+                                            className="w-full flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-2xl hover:bg-primary-500 hover:text-white transition-all shadow-sm group-hover:shadow-md cursor-pointer"
                                         >
-                                            <span className="text-[10px] font-bold uppercase tracking-wide">{vari.label}</span>
-                                            <span className="font-black text-xs">${vari.price}</span>
+                                            <span className="text-[10px] font-bold uppercase tracking-wide truncate pr-2">+ Agregar pieza</span>
+                                            <span className="font-black text-xs shrink-0">${baseVar.price}</span>
                                         </button>
-                                    ))}
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div key={item.id} className="bg-gray-50 dark:bg-gray-800/50 rounded-[32px] p-5 border border-transparent hover:border-primary-500/30 transition-all group">
+                                    <h3 className="text-sm font-black text-gray-900 dark:text-white uppercase tracking-tight mb-3 line-clamp-1">{item.name}</h3>
+                                    <div className="space-y-2">
+                                        {item.variations.map(vari => (
+                                            <button
+                                                key={vari.id}
+                                                onClick={() => addToCart(item, vari)}
+                                                className="w-full flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-2xl hover:bg-primary-500 hover:text-white transition-all shadow-sm group-hover:shadow-md cursor-pointer"
+                                            >
+                                                <span className="text-[10px] font-bold uppercase tracking-wide">{vari.label}</span>
+                                                <span className="font-black text-xs">${vari.price}</span>
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 
