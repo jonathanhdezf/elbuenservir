@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Utensils, Clock, MapPin, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, Minus, Trash2, ShoppingCart, X, ChefHat, Truck, Monitor, Search, Store, Zap, Mic, Download, Smartphone, Sparkles, User, CreditCard, Banknote, Building2, Landmark, Wallet, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Utensils, Clock, MapPin, Facebook, Phone, ChevronDown, Lock, Star, ChevronRight, Award, Heart, ShoppingBag, Check, ArrowRight, MessageCircle, Menu, Plus, Minus, Trash2, ShoppingCart, X, ChefHat, Truck, Monitor, Search, Store, Zap, Mic, Download, Smartphone, Sparkles, User, CreditCard, Banknote, Building2, Landmark, Wallet, AlertTriangle, ShieldAlert, PlayCircle } from 'lucide-react';
 import { Category, MenuItem, Customer, Order, PaymentMethod, CustomerCreditMovement } from '../types';
 import { soundManager } from '../utils/soundManager';
 import LiveOrderModal from '../components/LiveOrderModal';
@@ -7,6 +7,7 @@ import { useMobileBack } from '../hooks/useMobileBack';
 import { usePwaInstall } from '../hooks/usePwaInstall';
 import { InstallPwaModal } from '../components/InstallPwaModal';
 import LegalModal, { LegalDocType } from '../components/LegalModal';
+import { TlayoyosVideoModal } from '../components/TlayoyosVideoModal';
 import { CustomerAuthModal } from '../components/CustomerAuthModal';
 import { CustomerProfileModal } from '../components/CustomerProfileModal';
 import { CustomerAvatar } from '../components/CustomerAvatar';
@@ -112,6 +113,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     isOpen: false,
     doc: 'privacy'
   });
+  const [isHowMadeVideoOpen, setIsHowMadeVideoOpen] = useState(false);
 
   const handleDismissBanner = () => {
     soundManager.play('click');
@@ -575,9 +577,11 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   };
 
   // Mobile Back Button Navigation Logic
-  const hasOpenPublicModal = !!(isPromoModalOpen || extraModalType || isOrderModalOpen || isAuthModalOpen || isProfileModalOpen || isLiveOrderOpen || isDeliverySelectionOpen || isMobileMenuOpen);
+  const hasOpenPublicModal = !!(isHowMadeVideoOpen || isPromoModalOpen || extraModalType || isOrderModalOpen || isAuthModalOpen || isProfileModalOpen || isLiveOrderOpen || isDeliverySelectionOpen || isMobileMenuOpen);
   const handleClosePublicModal = () => {
-    if (isPromoModalOpen) {
+    if (isHowMadeVideoOpen) {
+      setIsHowMadeVideoOpen(false);
+    } else if (isPromoModalOpen) {
       setIsPromoModalOpen(false);
     } else if (extraModalType) {
       setExtraModalType(null);
@@ -1675,16 +1679,28 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                 </div>
               </div>
 
-              <div className="border-t border-gray-100 dark:border-gray-900 pt-12 flex flex-col md:flex-row justify-between items-center text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
-                <p>&copy; {new Date().getFullYear()} Tlayoyos 3 Marías. Todos los derechos reservados.</p>
-                <div className="flex space-x-8 mt-6 md:mt-0">
+              <div className="border-t border-gray-100 dark:border-gray-900 pt-12 flex flex-col lg:flex-row justify-between items-center gap-6 text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest">
+                <p className="text-center lg:text-left">&copy; {new Date().getFullYear()} Tlayoyos 3 Marías. Todos los derechos reservados.</p>
+                <div className="flex flex-wrap items-center justify-center lg:justify-end gap-x-7 gap-y-3">
+                  <a
+                    href="https://www.youtube.com/watch?v=FAYgJgaPiGE"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      soundManager.play('click');
+                      setIsHowMadeVideoOpen(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-gray-600 dark:text-gray-300 hover:text-primary-500 dark:hover:text-primary-400 hover:underline underline-offset-4 transition-colors cursor-pointer normal-case tracking-normal text-xs font-extrabold whitespace-nowrap shrink-0 py-1"
+                  >
+                    <PlayCircle className="w-4 h-4 text-primary-500 shrink-0" aria-hidden="true" />
+                    <span>Como se hacen / How are Tlayoyos Made?</span>
+                  </a>
                   <button
                     type="button"
                     onClick={() => {
                       soundManager.play('click');
                       setLegalModalState({ isOpen: true, doc: 'privacy' });
                     }}
-                    className="hover:text-primary-500 transition-colors uppercase cursor-pointer"
+                    className="hover:text-primary-500 transition-colors uppercase cursor-pointer whitespace-nowrap shrink-0 py-1"
                   >
                     Privacidad
                   </button>
@@ -1694,7 +1710,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                       soundManager.play('click');
                       setLegalModalState({ isOpen: true, doc: 'terms' });
                     }}
-                    className="hover:text-primary-500 transition-colors uppercase cursor-pointer"
+                    className="hover:text-primary-500 transition-colors uppercase cursor-pointer whitespace-nowrap shrink-0 py-1"
                   >
                     Términos
                   </button>
@@ -1704,7 +1720,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                       soundManager.play('click');
                       setLegalModalState({ isOpen: true, doc: 'cookies' });
                     }}
-                    className="hover:text-primary-500 transition-colors uppercase cursor-pointer"
+                    className="hover:text-primary-500 transition-colors uppercase cursor-pointer whitespace-nowrap shrink-0 py-1"
                   >
                     Cookies
                   </button>
@@ -1717,7 +1733,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                       }}
                       aria-label="Portal de Administración"
                       title="Administración"
-                      className="inline-flex items-center text-gray-300 dark:text-gray-700 hover:text-primary-500 dark:hover:text-primary-400 transition-colors cursor-pointer"
+                      className="inline-flex items-center text-gray-300 dark:text-gray-700 hover:text-primary-500 dark:hover:text-primary-400 transition-colors cursor-pointer py-1"
                     >
                       <Lock className="w-3.5 h-3.5" aria-hidden="true" />
                     </button>
@@ -3212,6 +3228,12 @@ export default function PublicView({ categories, menuItems, customers, orders = 
         isOpen={legalModalState.isOpen}
         onClose={() => setLegalModalState(prev => ({ ...prev, isOpen: false }))}
         initialDoc={legalModalState.doc}
+      />
+
+      {/* How are Tlayoyos Made Video Modal */}
+      <TlayoyosVideoModal
+        isOpen={isHowMadeVideoOpen}
+        onClose={() => setIsHowMadeVideoOpen(false)}
       />
     </div>
   );
