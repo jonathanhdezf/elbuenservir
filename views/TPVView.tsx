@@ -263,12 +263,18 @@ export default function TPVView({
         soundManager.play('navigation');
     };
 
-    const addToCart = (item: MenuItem, variation: any) => {
+    const getCartVariationQty = (itemId: string, variationLabel: string) => {
+        return cart
+            .filter(i => i.id === itemId && i.variationLabel === variationLabel)
+            .reduce((sum, i) => sum + i.quantity, 0);
+    };
+
+    const addToCart = (item: MenuItem, variation: any, delta: number = 1) => {
         setCart(prev => {
             const existing = prev.find(i => i.id === item.id && i.variationLabel === variation.label && !i.notes);
             if (existing) {
                 return prev.map(i => i === existing
-                    ? { ...i, quantity: i.quantity + 1, isOld: false }
+                    ? { ...i, quantity: i.quantity + delta, isOld: false }
                     : i
                 );
             }
@@ -277,20 +283,44 @@ export default function TPVView({
                 name: item.name,
                 variationLabel: variation.label,
                 price: variation.price,
-                quantity: 1,
+                quantity: delta,
                 isOld: false
             }];
         });
-        setLastAddedToast(`${item.name} agregado`);
+        setLastAddedToast(`${delta > 1 ? `${delta}× ` : ''}${item.name} agregado`);
+        soundManager.play('click');
+    };
+
+    const decrementCartVariation = (itemId: string, variationLabel: string) => {
+        setCart(prev => {
+            const matchIdx = [...prev]
+                .reverse()
+                .findIndex(i => i.id === itemId && i.variationLabel === variationLabel);
+            if (matchIdx === -1) return prev;
+            const targetIndex = prev.length - 1 - matchIdx;
+            const target = prev[targetIndex];
+            if (target.quantity <= 1) {
+                return prev.filter((_, idx) => idx !== targetIndex);
+            }
+            return prev.map((item, idx) =>
+                idx === targetIndex ? { ...item, quantity: item.quantity - 1 } : item
+            );
+        });
         soundManager.play('click');
     };
 
     const updateQuantity = (index: number, delta: number) => {
-        setCart(prev => prev.map((item, idx) =>
-            idx === index
-                ? { ...item, quantity: Math.max(1, item.quantity + delta) }
-                : item
-        ));
+        setCart(prev => {
+            const target = prev[index];
+            if (!target) return prev;
+            const nextQty = target.quantity + delta;
+            if (nextQty <= 0) {
+                return prev.filter((_, idx) => idx !== index);
+            }
+            return prev.map((item, idx) =>
+                idx === index ? { ...item, quantity: nextQty } : item
+            );
+        });
         soundManager.play('click');
     };
 
@@ -734,15 +764,32 @@ export default function TPVView({
                                 if (isTlayoyoDish(item)) {
                                     const sel = tlayoyoSelections[item.id] || DEFAULT_TLAYOYO_SELECTION;
                                     const baseVar = item.variations[0] || { id: 'm-tlayoyos-v1', label: 'Por pieza', price: 10 };
+                                    const currentLabel = formatTlayoyoVariationLabel(sel);
+                                    const activeQty = getCartVariationQty(item.id, currentLabel);
+                                    const totalDishQty = cart
+                                        .filter(i => i.id === item.id)
+                                        .reduce((sum, i) => sum + i.quantity, 0);
+
                                     return (
                                         <div
                                             key={item.id}
-                                            className="bg-white dark:bg-[#1a1118] rounded-2xl p-4 sm:p-5 border border-gray-200/80 dark:border-white/10 hover:border-primary-300 dark:hover:border-primary-500/40 transition-colors space-y-3"
+                                            className={`bg-white dark:bg-[#1a1118] rounded-2xl p-4 sm:p-5 border transition-colors space-y-3 ${
+                                                totalDishQty > 0
+                                                    ? 'border-primary-500/50 shadow-sm'
+                                                    : 'border-gray-200/80 dark:border-white/10 hover:border-primary-300 dark:hover:border-primary-500/40'
+                                            }`}
                                         >
                                             <div className="flex items-start justify-between gap-2">
-                                                <h3 className="text-sm font-extrabold text-gray-900 dark:text-white leading-snug">
-                                                    {item.name}
-                                                </h3>
+                                                <div className="min-w-0">
+                                                    <h3 className="text-sm font-extrabold text-gray-900 dark:text-white leading-snug">
+                                                        {item.name}
+                                                    </h3>
+                                                    {totalDishQty > 0 && (
+                                                        <span className="text-[11px] font-bold text-primary-600 dark:text-primary-400 tabular-nums">
+                                                            {totalDishQty} {totalDishQty === 1 ? 'pieza en comanda' : 'piezas en comanda'}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 <span className="text-sm font-black text-primary-500 tabular-nums shrink-0">
                                                     ${baseVar.price.toFixed(2)}
                                                 </span>
@@ -829,14 +876,53 @@ export default function TPVView({
                                                 </div>
                                             </div>
 
-                                            <button
-                                                type="button"
-                                                onClick={() => addToCart(item, { ...baseVar, label: formatTlayoyoVariationLabel(sel) })}
-                                                className="w-full min-h-[44px] flex items-center justify-between px-4 bg-primary-500/10 hover:bg-primary-500 text-primary-700 dark:text-primary-300 hover:text-white rounded-xl transition-colors font-bold text-xs cursor-pointer active:scale-[0.98]"
-                                            >
-                                                <span>+ Agregar pieza</span>
-                                                <span className="font-black tabular-nums">${baseVar.price.toFixed(2)}</span>
-                                            </button>
+                                            {activeQty > 0 ? (
+                                                <div className="flex items-center justify-between gap-2 p-1 rounded-2xl bg-primary-500/10 border border-primary-500/35">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => decrementCartVariation(item.id, currentLabel)}
+                                                        aria-label="Quitar una pieza"
+                                                        className="min-w-[44px] min-h-[44px] rounded-xl bg-white dark:bg-[#1a1118] text-gray-700 dark:text-white hover:text-red-500 flex items-center justify-center shadow-sm active:scale-95 transition-all cursor-pointer"
+                                                    >
+                                                        {activeQty === 1 ? <Trash2 className="w-4 h-4 text-red-500" /> : <Minus className="w-4 h-4" />}
+                                                    </button>
+                                                    <div className="text-center px-2">
+                                                        <span className="text-sm font-black text-gray-900 dark:text-white tabular-nums block leading-tight">
+                                                            {activeQty} {activeQty === 1 ? 'pieza' : 'piezas'}
+                                                        </span>
+                                                        <span className="text-[11px] font-bold text-primary-600 dark:text-primary-400 tabular-nums">
+                                                            ${(activeQty * baseVar.price).toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => addToCart(item, { ...baseVar, label: currentLabel }, 1)}
+                                                        aria-label="Agregar una pieza"
+                                                        className="min-w-[44px] min-h-[44px] rounded-xl bg-primary-500 hover:bg-primary-600 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all cursor-pointer"
+                                                    >
+                                                        <Plus className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => addToCart(item, { ...baseVar, label: currentLabel }, 1)}
+                                                        className="flex-1 min-h-[46px] flex items-center justify-between px-4 bg-primary-500/10 hover:bg-primary-500 text-primary-700 dark:text-primary-300 hover:text-white rounded-xl transition-colors font-bold text-xs cursor-pointer active:scale-[0.98]"
+                                                    >
+                                                        <span>+ Agregar</span>
+                                                        <span className="font-black tabular-nums">${baseVar.price.toFixed(2)}</span>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => addToCart(item, { ...baseVar, label: currentLabel }, 3)}
+                                                        title="Agregar 3 piezas"
+                                                        className="min-w-[48px] min-h-[46px] px-3 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-primary-500 hover:text-white text-gray-800 dark:text-white font-black text-xs tabular-nums transition-colors cursor-pointer active:scale-95"
+                                                    >
+                                                        +3
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 }
@@ -850,17 +936,59 @@ export default function TPVView({
                                             {item.name}
                                         </h3>
                                         <div className="space-y-2">
-                                            {item.variations.map(vari => (
-                                                <button
-                                                    key={vari.id}
-                                                    type="button"
-                                                    onClick={() => addToCart(item, vari)}
-                                                    className="w-full min-h-[44px] flex items-center justify-between px-3.5 py-2.5 bg-gray-50 dark:bg-white/5 hover:bg-primary-500 hover:text-white rounded-xl transition-colors cursor-pointer active:scale-[0.98]"
-                                                >
-                                                    <span className="text-xs font-semibold truncate pr-2">{vari.label}</span>
-                                                    <span className="font-black text-xs tabular-nums shrink-0">${vari.price.toFixed(2)}</span>
-                                                </button>
-                                            ))}
+                                            {item.variations.map(vari => {
+                                                const variQty = getCartVariationQty(item.id, vari.label);
+                                                if (variQty > 0) {
+                                                    return (
+                                                        <div
+                                                            key={vari.id}
+                                                            className="w-full min-h-[46px] flex items-center justify-between gap-2 pl-3 pr-1.5 py-1.5 bg-primary-500/10 border border-primary-500/35 rounded-xl"
+                                                        >
+                                                            <div className="min-w-0">
+                                                                <span className="text-xs font-bold text-gray-900 dark:text-white block truncate">
+                                                                    {vari.label}
+                                                                </span>
+                                                                <span className="text-[11px] font-bold text-primary-600 dark:text-primary-400 tabular-nums">
+                                                                    ${vari.price.toFixed(2)} c/u
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1 shrink-0">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => decrementCartVariation(item.id, vari.label)}
+                                                                    aria-label={`Quitar ${item.name} ${vari.label}`}
+                                                                    className="min-w-[38px] min-h-[38px] rounded-lg bg-white dark:bg-[#1a1118] text-gray-700 dark:text-white hover:text-red-500 flex items-center justify-center shadow-sm active:scale-95 transition-all cursor-pointer"
+                                                                >
+                                                                    {variQty === 1 ? <Trash2 className="w-3.5 h-3.5 text-red-500" /> : <Minus className="w-3.5 h-3.5" />}
+                                                                </button>
+                                                                <span className="w-7 text-center text-xs font-black tabular-nums text-gray-900 dark:text-white">
+                                                                    {variQty}
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => addToCart(item, vari, 1)}
+                                                                    aria-label={`Agregar ${item.name} ${vari.label}`}
+                                                                    className="min-w-[38px] min-h-[38px] rounded-lg bg-primary-500 hover:bg-primary-600 text-white flex items-center justify-center shadow-sm active:scale-95 transition-all cursor-pointer"
+                                                                >
+                                                                    <Plus className="w-3.5 h-3.5" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <button
+                                                        key={vari.id}
+                                                        type="button"
+                                                        onClick={() => addToCart(item, vari, 1)}
+                                                        className="w-full min-h-[46px] flex items-center justify-between px-3.5 py-2.5 bg-gray-50 dark:bg-white/5 hover:bg-primary-500 hover:text-white rounded-xl transition-colors cursor-pointer active:scale-[0.98]"
+                                                    >
+                                                        <span className="text-xs font-semibold truncate pr-2">{vari.label}</span>
+                                                        <span className="font-black text-xs tabular-nums shrink-0">${vari.price.toFixed(2)}</span>
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 );
@@ -984,35 +1112,35 @@ export default function TPVView({
                                             </div>
 
                                             <div className="flex items-center gap-1.5 shrink-0">
-                                                <div className="flex items-center bg-white dark:bg-[#1a1118] border border-gray-200/80 dark:border-white/10 rounded-xl p-0.5">
+                                                <div className="flex items-center bg-white dark:bg-[#1a1118] border border-gray-200/80 dark:border-white/10 rounded-xl p-0.5 gap-0.5">
                                                     <button
                                                         type="button"
-                                                        title="Reducir"
+                                                        title={item.quantity === 1 ? 'Quitar de comanda' : 'Reducir pieza'}
                                                         onClick={() => updateQuantity(idx, -1)}
-                                                        className="w-8 h-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-primary-500 rounded-lg cursor-pointer"
+                                                        className="min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-red-500 rounded-lg cursor-pointer active:scale-95 transition-all"
                                                     >
-                                                        <Minus className="w-3.5 h-3.5" />
+                                                        {item.quantity === 1 ? <Trash2 className="w-4 h-4 text-red-500" /> : <Minus className="w-4 h-4" />}
                                                     </button>
-                                                    <span className="w-6 text-center text-xs font-black tabular-nums text-gray-900 dark:text-white">
+                                                    <span className="w-7 text-center text-sm font-black tabular-nums text-gray-900 dark:text-white">
                                                         {item.quantity}
                                                     </span>
                                                     <button
                                                         type="button"
-                                                        title="Aumentar"
+                                                        title="Aumentar pieza"
                                                         onClick={() => updateQuantity(idx, 1)}
-                                                        className="w-8 h-8 flex items-center justify-center text-gray-600 dark:text-gray-300 hover:text-primary-500 rounded-lg cursor-pointer"
+                                                        className="min-w-[40px] min-h-[40px] flex items-center justify-center bg-primary-500/10 text-primary-600 dark:text-primary-400 hover:bg-primary-500 hover:text-white rounded-lg cursor-pointer active:scale-95 transition-all"
                                                     >
-                                                        <Plus className="w-3.5 h-3.5" />
+                                                        <Plus className="w-4 h-4" />
                                                     </button>
                                                 </div>
 
                                                 <button
                                                     type="button"
-                                                    title="Eliminar"
+                                                    title="Eliminar línea"
                                                     onClick={() => removeFromCart(idx)}
-                                                    className="w-9 h-9 flex items-center justify-center text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors cursor-pointer"
+                                                    className="min-w-[40px] min-h-[40px] flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors cursor-pointer"
                                                 >
-                                                    <Trash2 className="w-4 h-4" />
+                                                    <X className="w-4 h-4" />
                                                 </button>
                                             </div>
                                         </div>
