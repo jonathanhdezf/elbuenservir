@@ -1213,7 +1213,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
             </h2>
             <div className="space-y-4">
               <p className="text-xl font-black text-primary-500 italic tracking-tight">
-                ¡Donde todo, bien, todo rico!
+                ¡Donde todo bien, todo rico!
               </p>
               <p className="text-base text-gray-500 dark:text-gray-400 leading-relaxed">
                 En Tlayoyos 3 Marías, cada ingrediente es seleccionado cuidadosamente de productores locales para garantizar la frescura y el sabor auténtico que nos ha caracterizado por generaciones.
