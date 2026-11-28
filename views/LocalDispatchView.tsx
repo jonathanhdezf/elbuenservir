@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Order, Staff } from '../types';
+import { Order, Staff, SiteLog } from '../types';
 import {
     Utensils,
     Clock,
@@ -13,15 +13,19 @@ import {
     X,
     CreditCard,
     Banknote,
-    Building2
+    Building2,
+    UserCheck
 } from 'lucide-react';
 import { soundManager } from '../utils/soundManager';
 import { useMobileBack } from '../hooks/useMobileBack';
+import { OrderDeliveryVerificationModal } from '../components/OrderDeliveryVerificationModal';
+import { saveOrderDeliveryAudit } from '../utils/orderVerification';
 
 interface LocalDispatchViewProps {
     orders: Order[];
     staff: Staff[];
     onUpdateOrder: (order: Partial<Order>) => void;
+    onRecordLog?: (log: { user: string; action: string; details: string; type: SiteLog['type'] }) => void;
     updateCustomerStats: (name: string, phone: string, amount: number, adding?: boolean) => void;
     onEditOrder: (order: Order) => void;
     onOpenTableOrder?: (tableNum: string) => void;
@@ -32,6 +36,7 @@ const LocalDispatchView: React.FC<LocalDispatchViewProps> = ({
     orders,
     staff,
     onUpdateOrder,
+    onRecordLog,
     updateCustomerStats,
     onEditOrder,
     onOpenTableOrder,
@@ -48,12 +53,15 @@ const LocalDispatchView: React.FC<LocalDispatchViewProps> = ({
     const [cashReceived, setCashReceived] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<'efectivo' | 'tarjeta' | 'transferencia'>('efectivo');
     const [paymentError, setPaymentError] = useState<string | null>(null);
+    const [verifyingCounterOrder, setVerifyingCounterOrder] = useState<Order | null>(null);
+    const [deliveryFeedback, setDeliveryFeedback] = useState<string | null>(null);
 
     // Mobile Back Button Navigation Logic
-    const hasOpenLocalModal = isAuthModalOpen || isPaymentModalOpen;
+    const hasOpenLocalModal = isAuthModalOpen || isPaymentModalOpen || !!verifyingCounterOrder;
     const handleCloseLocalModal = () => {
         if (isAuthModalOpen) setIsAuthModalOpen(false);
         if (isPaymentModalOpen) setIsPaymentModalOpen(false);
+        if (verifyingCounterOrder) setVerifyingCounterOrder(null);
     };
 
     useMobileBack({
@@ -187,14 +195,49 @@ const LocalDispatchView: React.FC<LocalDispatchViewProps> = ({
             handleOpenPayment(order);
             return;
         }
-        onUpdateOrder({ id: order.id, status: 'delivered' });
-        soundManager.play('confirm');
+        setVerifyingCounterOrder(order);
+        soundManager.play('click');
+    };
+
+    const handleConfirmCounterDelivery = (order: Order, deliveredBy: Staff) => {
+        const deliveredAt = new Date().toISOString();
+        saveOrderDeliveryAudit(order.id, {
+            deliveredBy: deliveredBy.name,
+            deliveredById: deliveredBy.id,
+            deliveredAt
+        });
+        onUpdateOrder({
+            id: order.id,
+            status: 'delivered',
+            dispatchedAt: order.dispatchedAt || deliveredAt,
+            waiterId: order.waiterId || deliveredBy.id,
+            deliveredBy: deliveredBy.name,
+            deliveredById: deliveredBy.id,
+            deliveredAt
+        });
+        onRecordLog?.({
+            user: deliveredBy.name,
+            action: 'Entrega en Despacho Local',
+            details: `Pedido ${order.id} (${order.customerName}, $${order.total.toFixed(2)}) entregado por ${deliveredBy.name} [${deliveredBy.id}]`,
+            type: 'success'
+        });
+        setDeliveryFeedback(`Pedido ${order.id} entregado y registrado por ${deliveredBy.name}`);
+        setTimeout(() => setDeliveryFeedback(null), 6000);
+        setVerifyingCounterOrder(null);
     };
 
     const counterOrders = orders.filter(o =>
         o.address?.toLowerCase().includes('mostrador') &&
         o.status === 'ready'
     );
+
+    const recentDeliveredCounterOrders = orders
+        .filter(o =>
+            o.address?.toLowerCase().includes('mostrador') &&
+            o.status === 'delivered' &&
+            (o.deliveredBy || o.dispatchedAt)
+        )
+        .slice(0, 5);
 
     const occupiedCount = tables.filter(t => !!getTableOrder(t)).length;
     const availableCount = tables.length - occupiedCount;
@@ -242,6 +285,23 @@ const LocalDispatchView: React.FC<LocalDispatchViewProps> = ({
             </header>
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8 space-y-8">
+                {deliveryFeedback && (
+                    <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs sm:text-sm font-bold flex items-center justify-between gap-3 animate-in fade-in duration-200">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <UserCheck className="w-5 h-5 text-emerald-500 shrink-0" />
+                            <span className="truncate">{deliveryFeedback}</span>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setDeliveryFeedback(null)}
+                            aria-label="Cerrar aviso"
+                            className="p-1 text-emerald-600/70 hover:text-emerald-700 dark:hover:text-emerald-200 cursor-pointer shrink-0"
+                        >
+                            <X className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
+
                 {/* Summary Strip (Mobile) */}
                 <div className="grid grid-cols-3 gap-3 sm:hidden">
                     <div className="bg-white dark:bg-[#1a1118] border border-gray-200/80 dark:border-white/10 rounded-2xl p-3.5">
@@ -413,6 +473,52 @@ const LocalDispatchView: React.FC<LocalDispatchViewProps> = ({
                                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                                         Aparecerán aquí en cuanto cocina los marque listos
                                     </p>
+                                </div>
+                            )}
+
+                            {recentDeliveredCounterOrders.length > 0 && (
+                                <div className="pt-3 space-y-2.5">
+                                    <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-gray-500 px-1">
+                                        Últimas entregas registradas
+                                    </h3>
+                                    <div className="space-y-2">
+                                        {recentDeliveredCounterOrders.map((delivered) => {
+                                            const deliveredName =
+                                                delivered.deliveredBy ||
+                                                staff.find((s) => s.id === delivered.waiterId)?.name ||
+                                                'Personal';
+                                            const deliveredTime = delivered.deliveredAt || delivered.dispatchedAt;
+                                            return (
+                                                <div
+                                                    key={delivered.id}
+                                                    className="px-4 py-3 rounded-2xl bg-white/80 dark:bg-[#1a1118]/80 border border-gray-200/70 dark:border-white/10 flex items-center justify-between gap-3 text-xs"
+                                                >
+                                                    <div className="min-w-0">
+                                                        <p className="font-bold text-gray-900 dark:text-white truncate">
+                                                            {delivered.id} · {delivered.customerName}
+                                                        </p>
+                                                        <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1 mt-0.5 truncate">
+                                                            <UserCheck className="w-3.5 h-3.5 shrink-0" />
+                                                            <span>Entregó: {deliveredName}</span>
+                                                        </p>
+                                                    </div>
+                                                    <div className="text-right shrink-0 tabular-nums">
+                                                        <span className="font-bold text-gray-900 dark:text-white block">
+                                                            ${delivered.total.toFixed(2)}
+                                                        </span>
+                                                        {deliveredTime && (
+                                                            <span className="text-[10px] text-gray-400">
+                                                                {new Date(deliveredTime).toLocaleTimeString('es-MX', {
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit'
+                                                                })}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -635,6 +741,15 @@ const LocalDispatchView: React.FC<LocalDispatchViewProps> = ({
                     </div>
                 </div>
             )}
+
+            {/* Order Delivery Verification Modal (Manual Order Number / Camera Barcode + Staff User & Password) */}
+            <OrderDeliveryVerificationModal
+                isOpen={!!verifyingCounterOrder}
+                order={verifyingCounterOrder}
+                staff={staff}
+                onClose={() => setVerifyingCounterOrder(null)}
+                onVerified={handleConfirmCounterDelivery}
+            />
         </div>
     );
 };

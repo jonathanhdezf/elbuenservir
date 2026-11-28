@@ -6,7 +6,9 @@ import {
     Plus, DollarSign, LayoutGrid, Receipt, Users, User, UserPlus,
     Banknote, CreditCard, MessageCircle
 } from 'lucide-react';
-import { Order, Staff } from '../types';
+import { Order, Staff, SiteLog } from '../types';
+import { OrderDeliveryVerificationModal } from './OrderDeliveryVerificationModal';
+import { saveOrderDeliveryAudit } from '../utils/orderVerification';
 
 interface LocalDispatchProps {
     orders: Order[];
@@ -15,6 +17,7 @@ interface LocalDispatchProps {
     setActiveTableOrders: React.Dispatch<React.SetStateAction<Record<number, string>>>;
     onAddOrder: (tableNum: number, waiterId: string) => void;
     onPrintTicket: (order: Order) => void;
+    onRecordLog?: (log: { user: string; action: string; details: string; type: SiteLog['type'] }) => void;
     staff: Staff[];
     lockedWaiterId?: string;
 }
@@ -26,10 +29,11 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
     setActiveTableOrders,
     onAddOrder,
     onPrintTicket,
+    onRecordLog,
     staff,
     lockedWaiterId
 }) => {
-    const [verifyingOrder, setVerifyingOrder] = useState<string | null>(null);
+    const [verifyingOrder, setVerifyingOrder] = useState<Order | null>(null);
     const [payingOrder, setPayingOrder] = useState<Order | null>(null);
     const [assigningWaiterToTable, setAssigningWaiterToTable] = useState<number | null>(null);
     const [assigningWaiterToOrderId, setAssigningWaiterToOrderId] = useState<string | null>(null);
@@ -37,7 +41,6 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
     const [selectedWaiterId, setSelectedWaiterId] = useState<string>(lockedWaiterId || '');
     const [ticketRef, setTicketRef] = useState('');
     const [opRef, setOpRef] = useState('');
-    const [ticketInput, setTicketInput] = useState('');
     const [cashReceived, setCashReceived] = useState<string>('');
     const [error, setError] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'orders' | 'tables'>('tables');
@@ -106,7 +109,6 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
         setTicketRef('');
         setOpRef('');
         setCashReceived('');
-        setTicketInput('');
         setError(null);
     };
 
@@ -128,26 +130,43 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
         return false;
     });
 
-    const handleVerify = (orderId: string) => {
-        if (ticketInput.trim().toUpperCase() === orderId.toUpperCase()) {
-            setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'delivered' } : o));
+    const handleCompleteVerifiedDelivery = (verifiedOrder: Order, deliveredBy: Staff) => {
+        const deliveredAt = new Date().toISOString();
+        saveOrderDeliveryAudit(verifiedOrder.id, {
+            deliveredBy: deliveredBy.name,
+            deliveredById: deliveredBy.id,
+            deliveredAt
+        });
 
-            // If it was a table order, clear the table
-            const tableNum = Object.keys(activeTableOrders).find(key => activeTableOrders[parseInt(key)] === orderId);
-            if (tableNum) {
-                setActiveTableOrders(prev => {
-                    const newState = { ...prev };
-                    delete newState[parseInt(tableNum)];
-                    return newState;
-                });
-            }
+        setOrders(prev => prev.map(o => o.id === verifiedOrder.id ? {
+            ...o,
+            status: 'delivered',
+            dispatchedAt: o.dispatchedAt || deliveredAt,
+            waiterId: o.waiterId || deliveredBy.id,
+            deliveredBy: deliveredBy.name,
+            deliveredById: deliveredBy.id,
+            deliveredAt
+        } : o));
 
-            setVerifyingOrder(null);
-            setTicketInput('');
-            setError(null);
-        } else {
-            setError('Número de ticket incorrecto');
+        onRecordLog?.({
+            user: deliveredBy.name,
+            action: 'Entrega en Despacho Local',
+            details: `Pedido ${verifiedOrder.id} (${verifiedOrder.customerName}, $${verifiedOrder.total.toFixed(2)}) entregado por ${deliveredBy.name} [${deliveredBy.id}]`,
+            type: 'success'
+        });
+
+        // If it was a table order, clear the table
+        const tableNum = Object.keys(activeTableOrders).find(key => activeTableOrders[parseInt(key)] === verifiedOrder.id);
+        if (tableNum) {
+            setActiveTableOrders(prev => {
+                const newState = { ...prev };
+                delete newState[parseInt(tableNum)];
+                return newState;
+            });
         }
+
+        setVerifyingOrder(null);
+        setError(null);
     };
 
     const tables = [1, 2, 3, 4, 5];
@@ -286,35 +305,6 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
                     ) : (
                         localOrders.map(order => (
                             <div key={order.id} className="bg-white dark:bg-gray-800 rounded-[32px] overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700 relative">
-                                {verifyingOrder === order.id && (
-                                    <div className="absolute inset-0 bg-white/95 dark:bg-gray-800/95 z-10 flex flex-col items-center justify-center p-6 animate-in fade-in duration-200">
-                                        <button onClick={() => { setVerifyingOrder(null); setError(null); setTicketInput(''); }} title="Cerrar" className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
-                                        <ShieldCheck className="w-12 h-12 text-blue-500 mb-4" />
-                                        <h4 className="text-lg font-black uppercase text-gray-900 dark:text-white mb-2">Confirmar Entrega</h4>
-                                        <p className="text-xs text-gray-500 mb-4 text-center px-4">Ingrese ID de Orden para validar salida del pedido</p>
-
-                                        <input
-                                            type="text"
-                                            value={ticketInput}
-                                            onChange={(e) => { setTicketInput(e.target.value); setError(null); }}
-                                            placeholder={`Ej. ${order.id}`}
-                                            className="w-full bg-gray-50 dark:bg-gray-900 border-2 border-gray-100 dark:border-gray-700 rounded-xl px-4 py-3 font-bold text-center uppercase mb-2 focus:border-blue-500 outline-none"
-                                            autoFocus
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter') handleVerify(order.id);
-                                            }}
-                                        />
-
-                                        {error && <p className="text-xs font-bold text-red-500 mb-2 flex items-center"><AlertCircle className="w-3 h-3 mr-1" /> {error}</p>}
-
-                                        <button
-                                            onClick={() => handleVerify(order.id)}
-                                            className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-black uppercase tracking-widest text-xs transition-all shadow-lg"
-                                        >
-                                            Completar Entrega
-                                        </button>
-                                    </div>
-                                )}
 
                                 <div className={`p-6 ${order.paymentStatus === 'paid' ? 'bg-blue-600 text-white' : order.status === 'ready' ? 'bg-emerald-500 text-white' : 'bg-gray-900 text-white'} flex justify-between items-center`}>
                                     <div>
@@ -378,7 +368,7 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
                                                 <button
                                                     onClick={() => {
                                                         if (order.paymentStatus === 'paid') {
-                                                            setVerifyingOrder(order.id);
+                                                            setVerifyingOrder(order);
                                                             setError(null);
                                                         } else {
                                                             setPayingOrder(order);
@@ -604,6 +594,14 @@ export const LocalDispatchSection: React.FC<LocalDispatchProps> = ({
                     </div>
                 </div>
             )}
+
+            <OrderDeliveryVerificationModal
+                isOpen={!!verifyingOrder}
+                order={verifyingOrder}
+                staff={staff}
+                onClose={() => setVerifyingOrder(null)}
+                onVerified={handleCompleteVerifiedDelivery}
+            />
         </div>
     );
 };

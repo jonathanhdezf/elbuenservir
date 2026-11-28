@@ -161,10 +161,21 @@ function buildMenuContext(menuItems: MenuItem[], categories: Category[]): string
     items.forEach(item => {
       const vars = item.variations.map(v => `${v.label}: $${v.price}`).join(' | ');
       const flags: string[] = [];
-      if (item.allowAccompaniments === false) flags.push('sin notas/acompañamientos');
-      if (item.allowSides === false) flags.push('sin guarnición');
+      if (item.allowAccompaniments === false) {
+        flags.push('sin notas/acompañamientos');
+      } else if (item.customAccompaniments?.length) {
+        flags.push(`acompañamientos: ${item.customAccompaniments.join(', ')}`);
+      }
+      if (item.allowSides === false) {
+        flags.push('sin guarnición');
+      } else if (item.customSides?.length) {
+        flags.push(`guarniciones: ${item.customSides.join(', ')}`);
+      }
       const flagText = flags.length > 0 ? ` [${flags.join(', ')}]` : '';
-      lines.push(`• ${item.name} (${vars})${flagText}`);
+      const rellenoRule = item.name.toLowerCase().includes('relleno') && item.name.toLowerCase().includes('tlayoyo')
+        ? ' — REGLA: 1 ingrediente cuesta $20; si el cliente combina 2 ingredientes en un mismo tlayoyo cuesta $25'
+        : '';
+      lines.push(`• ${item.name} (${vars})${flagText}${rellenoRule}`);
     });
   });
 
@@ -436,7 +447,7 @@ export default function LiveOrderModal({
     cartRef.current = nextCart;
     setCart(nextCart);
 
-    try { soundManager.play('confirm_generic'); } catch (e) { }
+    try { soundManager.play('confirm'); } catch (e) { }
     setTimeout(() => setLastAddedId(null), 2000);
   }, [resolveDishFromCatalog]);
 
@@ -1347,7 +1358,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
         comments: i.notes
       })));
     }
-    soundManager.play('confirm_generic');
+    soundManager.play('confirm');
     disconnect();
     onClose();
   };
@@ -1501,7 +1512,7 @@ INSTRUCCIONES CLAVE Y USO OBLIGATORIO DE HERRAMIENTAS:
                 onClick={() => {
                   localStorage.setItem('gemini_api_key', customApiKey.trim());
                   setShowApiKeyModal(false);
-                  soundManager.play('confirm_generic');
+                  soundManager.play('confirm');
                   disconnect();
                   setTimeout(() => connect(), 200);
                 }}

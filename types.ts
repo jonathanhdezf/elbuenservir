@@ -14,6 +14,8 @@ export interface MenuItem {
   variations: PricingVariation[];
   allowAccompaniments?: boolean;
   allowSides?: boolean;
+  customAccompaniments?: string[];
+  customSides?: string[];
 }
 
 
@@ -76,6 +78,9 @@ export interface Order {
   deliveryFee?: number;
   notifiedStatuses?: Record<string, boolean>;
   whatsappNotified?: boolean;
+  deliveredBy?: string;
+  deliveredById?: string;
+  deliveredAt?: string;
 }
 
 export interface Customer {

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { MenuItem, Category, TabId, Order, Customer, DeliveryDriver, Staff, SiteLog, AdminSection, EnabledModules, DEFAULT_ENABLED_MODULES } from './types';
 import AdminView from './views/AdminView';
 import PublicView from './views/PublicView';
@@ -11,8 +11,10 @@ import ControlPanelView from './views/ControlPanelView';
 import RepartidorView from './views/RepartidorView';
 import { ControlPanelAuthModal } from './components/ControlPanelAuthModal';
 import { DigitalTicketModal } from './components/DigitalTicketModal';
-import { databaseService, mapOrderFromDb, mapMenuItemFromDb, mapCategoryFromDb, mapCustomerFromDb } from './services/databaseService';
+import { databaseService, NormalizedRealtimeChange } from './services/databaseService';
 import { notificationService } from './services/notificationService';
+import { mergeSavedMenuItemOptions, saveMenuItemOptions } from './utils/menuOptions';
+import { mergeOrderDeliveryAudit, mergeSingleOrderDeliveryAudit, saveOrderDeliveryAudit } from './utils/orderVerification';
 
 const INITIAL_CATEGORIES: Category[] = [
   { id: 'cat-3', name: 'Menú del Día' },
@@ -39,6 +41,24 @@ const RAW_INITIAL_ITEMS: MenuItem[] = [
     allowSides: false,
     variations: [
       { id: 'm-tlayoyos-v1', label: 'Por pieza', price: 10 }
+    ]
+  },
+  {
+    id: 'item-1795824048202',
+    categoryId: 'cat-desayunos',
+    name: 'Tlayoyos Rellenos',
+    description: 'Tlayoyos rellenos preparados al gusto (1 ingrediente $20 · 2 ingredientes $25): Pollo, Chicharrón, Longaniza, Champiñón, Queso de hebra, Bistec y Salchicha. Elige tu salsa y queso.',
+    isActive: true,
+    allowAccompaniments: true,
+    allowSides: false,
+    variations: [
+      { id: 'v-relleno-pollo', label: 'Pollo', price: 20 },
+      { id: 'v-relleno-chicharron', label: 'Chicharrón', price: 20 },
+      { id: 'v-relleno-longaniza', label: 'Longaniza', price: 20 },
+      { id: 'v-relleno-champinon', label: 'Champiñón', price: 20 },
+      { id: 'v-relleno-queso-hebra', label: 'Queso de hebra', price: 20 },
+      { id: 'v-relleno-bistec', label: 'Bistec', price: 20 },
+      { id: 'v-relleno-salchicha', label: 'Salchicha', price: 20 }
     ]
   },
   {
@@ -363,34 +383,117 @@ const INITIAL_LOGS: SiteLog[] = [
     type: 'success'
   }
 ];
+type AppView = 'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch' | 'control_panel' | 'driver_portal';
+type PanelView = Exclude<AppView, 'public'>;
+
+const PANEL_VIEW_STORAGE_KEY = 'tlayoyos_3_marias_active_panel_view';
+const ADMIN_SECTION_STORAGE_KEY = 'tlayoyos_3_marias_admin_section';
+const VALID_PANEL_VIEWS: readonly PanelView[] = [
+  'control_panel',
+  'admin',
+  'kitchen',
+  'logistics',
+  'tpv',
+  'local_dispatch',
+  'driver_portal',
+];
+const VALID_ADMIN_SECTIONS: readonly AdminSection[] = [
+  'dashboard',
+  'kitchen',
+  'kds',
+  'dds',
+  'menu',
+  'orders',
+  'customers',
+  'reports',
+  'driver_dashboard',
+  'tpv',
+  'local_dispatch',
+  'staff_management',
+  'logs',
+  'payroll',
+];
+
+const isValidPanelView = (val: string | null): val is PanelView =>
+  Boolean(val && (VALID_PANEL_VIEWS as readonly string[]).includes(val));
+
+const isValidAdminSection = (val: string | null): val is AdminSection =>
+  Boolean(val && (VALID_ADMIN_SECTIONS as readonly string[]).includes(val));
+
 const isAdminRoutePath = (pathname: string) => {
   const normalized = pathname.replace(/\/+$/, '').toLowerCase();
   return normalized === '/administracion' || normalized === '/admin';
 };
 
-export default function App() {
-  const [view, setView] = useState<'admin' | 'public' | 'kitchen' | 'logistics' | 'tpv' | 'local_dispatch' | 'control_panel' | 'driver_portal'>(() => {
-    if (typeof window !== 'undefined' && isAdminRoutePath(window.location.pathname)) {
-      return 'control_panel';
+const getInitialPanelView = (): AppView => {
+  if (typeof window === 'undefined') return 'public';
+  if (!isAdminRoutePath(window.location.pathname)) return 'public';
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const moduloParam = params.get('modulo');
+    if (isValidPanelView(moduloParam)) {
+      return moduloParam;
     }
-    return 'public';
-  });
+    const storedView = sessionStorage.getItem(PANEL_VIEW_STORAGE_KEY);
+    if (isValidPanelView(storedView)) {
+      return storedView;
+    }
+  } catch {
+    // ignore storage/url errors
+  }
+  return 'control_panel';
+};
+
+const getInitialAdminSection = (): AdminSection => {
+  if (typeof window === 'undefined') return 'dashboard';
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const sectionParam = params.get('section');
+    if (isValidAdminSection(sectionParam)) return sectionParam;
+    const storedSection = sessionStorage.getItem(ADMIN_SECTION_STORAGE_KEY);
+    if (isValidAdminSection(storedSection)) return storedSection;
+  } catch {
+    // ignore
+  }
+  return 'dashboard';
+};
+
+export default function App() {
+  const [view, setView] = useState<AppView>(getInitialPanelView);
   const [categories, setCategories] = useState<Category[]>(INITIAL_CATEGORIES);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(INITIAL_ITEMS);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>(() => mergeSavedMenuItemOptions(INITIAL_ITEMS));
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [drivers, setDrivers] = useState<DeliveryDriver[]>(INITIAL_DRIVERS);
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
   const [staff, setStaff] = useState<Staff[]>(INITIAL_STAFF);
   const [logs, setLogs] = useState<SiteLog[]>(INITIAL_LOGS);
+
+  const categoriesRef = React.useRef<Category[]>(categories);
+  const menuItemsRef = React.useRef<MenuItem[]>(menuItems);
+  const ordersRef = React.useRef<Order[]>(orders);
+  const driversRef = React.useRef<DeliveryDriver[]>(drivers);
+  const customersRef = React.useRef<Customer[]>(customers);
+  const staffRef = React.useRef<Staff[]>(staff);
+  const logsRef = React.useRef<SiteLog[]>(logs);
+
+  useEffect(() => { categoriesRef.current = categories; }, [categories]);
+  useEffect(() => { menuItemsRef.current = menuItems; }, [menuItems]);
+  useEffect(() => { ordersRef.current = orders; }, [orders]);
+  useEffect(() => { driversRef.current = drivers; }, [drivers]);
+  useEffect(() => { customersRef.current = customers; }, [customers]);
+  useEffect(() => { staffRef.current = staff; }, [staff]);
+  useEffect(() => { logsRef.current = logs; }, [logs]);
   const [tpvEditOrder, setTpvEditOrder] = useState<Order | null>(null);
   const [tpvInitialTable, setTpvInitialTable] = useState<string | null>(null);
   const [tpvReturnView, setTpvReturnView] = useState<'control_panel' | 'local_dispatch'>('control_panel');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [systemBgColor, setSystemBgColor] = useState('#0f172a');
   const [systemBgEffect, setSystemBgEffect] = useState<'none' | 'gradient' | 'animated-blobs' | 'stars'>('gradient');
-  const [adminInitialSection, setAdminInitialSection] = useState<AdminSection>('dashboard');
+  const [adminInitialSection, setAdminInitialSection] = useState<AdminSection>(getInitialAdminSection);
   const [panelMode, setPanelMode] = useState<'basic' | 'advanced'>('basic');
   const [pendingRedirectSection, setPendingRedirectSection] = useState<AdminSection | null>(null);
+  const viewRef = React.useRef<AppView>(view);
+  useEffect(() => { viewRef.current = view; }, [view]);
 
   const [enabledModules, setEnabledModules] = useState<EnabledModules>(() => {
     try {
@@ -426,10 +529,53 @@ export default function App() {
       return false;
     }
   });
+  const isPanelAuthenticatedRef = React.useRef<boolean>(isPanelAuthenticated);
+  useEffect(() => { isPanelAuthenticatedRef.current = isPanelAuthenticated; }, [isPanelAuthenticated]);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
+  const navigateToView = React.useCallback((nextView: AppView, section?: AdminSection) => {
+    viewRef.current = nextView;
+    setView(nextView);
+
+    if (section) {
+      setAdminInitialSection(section);
+      try {
+        sessionStorage.setItem(ADMIN_SECTION_STORAGE_KEY, section);
+      } catch {
+        // ignore
+      }
+    }
+
+    try {
+      if (nextView === 'public') {
+        sessionStorage.removeItem(PANEL_VIEW_STORAGE_KEY);
+        if (isAdminRoutePath(window.location.pathname) || window.location.search.includes('modulo=')) {
+          window.history.replaceState({}, '', '/');
+        }
+      } else {
+        sessionStorage.setItem(PANEL_VIEW_STORAGE_KEY, nextView);
+        const url = new URL(window.location.href);
+        url.pathname = '/administracion';
+        if (nextView === 'control_panel') {
+          url.searchParams.delete('modulo');
+          url.searchParams.delete('section');
+        } else {
+          url.searchParams.set('modulo', nextView);
+          if (nextView === 'admin' && section) {
+            url.searchParams.set('section', section);
+          } else if (nextView !== 'admin') {
+            url.searchParams.delete('section');
+          }
+        }
+        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+      }
+    } catch {
+      // ignore history/storage errors
+    }
+  }, []);
+
   const handleEnterControlPanel = () => {
-    if (isPanelAuthenticated) {
+    if (isPanelAuthenticatedRef.current) {
       try {
         if (!isAdminRoutePath(window.location.pathname)) {
           window.history.pushState({}, '', '/administracion');
@@ -437,20 +583,20 @@ export default function App() {
       } catch {
         // ignore
       }
-      setView('control_panel');
+      navigateToView('control_panel');
     } else {
       setIsAuthModalOpen(true);
     }
   };
 
-  const handleOpenAdminOrders = (orderId?: string | null) => {
-    const hasAdminSession = isPanelAuthenticated || notificationService.isAdmin();
+  const handleOpenAdminOrders = React.useCallback((orderId?: string | null) => {
+    const hasAdminSession = isPanelAuthenticatedRef.current || notificationService.isAdmin();
 
     if (hasAdminSession) {
+      isPanelAuthenticatedRef.current = true;
       setIsPanelAuthenticated(true);
       notificationService.setAdminAuthenticated(true);
-      setAdminInitialSection('orders');
-      setView('admin');
+      navigateToView('admin', 'orders');
 
       // Dispatch to AdminView (in case it is already mounted)
       setTimeout(() => {
@@ -459,11 +605,10 @@ export default function App() {
         }));
       }, 50);
 
-      // Clean up URL parameters cleanly without page refresh
+      // Clean up temporary deep-link URL parameters cleanly without page refresh
       try {
         const url = new URL(window.location.href);
-        if (url.searchParams.has('section') || url.searchParams.has('action') || url.searchParams.has('orderId')) {
-          url.searchParams.delete('section');
+        if (url.searchParams.has('action') || url.searchParams.has('orderId') || url.searchParams.has('view')) {
           url.searchParams.delete('action');
           url.searchParams.delete('orderId');
           url.searchParams.delete('view');
@@ -477,9 +622,10 @@ export default function App() {
       setPendingRedirectSection('orders');
       setIsAuthModalOpen(true);
     }
-  };
+  }, [navigateToView]);
 
   const handleAuthSuccess = () => {
+    isPanelAuthenticatedRef.current = true;
     setIsPanelAuthenticated(true);
     notificationService.setAdminAuthenticated(true);
 
@@ -493,13 +639,15 @@ export default function App() {
     if (pendingRedirectSection) {
       const targetSec = pendingRedirectSection;
       setPendingRedirectSection(null);
-      setAdminInitialSection(targetSec);
-      setView('admin');
+      navigateToView('admin', targetSec);
       setTimeout(() => {
         window.dispatchEvent(new CustomEvent('navigate_to_admin_section', {
           detail: { section: targetSec, orderId: null }
         }));
       }, 50);
+    } else if (viewRef.current !== 'public' && viewRef.current !== 'control_panel') {
+      // Preserve intended module when authenticating directly on e.g. /administracion?modulo=kitchen
+      navigateToView(viewRef.current);
     } else {
       try {
         if (!isAdminRoutePath(window.location.pathname)) {
@@ -508,12 +656,17 @@ export default function App() {
       } catch {
         // ignore
       }
-      setView('control_panel');
+      navigateToView('control_panel');
     }
   };
 
   const [digitalTicketOrderId, setDigitalTicketOrderId] = useState<string | null>(null);
+  const digitalTicketOrderIdRef = useRef<string | null>(null);
   const [isDigitalTicketOpen, setIsDigitalTicketOpen] = useState(false);
+
+  useEffect(() => {
+    digitalTicketOrderIdRef.current = digitalTicketOrderId;
+  }, [digitalTicketOrderId]);
 
   useEffect(() => {
     const handleUrlTicket = () => {
@@ -577,23 +730,35 @@ export default function App() {
 
   // Handle notification clicks, URL deep links, and service worker messages to open orders
   useEffect(() => {
-    const handleUrlNavigation = () => {
+    const handleUrlNavigation = (event?: PopStateEvent) => {
       try {
-        if (isAdminRoutePath(window.location.pathname)) {
-          setView('control_panel');
-          return;
-        }
-
+        const isPop = Boolean(event);
         const search = window.location.search;
         const params = new URLSearchParams(search);
         const viewParam = params.get('view');
         const sectionParam = params.get('section');
         const actionParam = params.get('action');
 
-        if ((viewParam === 'admin' && sectionParam === 'orders') || actionParam === 'open_orders' || sectionParam === 'orders') {
+        if ((viewParam === 'admin' && sectionParam === 'orders') || actionParam === 'open_orders' || (!isAdminRoutePath(window.location.pathname) && sectionParam === 'orders')) {
           handleOpenAdminOrders(params.get('orderId'));
-        } else if (window.location.pathname === '/' || window.location.pathname === '') {
-          setView((currentView) => (currentView === 'control_panel' ? 'public' : currentView));
+          return;
+        }
+
+        if (isAdminRoutePath(window.location.pathname)) {
+          // Never hijack active sub-views (KDS, Barra, TPV, Admin, Logística) back to control_panel on popstate/trap events
+          if (isPop && viewRef.current !== 'public') {
+            return;
+          }
+          if (!isPop && viewRef.current === 'public') {
+            navigateToView(getInitialPanelView());
+          }
+          return;
+        }
+
+        if (window.location.pathname === '/' || window.location.pathname === '') {
+          if (viewRef.current === 'control_panel') {
+            navigateToView('public');
+          }
         }
       } catch (e) {
         console.warn('Error reading URL navigation params:', e);
@@ -634,9 +799,9 @@ export default function App() {
         channel.close();
       }
     };
-  }, [isPanelAuthenticated]);
+  }, [handleOpenAdminOrders, navigateToView]);
 
-  // Load and sync from Supabase PostgreSQL Database with Realtime
+  // Load and sync from Supabase PostgreSQL Database with quota-safe Broadcast + Realtime
   useEffect(() => {
     let isMounted = true;
 
@@ -648,65 +813,321 @@ export default function App() {
       INITIAL_STAFF
     ).then((result) => {
       if (!isMounted || !result) return;
-      if (result.categories?.length) setCategories(result.categories);
-      if (result.menuItems?.length) setMenuItems(result.menuItems);
-      if (result.orders) setOrders(result.orders);
-      if (result.customers?.length) setCustomers(result.customers);
-      if (result.drivers?.length) setDrivers(result.drivers);
-      if (result.staff?.length) setStaff(result.staff);
+      if (result.categories?.length) {
+        categoriesRef.current = result.categories;
+        setCategories(result.categories);
+      }
+      if (result.menuItems?.length) {
+        const mergedItems = mergeSavedMenuItemOptions(result.menuItems);
+        menuItemsRef.current = mergedItems;
+        setMenuItems(mergedItems);
+      }
+      if (result.orders) {
+        const mergedOrders = mergeOrderDeliveryAudit(result.orders);
+        ordersRef.current = mergedOrders;
+        setOrders(mergedOrders);
+      }
+      if (result.customers?.length) {
+        customersRef.current = result.customers;
+        setCustomers(result.customers);
+      }
+      if (result.drivers?.length) {
+        driversRef.current = result.drivers;
+        setDrivers(result.drivers);
+      }
+      if (result.staff?.length) {
+        staffRef.current = result.staff;
+        setStaff(result.staff);
+      }
     });
 
+    const applyRemoteOrderUpsert = (rawOrder: Order) => {
+      const incoming = mergeSingleOrderDeliveryAudit(rawOrder);
+      if (incoming.deliveredBy && incoming.deliveredAt) {
+        saveOrderDeliveryAudit(incoming.id, {
+          deliveredBy: incoming.deliveredBy,
+          deliveredById: incoming.deliveredById || incoming.waiterId || '',
+          deliveredAt: incoming.deliveredAt
+        });
+      }
+
+      const prev = ordersRef.current;
+      const existing = prev.find(o => o.id === incoming.id);
+      if (!existing) {
+        const next = [incoming, ...prev];
+        ordersRef.current = next;
+        setOrders(next);
+        if (notificationService.isAdmin() && (incoming.status === 'pending' || incoming.status === 'kitchen')) {
+          notificationService.notifyNewOrder(incoming);
+        }
+      } else if (JSON.stringify(existing) !== JSON.stringify(incoming)) {
+        const next = prev.map(o => (o.id === incoming.id ? incoming : o));
+        ordersRef.current = next;
+        setOrders(next);
+      }
+    };
+
+    // Filter Realtime order updates by relevant order IDs for the active view to minimize Supabase quota and network traffic
+    const getRelevantOrderIdsForView = (
+      currentView: AppView,
+      allOrders: Order[],
+      activeTicketId?: string | null
+    ): Set<string> | null => {
+      // In admin and control panel, all orders are needed for full oversight
+      if (currentView === 'admin' || currentView === 'control_panel') {
+        return null;
+      }
+
+      // KDS: only active orders sent to kitchen
+      if (currentView === 'kitchen') {
+        return new Set(
+          allOrders
+            .filter(o => o.status === 'pending' || o.status === 'kitchen' || o.status === 'ready')
+            .map(o => o.id)
+        );
+      }
+
+      // Logistics / Delivery: only active delivery & ready orders
+      if (currentView === 'logistics' || currentView === 'driver_portal') {
+        return new Set(
+          allOrders
+            .filter(o => o.status === 'kitchen' || o.status === 'ready' || o.status === 'delivery')
+            .map(o => o.id)
+        );
+      }
+
+      // Local Dispatch & TPV: table and counter service active orders
+      if (currentView === 'local_dispatch' || currentView === 'tpv') {
+        return new Set(
+          allOrders
+            .filter(o => o.status !== 'delivered' && o.status !== 'cancelled')
+            .map(o => o.id)
+        );
+      }
+
+      // Public menu view: only client's own digital ticket or recent online session orders
+      if (currentView === 'public') {
+        const relevant = new Set<string>();
+        if (activeTicketId) relevant.add(activeTicketId);
+        allOrders
+          .filter(o => o.source === 'online' && o.status !== 'delivered' && o.status !== 'cancelled')
+          .slice(0, 5)
+          .forEach(o => relevant.add(o.id));
+        return relevant;
+      }
+
+      return null;
+    };
+
+    const isOrderRelevantForView = (
+      orderId: string,
+      order: Order | undefined,
+      eventType: 'INSERT' | 'UPDATE' | 'DELETE' = 'UPDATE',
+      currentView: AppView,
+      allOrders: Order[],
+      activeTicketId?: string | null
+    ): boolean => {
+      const relevantIds = getRelevantOrderIdsForView(currentView, allOrders, activeTicketId);
+      if (relevantIds === null) return true;
+
+      if (orderId && relevantIds.has(orderId)) return true;
+
+      if (eventType === 'INSERT') {
+        if (!order) return true;
+        if (currentView === 'kitchen') {
+          return order.status === 'pending' || order.status === 'kitchen';
+        }
+        if (currentView === 'logistics' || currentView === 'driver_portal') {
+          return Boolean(order.address?.toLowerCase().includes('domicilio')) || order.status === 'ready' || order.status === 'delivery';
+        }
+        if (currentView === 'local_dispatch' || currentView === 'tpv') {
+          return Boolean(order.address?.toLowerCase().includes('mesa') || order.address?.toLowerCase().includes('mostrador'));
+        }
+        if (currentView === 'public') {
+          return Boolean(activeTicketId && order.id === activeTicketId);
+        }
+        return true;
+      }
+
+      if (eventType === 'DELETE') {
+        return Boolean(orderId && relevantIds.has(orderId));
+      }
+
+      if (order) {
+        if (currentView === 'kitchen' && (order.status === 'kitchen' || order.status === 'pending' || order.status === 'ready')) {
+          return true;
+        }
+        if (currentView === 'logistics' && (order.status === 'ready' || order.status === 'delivery')) {
+          return true;
+        }
+        if ((currentView === 'local_dispatch' || currentView === 'tpv') && order.status !== 'delivered' && order.status !== 'cancelled') {
+          return true;
+        }
+      }
+
+      return false;
+    };
+
     const unsubscribe = databaseService.subscribeToChanges({
-      onOrderChange: (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newOrder = mapOrderFromDb(payload.new);
-          // Send push notification and audio alert for newly received order ONLY if admin is authenticated
-          if (notificationService.isAdmin()) {
-            notificationService.notifyNewOrder(newOrder);
+      getRelevantOrderIds: () => {
+        return getRelevantOrderIdsForView(viewRef.current, ordersRef.current, digitalTicketOrderIdRef.current);
+      },
+      isOrderRelevant: (orderId: string, order?: Order, eventType?: 'INSERT' | 'UPDATE' | 'DELETE') => {
+        return isOrderRelevantForView(
+          orderId,
+          order,
+          eventType,
+          viewRef.current,
+          ordersRef.current,
+          digitalTicketOrderIdRef.current
+        );
+      },
+      onOrderChange: (change: NormalizedRealtimeChange<Order>) => {
+        if (!isMounted) return;
+        const currentView = viewRef.current;
+        const targetId = change.id || change.record?.id;
+        const isRelevant = isOrderRelevantForView(
+          targetId || '',
+          change.record,
+          change.eventType,
+          currentView,
+          ordersRef.current,
+          digitalTicketOrderIdRef.current
+        );
+        if (!isRelevant) return;
+
+        if (change.eventType === 'DELETE') {
+          if (!change.id) return;
+          const next = ordersRef.current.filter(o => o.id !== change.id);
+          if (next.length !== ordersRef.current.length) {
+            ordersRef.current = next;
+            setOrders(next);
           }
-          setOrders(prev => {
-            if (prev.some(o => o.id === newOrder.id)) return prev;
-            return [newOrder, ...prev];
+          return;
+        }
+        if (change.record) {
+          applyRemoteOrderUpsert(change.record);
+        }
+      },
+      onOrderSyncBatch: (recentOrders: Order[]) => {
+        if (!isMounted || !recentOrders) return;
+        const mergedRecent = mergeOrderDeliveryAudit(recentOrders);
+        const recentMap = new Map<string, Order>(mergedRecent.map(o => [o.id, o]));
+        const prev = ordersRef.current;
+        const prevMap = new Map<string, Order>(prev.map(o => [o.id, o]));
+
+        let hasChanges = false;
+        const newlyAdded: Order[] = [];
+
+        for (const rec of mergedRecent) {
+          const existing = prevMap.get(rec.id);
+          if (!existing) {
+            hasChanges = true;
+            newlyAdded.push(rec);
+          } else if (JSON.stringify(existing) !== JSON.stringify(rec)) {
+            hasChanges = true;
+          }
+        }
+
+        // Preserve historical orders older than the catch-up window
+        const oldestRecentTs = mergedRecent.length >= 80
+          ? Math.min(...mergedRecent.map(o => new Date(o.createdAt).getTime() || Date.now()))
+          : -Infinity;
+
+        const preservedOlder = prev.filter(o => {
+          if (recentMap.has(o.id)) return false;
+          const ts = new Date(o.createdAt).getTime() || 0;
+          if (ts < oldestRecentTs) return true;
+          hasChanges = true; // pruned order deleted within recent window
+          return false;
+        });
+
+        if (!hasChanges) return;
+
+        const next = [...mergedRecent, ...preservedOlder];
+        ordersRef.current = next;
+        setOrders(next);
+
+        if (notificationService.isAdmin() && newlyAdded.length > 0) {
+          newlyAdded.forEach(order => {
+            if (order.status === 'pending' || order.status === 'kitchen') {
+              notificationService.notifyNewOrder(order);
+            }
           });
-        } else if (payload.eventType === 'UPDATE') {
-          const updatedOrder = mapOrderFromDb(payload.new);
-          setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-        } else if (payload.eventType === 'DELETE') {
-          setOrders(prev => prev.filter(o => o.id !== payload.old?.id));
         }
       },
-      onMenuItemChange: (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newItem = mapMenuItemFromDb(payload.new);
-          setMenuItems(prev => [...prev.filter(i => i.id !== newItem.id), newItem]);
-        } else if (payload.eventType === 'UPDATE') {
-          const updatedItem = mapMenuItemFromDb(payload.new);
-          setMenuItems(prev => prev.map(i => i.id === updatedItem.id ? updatedItem : i));
-        } else if (payload.eventType === 'DELETE') {
-          setMenuItems(prev => prev.filter(i => i.id !== payload.old?.id));
+      onMenuItemChange: (change: NormalizedRealtimeChange<MenuItem>) => {
+        if (!isMounted) return;
+        if (change.eventType === 'DELETE') {
+          if (!change.id) return;
+          const next = menuItemsRef.current.filter(i => i.id !== change.id);
+          menuItemsRef.current = next;
+          setMenuItems(next);
+          return;
+        }
+        if (change.record) {
+          const incoming = mergeSavedMenuItemOptions([change.record])[0];
+          const prev = menuItemsRef.current;
+          const exists = prev.some(i => i.id === incoming.id);
+          const next = exists ? prev.map(i => (i.id === incoming.id ? incoming : i)) : [...prev, incoming];
+          menuItemsRef.current = next;
+          setMenuItems(next);
+          saveMenuItemOptions(next);
         }
       },
-      onCategoryChange: (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newCat = mapCategoryFromDb(payload.new);
-          setCategories(prev => [...prev.filter(c => c.id !== newCat.id), newCat]);
-        } else if (payload.eventType === 'UPDATE') {
-          const updatedCat = mapCategoryFromDb(payload.new);
-          setCategories(prev => prev.map(c => c.id === updatedCat.id ? updatedCat : c));
-        } else if (payload.eventType === 'DELETE') {
-          setCategories(prev => prev.filter(c => c.id !== payload.old?.id));
+      onCategoryChange: (change: NormalizedRealtimeChange<Category>) => {
+        if (!isMounted) return;
+        if (change.eventType === 'DELETE') {
+          if (!change.id) return;
+          const next = categoriesRef.current.filter(c => c.id !== change.id);
+          categoriesRef.current = next;
+          setCategories(next);
+          return;
+        }
+        if (change.record) {
+          const incoming = change.record;
+          const prev = categoriesRef.current;
+          const exists = prev.some(c => c.id === incoming.id);
+          const next = exists ? prev.map(c => (c.id === incoming.id ? incoming : c)) : [...prev, incoming];
+          categoriesRef.current = next;
+          setCategories(next);
         }
       },
-      onCustomerChange: (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newCust = mapCustomerFromDb(payload.new);
-          setCustomers(prev => [...prev.filter(c => c.id !== newCust.id), newCust]);
-        } else if (payload.eventType === 'UPDATE') {
-          const updatedCust = mapCustomerFromDb(payload.new);
-          setCustomers(prev => prev.map(c => c.id === updatedCust.id ? updatedCust : c));
-        } else if (payload.eventType === 'DELETE') {
-          setCustomers(prev => prev.filter(c => c.id !== payload.old?.id));
+      onCustomerChange: (change: NormalizedRealtimeChange<Customer>) => {
+        if (!isMounted) return;
+        if (change.eventType === 'DELETE') {
+          if (!change.id) return;
+          const next = customersRef.current.filter(c => c.id !== change.id);
+          customersRef.current = next;
+          setCustomers(next);
+          return;
         }
+        if (change.record) {
+          const incoming = change.record;
+          const prev = customersRef.current;
+          const exists = prev.some(c => c.id === incoming.id);
+          const next = exists ? prev.map(c => (c.id === incoming.id ? incoming : c)) : [...prev, incoming];
+          customersRef.current = next;
+          setCustomers(next);
+        }
+      },
+      onDriverChange: (change: NormalizedRealtimeChange<DeliveryDriver>) => {
+        if (!isMounted || !change.record) return;
+        const incoming = change.record;
+        const prev = driversRef.current;
+        const exists = prev.some(d => d.id === incoming.id);
+        const next = exists ? prev.map(d => (d.id === incoming.id ? incoming : d)) : [...prev, incoming];
+        driversRef.current = next;
+        setDrivers(next);
+      },
+      onStaffChange: (change: NormalizedRealtimeChange<Staff>) => {
+        if (!isMounted || !change.record) return;
+        const incoming = change.record;
+        const prev = staffRef.current;
+        const exists = prev.some(s => s.id === incoming.id);
+        const next = exists ? prev.map(s => (s.id === incoming.id ? incoming : s)) : [...prev, incoming];
+        staffRef.current = next;
+        setStaff(next);
       }
     });
 
@@ -716,103 +1137,108 @@ export default function App() {
     };
   }, []);
 
-  // Sync state mutation handlers with Supabase
-  const handleSetOrders: React.Dispatch<React.SetStateAction<Order[]>> = (action) => {
-    setOrders(prev => {
-      const next = typeof action === 'function' ? action(prev) : action;
-      const changed = next.filter(nextOrder => {
-        const oldOrder = prev.find(p => p.id === nextOrder.id);
-        return !oldOrder || JSON.stringify(oldOrder) !== JSON.stringify(nextOrder);
-      });
-      changed.forEach(order => databaseService.upsertOrder(order));
+  // Sync state mutation handlers with Supabase outside React state updaters (StrictMode safe)
+  const handleSetOrders: React.Dispatch<React.SetStateAction<Order[]>> = React.useCallback((action) => {
+    const prev = ordersRef.current;
+    const next = typeof action === 'function' ? action(prev) : action;
+    ordersRef.current = next;
+    setOrders(next);
 
-      const deleted = prev.filter(p => !next.some(n => n.id === p.id));
-      deleted.forEach(order => databaseService.deleteOrder(order.id));
-
-      return next;
+    const changed = next.filter(nextOrder => {
+      const oldOrder = prev.find(p => p.id === nextOrder.id);
+      return !oldOrder || JSON.stringify(oldOrder) !== JSON.stringify(nextOrder);
     });
-  };
+    changed.forEach(order => databaseService.upsertOrder(order));
 
-  const handleSetMenuItems: React.Dispatch<React.SetStateAction<MenuItem[]>> = (action) => {
-    setMenuItems(prev => {
-      const next = typeof action === 'function' ? action(prev) : action;
-      const changed = next.filter(nextItem => {
-        const oldItem = prev.find(p => p.id === nextItem.id);
-        return !oldItem || JSON.stringify(oldItem) !== JSON.stringify(nextItem);
-      });
-      changed.forEach(item => databaseService.upsertMenuItem(item));
+    const deleted = prev.filter(p => !next.some(n => n.id === p.id));
+    deleted.forEach(order => databaseService.deleteOrder(order.id));
+  }, []);
 
-      const deleted = prev.filter(p => !next.some(n => n.id === p.id));
-      deleted.forEach(item => databaseService.deleteMenuItem(item.id));
+  const handleSetMenuItems: React.Dispatch<React.SetStateAction<MenuItem[]>> = React.useCallback((action) => {
+    const prev = menuItemsRef.current;
+    const next = typeof action === 'function' ? action(prev) : action;
+    menuItemsRef.current = next;
+    setMenuItems(next);
+    saveMenuItemOptions(next);
 
-      return next;
+    const changed = next.filter(nextItem => {
+      const oldItem = prev.find(p => p.id === nextItem.id);
+      return !oldItem || JSON.stringify(oldItem) !== JSON.stringify(nextItem);
     });
-  };
+    changed.forEach(item => databaseService.upsertMenuItem(item));
 
-  const handleSetCategories: React.Dispatch<React.SetStateAction<Category[]>> = (action) => {
-    setCategories(prev => {
-      const next = typeof action === 'function' ? action(prev) : action;
-      const changed = next.filter(nextCat => {
-        const oldCat = prev.find(p => p.id === nextCat.id);
-        return !oldCat || JSON.stringify(oldCat) !== JSON.stringify(nextCat);
-      });
-      changed.forEach(cat => databaseService.upsertCategory(cat));
+    const deleted = prev.filter(p => !next.some(n => n.id === p.id));
+    deleted.forEach(item => databaseService.deleteMenuItem(item.id));
+  }, []);
 
-      const deleted = prev.filter(p => !next.some(n => n.id === p.id));
-      deleted.forEach(cat => databaseService.deleteCategory(cat.id));
+  const handleSetCategories: React.Dispatch<React.SetStateAction<Category[]>> = React.useCallback((action) => {
+    const prev = categoriesRef.current;
+    const next = typeof action === 'function' ? action(prev) : action;
+    categoriesRef.current = next;
+    setCategories(next);
 
-      return next;
+    const changed = next.filter(nextCat => {
+      const oldCat = prev.find(p => p.id === nextCat.id);
+      return !oldCat || JSON.stringify(oldCat) !== JSON.stringify(nextCat);
     });
-  };
+    changed.forEach(cat => databaseService.upsertCategory(cat));
 
-  const handleSetCustomers: React.Dispatch<React.SetStateAction<Customer[]>> = (action) => {
-    setCustomers(prev => {
-      const next = typeof action === 'function' ? action(prev) : action;
-      const changed = next.filter(nextCust => {
-        const oldCust = prev.find(p => p.id === nextCust.id);
-        return !oldCust || JSON.stringify(oldCust) !== JSON.stringify(nextCust);
-      });
-      changed.forEach(cust => databaseService.upsertCustomer(cust));
+    const deleted = prev.filter(p => !next.some(n => n.id === p.id));
+    deleted.forEach(cat => databaseService.deleteCategory(cat.id));
+  }, []);
 
-      const deleted = prev.filter(p => !next.some(n => n.id === p.id));
-      deleted.forEach(cust => databaseService.deleteCustomer(cust.id));
+  const handleSetCustomers: React.Dispatch<React.SetStateAction<Customer[]>> = React.useCallback((action) => {
+    const prev = customersRef.current;
+    const next = typeof action === 'function' ? action(prev) : action;
+    customersRef.current = next;
+    setCustomers(next);
 
-      return next;
+    const changed = next.filter(nextCust => {
+      const oldCust = prev.find(p => p.id === nextCust.id);
+      return !oldCust || JSON.stringify(oldCust) !== JSON.stringify(nextCust);
     });
-  };
+    changed.forEach(cust => databaseService.upsertCustomer(cust));
 
-  const handleSetDrivers: React.Dispatch<React.SetStateAction<DeliveryDriver[]>> = (action) => {
-    setDrivers(prev => {
-      const next = typeof action === 'function' ? action(prev) : action;
-      const changed = next.filter(nextD => {
-        const oldD = prev.find(p => p.id === nextD.id);
-        return !oldD || JSON.stringify(oldD) !== JSON.stringify(nextD);
-      });
-      changed.forEach(driver => databaseService.upsertDriver(driver));
-      return next;
-    });
-  };
+    const deleted = prev.filter(p => !next.some(n => n.id === p.id));
+    deleted.forEach(cust => databaseService.deleteCustomer(cust.id));
+  }, []);
 
-  const handleSetStaff: React.Dispatch<React.SetStateAction<Staff[]>> = (action) => {
-    setStaff(prev => {
-      const next = typeof action === 'function' ? action(prev) : action;
-      const changed = next.filter(nextS => {
-        const oldS = prev.find(p => p.id === nextS.id);
-        return !oldS || JSON.stringify(oldS) !== JSON.stringify(nextS);
-      });
-      changed.forEach(s => databaseService.upsertStaff(s));
-      return next;
-    });
-  };
+  const handleSetDrivers: React.Dispatch<React.SetStateAction<DeliveryDriver[]>> = React.useCallback((action) => {
+    const prev = driversRef.current;
+    const next = typeof action === 'function' ? action(prev) : action;
+    driversRef.current = next;
+    setDrivers(next);
 
-  const handleSetLogs: React.Dispatch<React.SetStateAction<SiteLog[]>> = (action) => {
-    setLogs(prev => {
-      const next = typeof action === 'function' ? action(prev) : action;
-      const newLogs = next.filter(n => !prev.some(p => p.id === n.id));
-      newLogs.forEach(l => databaseService.insertLog(l));
-      return next;
+    const changed = next.filter(nextD => {
+      const oldD = prev.find(p => p.id === nextD.id);
+      return !oldD || JSON.stringify(oldD) !== JSON.stringify(nextD);
     });
-  };
+    changed.forEach(driver => databaseService.upsertDriver(driver));
+  }, []);
+
+  const handleSetStaff: React.Dispatch<React.SetStateAction<Staff[]>> = React.useCallback((action) => {
+    const prev = staffRef.current;
+    const next = typeof action === 'function' ? action(prev) : action;
+    staffRef.current = next;
+    setStaff(next);
+
+    const changed = next.filter(nextS => {
+      const oldS = prev.find(p => p.id === nextS.id);
+      return !oldS || JSON.stringify(oldS) !== JSON.stringify(nextS);
+    });
+    changed.forEach(s => databaseService.upsertStaff(s));
+  }, []);
+
+  const handleSetLogs: React.Dispatch<React.SetStateAction<SiteLog[]>> = React.useCallback((action) => {
+    const prev = logsRef.current;
+    const next = typeof action === 'function' ? action(prev) : action;
+    logsRef.current = next;
+    setLogs(next);
+
+    const prevIds = new Set(prev.map(p => p.id));
+    const newLogs = next.filter(n => !prevIds.has(n.id));
+    newLogs.forEach(l => databaseService.insertLog(l));
+  }, []);
 
   const updateCustomerStats = React.useCallback((customerName: string, customerPhone: string, amount: number, isAdding: boolean = true) => {
     if (!customerPhone || customerPhone === 'N/A' || customerPhone === '0000000000') return;
@@ -866,81 +1292,67 @@ export default function App() {
     }));
   }, []);
 
-  const renderCurrentView = () => {
-    if (view === 'control_panel') {
-      if (!isPanelAuthenticated) {
-        return (
-          <>
-            <PublicView
-              categories={categories}
-              menuItems={menuItems}
-              customers={customers}
-              orders={orders}
-              onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
-              onUpdateCustomer={(updated) => handleSetCustomers(prev => prev.map(c => c.id === updated.id ? updated : c))}
-              onAddOrder={(order) => {
-                handleSetOrders(prev => [order, ...prev]);
-                updateCustomerStats(order.customerName, order.customerPhone, order.total, true);
-                if (notificationService.isAdmin()) {
-                  notificationService.notifyNewOrder(order);
-                }
-              }}
-              onEnterControlPanel={handleEnterControlPanel}
-              onViewDigitalTicket={handleOpenDigitalTicket}
-              isDarkMode={isDarkMode}
-              setIsDarkMode={setIsDarkMode}
-            />
-            <ControlPanelAuthModal
-              isOpen={true}
-              onClose={() => {
-                try {
-                  if (isAdminRoutePath(window.location.pathname)) {
-                    window.history.replaceState({}, '', '/');
-                  }
-                } catch {
-                  // ignore
-                }
-                setView('public');
-              }}
-              onSuccess={handleAuthSuccess}
-            />
-          </>
-        );
-      }
+  useEffect(() => {
+    if (
+      (view === 'driver_portal' && !enabledModules.driver_portal) ||
+      (view === 'kitchen' && !enabledModules.kitchen) ||
+      (view === 'logistics' && !enabledModules.logistics) ||
+      (view === 'tpv' && !enabledModules.tpv)
+    ) {
+      navigateToView('control_panel');
+    }
+  }, [view, enabledModules, navigateToView]);
 
+  const renderCurrentView = () => {
+    if (view !== 'public' && !isPanelAuthenticated) {
+      return (
+        <>
+          <PublicView
+            categories={categories}
+            menuItems={menuItems}
+            customers={customers}
+            orders={orders}
+            onAddCustomer={(customer) => handleSetCustomers(prev => [...prev, customer])}
+            onUpdateCustomer={(updated) => handleSetCustomers(prev => prev.map(c => c.id === updated.id ? updated : c))}
+            onAddOrder={(order) => {
+              handleSetOrders(prev => [order, ...prev]);
+              updateCustomerStats(order.customerName, order.customerPhone, order.total, true);
+              if (notificationService.isAdmin()) {
+                notificationService.notifyNewOrder(order);
+              }
+            }}
+            onEnterControlPanel={handleEnterControlPanel}
+            onViewDigitalTicket={handleOpenDigitalTicket}
+            isDarkMode={isDarkMode}
+            setIsDarkMode={setIsDarkMode}
+          />
+          <ControlPanelAuthModal
+            isOpen={true}
+            onClose={() => {
+              navigateToView('public');
+            }}
+            onSuccess={handleAuthSuccess}
+          />
+        </>
+      );
+    }
+
+    if (view === 'control_panel') {
       return (
         <ControlPanelView
           onNavigate={(newView, section) => {
-            if (section) {
-              setAdminInitialSection(section);
-            } else {
-              setAdminInitialSection('dashboard');
-            }
-            setView(newView as any);
+            navigateToView(newView as AppView, section || 'dashboard');
           }}
           onExit={() => {
+            isPanelAuthenticatedRef.current = false;
             setIsPanelAuthenticated(false);
             notificationService.setAdminAuthenticated(false);
-            try {
-              if (isAdminRoutePath(window.location.pathname)) {
-                window.history.replaceState({}, '', '/');
-              }
-            } catch {
-              // ignore
-            }
-            setView('public');
+            navigateToView('public');
           }}
           isDarkMode={isDarkMode}
           setIsDarkMode={setIsDarkMode}
           onGoToPublicSite={() => {
-            try {
-              if (isAdminRoutePath(window.location.pathname)) {
-                window.history.replaceState({}, '', '/');
-              }
-            } catch {
-              // ignore
-            }
-            setView('public');
+            navigateToView('public');
           }}
           activeOrdersCount={orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled').length}
           menuItemsCount={menuItems.length}
@@ -958,10 +1370,7 @@ export default function App() {
     }
 
     if (view === 'driver_portal') {
-      if (!enabledModules.driver_portal) {
-        setView('control_panel');
-        return null;
-      }
+      if (!enabledModules.driver_portal) return null;
       return (
         <RepartidorView
           drivers={drivers}
@@ -972,31 +1381,25 @@ export default function App() {
           updateDriverStats={updateDriverStats}
           isDarkMode={isDarkMode}
           setIsDarkMode={setIsDarkMode}
-          onExit={() => setView('control_panel')}
+          onExit={() => navigateToView('control_panel')}
         />
       );
     }
 
     if (view === 'kitchen') {
-      if (!enabledModules.kitchen) {
-        setView('control_panel');
-        return null;
-      }
+      if (!enabledModules.kitchen) return null;
       return (
         <MonitorCocina
           orders={orders}
           setOrders={handleSetOrders}
           isDarkMode={isDarkMode}
           setIsDarkMode={setIsDarkMode}
-          onExit={() => setView('control_panel')}
+          onExit={() => navigateToView('control_panel')}
         />
       );
     }
     if (view === 'logistics') {
-      if (!enabledModules.logistics) {
-        setView('control_panel');
-        return null;
-      }
+      if (!enabledModules.logistics) return null;
       return (
         <LogisticaDespachos
           orders={orders}
@@ -1005,7 +1408,7 @@ export default function App() {
           setDrivers={handleSetDrivers}
           isDarkMode={isDarkMode}
           setIsDarkMode={setIsDarkMode}
-          onExit={() => setView('control_panel')}
+          onExit={() => navigateToView('control_panel')}
         />
       );
     }
@@ -1022,6 +1425,8 @@ export default function App() {
           setOrders={handleSetOrders}
           drivers={drivers}
           setDrivers={handleSetDrivers}
+          staff={staff}
+          setStaff={handleSetStaff}
           logs={logs}
           setLogs={handleSetLogs}
           customers={customers}
@@ -1032,18 +1437,11 @@ export default function App() {
           setIsDarkMode={setIsDarkMode}
           onExit={() => {
             setPanelMode('basic');
-            setView('control_panel');
+            navigateToView('control_panel');
           }}
           onViewDigitalTicket={handleOpenDigitalTicket}
           onGoToPublicSite={() => {
-            try {
-              if (isAdminRoutePath(window.location.pathname)) {
-                window.history.replaceState({}, '', '/');
-              }
-            } catch {
-              // ignore
-            }
-            setView('public');
+            navigateToView('public');
           }}
           enabledModules={enabledModules}
         />
@@ -1051,10 +1449,7 @@ export default function App() {
     }
 
     if (view === 'tpv') {
-      if (!enabledModules.tpv) {
-        setView('control_panel');
-        return null;
-      }
+      if (!enabledModules.tpv) return null;
       return (
         <TPVView
           categories={categories}
@@ -1080,7 +1475,7 @@ export default function App() {
             setTpvInitialTable(null);
             if (tpvReturnView === 'local_dispatch') {
               setTpvReturnView('control_panel');
-              setView('local_dispatch');
+              navigateToView('local_dispatch');
             }
           }}
           onUpdateOrder={(order) => {
@@ -1088,7 +1483,7 @@ export default function App() {
             setTpvEditOrder(null);
             setTpvInitialTable(null);
             setTpvReturnView('control_panel');
-            setView('local_dispatch');
+            navigateToView('local_dispatch');
           }}
           initialOrder={tpvEditOrder}
           initialTable={tpvInitialTable}
@@ -1099,7 +1494,7 @@ export default function App() {
             setTpvEditOrder(null);
             setTpvInitialTable(null);
             setTpvReturnView('control_panel');
-            setView(target);
+            navigateToView(target);
           }}
         />
       );
@@ -1112,23 +1507,37 @@ export default function App() {
           staff={staff}
           updateCustomerStats={updateCustomerStats}
           onUpdateOrder={(updated) => handleSetOrders(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o))}
+          onRecordLog={(entry) => {
+            const uniqueSuffix = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+              ? crypto.randomUUID().slice(0, 8)
+              : Math.random().toString(36).slice(2, 8);
+            const newLog: SiteLog = {
+              id: `log-${Date.now()}-${uniqueSuffix}`,
+              timestamp: new Date().toISOString(),
+              user: entry.user,
+              action: entry.action,
+              details: entry.details,
+              type: entry.type
+            };
+            handleSetLogs(prev => [newLog, ...prev]);
+          }}
           onEditOrder={(order) => {
             setTpvEditOrder(order);
             setTpvInitialTable(null);
             setTpvReturnView('local_dispatch');
-            setView('tpv');
+            navigateToView('tpv');
           }}
           onOpenTableOrder={(tableNum) => {
             setTpvEditOrder(null);
             setTpvInitialTable(tableNum);
             setTpvReturnView('local_dispatch');
-            setView('tpv');
+            navigateToView('tpv');
           }}
           setView={(nextView) => {
             if (nextView === 'tpv') {
               setTpvReturnView('local_dispatch');
             }
-            setView(nextView);
+            navigateToView(nextView as AppView);
           }}
         />
       );

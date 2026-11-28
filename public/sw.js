@@ -1,5 +1,5 @@
-// Service Worker for Tlayoyos 3 Marías PWA - v8
-const CACHE_NAME = 'tlayoyos-3-marias-v8';
+// Service Worker for Tlayoyos 3 Marías PWA - v9
+const CACHE_NAME = 'tlayoyos-3-marias-v9';
 
 self.addEventListener('install', (event) => {
   // Activate immediately without waiting for other tabs
@@ -24,9 +24,28 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
-  // Always Network-First for HTML/JS/CSS to ensure users see updates instantly
+  const url = new URL(event.request.url);
+  // Skip Vite dev / module endpoints so code edits are never served from SW cache
+  if (
+    url.pathname.startsWith('/@') ||
+    url.pathname.startsWith('/node_modules/') ||
+    url.pathname.startsWith('/views/') ||
+    url.pathname.startsWith('/components/') ||
+    url.pathname.startsWith('/utils/') ||
+    url.pathname.startsWith('/services/') ||
+    url.pathname.startsWith('/hooks/') ||
+    /\.(tsx?|jsx?|map)(\?|$)/.test(url.pathname)
+  ) {
+    return;
+  }
+
+  // Always Network-First (bypassing HTTP cache on navigations) to ensure mobile users see updates immediately
+  const requestToFetch = event.request.mode === 'navigate'
+    ? new Request(event.request, { cache: 'no-cache' })
+    : event.request;
+
   event.respondWith(
-    fetch(event.request)
+    fetch(requestToFetch)
       .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
           const responseToCache = networkResponse.clone();

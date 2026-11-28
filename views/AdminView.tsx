@@ -32,14 +32,25 @@ import { CustomerAvatar } from '../components/CustomerAvatar';
 import {
   TLAYOYO_SALSAS,
   TLAYOYO_CHEESE_OPTIONS,
-  DEFAULT_TLAYOYO_SELECTION,
-  TlayoyoSelection,
+  EMPTY_TLAYOYO_DRAFT,
+  TlayoyoDraft,
   isTlayoyoDish,
-  toggleTlayoyoSalsa,
-  toggleTlayoyoSalsaAparte,
-  setTlayoyoSinSalsa,
+  isTlayoyoRellenoDish,
+  getTlayoyoRellenoIngredients,
+  toggleTlayoyoRellenoIngredient,
+  getTlayoyoRellenoPrice,
+  formatTlayoyoRellenoLabel,
+  toggleTlayoyoDraftSalsa,
+  toggleTlayoyoDraftSalsaAparte,
+  toggleTlayoyoDraftSinSalsa,
+  toggleTlayoyoDraftCheese,
   formatTlayoyoVariationLabel
 } from '../utils/tlayoyoConfig';
+import {
+  SALSAS_Y_QUESO_ACCOMPANIMENTS,
+  getDefaultAccompanimentLabels,
+  saveMenuItemOptions
+} from '../utils/menuOptions';
 
 interface AdminViewProps {
   categories: Category[];
@@ -50,6 +61,8 @@ interface AdminViewProps {
   setOrders: React.Dispatch<React.SetStateAction<Order[]>>;
   drivers: DeliveryDriver[];
   setDrivers: React.Dispatch<React.SetStateAction<DeliveryDriver[]>>;
+  staff?: Staff[];
+  setStaff?: React.Dispatch<React.SetStateAction<Staff[]>>;
   logs: SiteLog[];
   setLogs: React.Dispatch<React.SetStateAction<SiteLog[]>>;
   customers: Customer[];
@@ -90,6 +103,8 @@ export default function AdminView({
   setOrders,
   drivers,
   setDrivers,
+  staff: propStaff,
+  setStaff: propSetStaff,
   logs,
   setLogs,
   customers,
@@ -142,6 +157,12 @@ export default function AdminView({
   const [activeTab, setActiveTab] = useState<TabId>(categories[0]?.id || '');
 
   useEffect(() => {
+    if (categories.length > 0 && !categories.some((c) => c.id === activeTab)) {
+      setActiveTab(categories[0].id);
+    }
+  }, [categories, activeTab]);
+
+  useEffect(() => {
     if (initialSection) {
       setActiveSection(initialSection);
     }
@@ -166,7 +187,9 @@ export default function AdminView({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [staff, setStaff] = useState<Staff[]>(INITIAL_STAFF);
+  const [localStaff, setLocalStaff] = useState<Staff[]>(INITIAL_STAFF);
+  const staff = propStaff ?? localStaff;
+  const setStaff = propSetStaff ?? setLocalStaff;
   const [notificationHistory, setNotificationHistory] = useState<Notification[]>([]);
   const [activeTableOrders, setActiveTableOrders] = useState<Record<number, string>>({});
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -199,7 +222,8 @@ export default function AdminView({
   const [tpvAddress, setTpvAddress] = useState('');
   const [tpvDeliveryType, setTpvDeliveryType] = useState<'store' | 'table' | 'delivery'>('store');
   const [tpvWaiterId, setTpvWaiterId] = useState<string | null>(null);
-  const [tpvTlayoyoSel, setTpvTlayoyoSel] = useState<Record<string, TlayoyoSelection>>({});
+  const [tpvTlayoyoSel, setTpvTlayoyoSel] = useState<Record<string, TlayoyoDraft>>({});
+  const [tpvTlayoyoError, setTpvTlayoyoError] = useState<Record<string, string>>({});
   const [visibleItemsCount, setVisibleItemsCount] = useState(6);
 
   // Orders Management & Search / Filter States
@@ -231,11 +255,16 @@ export default function AdminView({
     soundManager.play(action, section || activeSection);
   }, [activeSection]);
 
-  const recordLog = useCallback((action: string, details: string, type: SiteLog['type'] = 'info') => {
+  const notificationsRef = useRef<Notification[]>([]);
+
+  const recordLog = useCallback((action: string, details: string, type: SiteLog['type'] = 'info', user: string = 'Sistema') => {
+    const uniqueSuffix = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID().slice(0, 8)
+      : `${Math.random().toString(36).slice(2, 7)}-${Math.random().toString(36).slice(2, 5)}`;
     const newLog: SiteLog = {
-      id: `log-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: `log-${Date.now()}-${uniqueSuffix}`,
       timestamp: new Date().toISOString(),
-      user: 'Sistema',
+      user,
       action,
       details,
       type
@@ -245,29 +274,30 @@ export default function AdminView({
 
   const addNotification = useCallback((message: string, type: 'success' | 'error' | 'info' | 'kitchen' = 'success') => {
     // Prevent duplicate messages in the current view to avoid stacking
-    setNotifications(prev => {
-      if (prev.some(n => n.message === message)) return prev;
+    if (notificationsRef.current.some(n => n.message === message)) return;
 
-      const id = Date.now() + Math.random();
-      const timestamp = new Date().toISOString();
-      const newNotif = { id, message, type, timestamp } as any;
+    const id = Date.now() + Math.random();
+    const timestamp = new Date().toISOString();
+    const newNotif = { id, message, type, timestamp } as any;
 
-      setNotificationHistory(h => [newNotif, ...h]);
+    const nextNotifications = [...notificationsRef.current, newNotif];
+    notificationsRef.current = nextNotifications;
+    setNotifications(nextNotifications);
+    setNotificationHistory(h => [newNotif, ...h]);
 
-      setTimeout(() => {
-        setNotifications(current => current.filter(n => n.id !== id));
-      }, 4000);
+    setTimeout(() => {
+      const filtered = notificationsRef.current.filter(n => n.id !== id);
+      notificationsRef.current = filtered;
+      setNotifications(current => current.filter(n => n.id !== id));
+    }, 4000);
 
-      // Register the notification in the System Logs
-      let logType: SiteLog['type'] = 'info';
-      if (type === 'error') logType = 'error';
-      else if (type === 'success') logType = 'success';
-      else if (type === 'kitchen') logType = 'info';
-      
-      recordLog('Notificación', message, logType);
+    // Register the notification in the System Logs outside any state updater
+    let logType: SiteLog['type'] = 'info';
+    if (type === 'error') logType = 'error';
+    else if (type === 'success') logType = 'success';
+    else if (type === 'kitchen') logType = 'info';
 
-      return [...prev, newNotif];
-    });
+    recordLog('Notificación', message, logType);
 
     // Sound is handled by the data effect (badges) to avoid redundant "monster" sounds
     if (type === 'error') {
@@ -631,6 +661,10 @@ export default function AdminView({
     const isSidesCategory = activeTab === 'cat-5' || activeTab === 'cat-acompanar';
     const isDrinkOrDessert = activeTab === 'cat-1' || activeTab === 'cat-2';
     const isCaldos = activeTab === 'cat-caldos';
+    const defaultAccompaniments = isCaldos
+      ? getDefaultAccompanimentLabels({ name: 'Caldo', categoryId: 'cat-caldos' })
+      : [...SALSAS_Y_QUESO_ACCOMPANIMENTS];
+
     const newItem: MenuItem = {
       id: `item-${Date.now()}`,
       categoryId: activeTab,
@@ -638,15 +672,20 @@ export default function AdminView({
       description: '',
       isActive: true,
       variations: [{ id: `v-${Date.now()}`, label: 'Sencillo', price: 0 }],
-      allowAccompaniments: isCaldos,
+      allowAccompaniments: !isDrinkOrDessert && !isSidesCategory,
+      customAccompaniments: !isDrinkOrDessert && !isSidesCategory ? [...defaultAccompaniments] : undefined,
       allowSides: !isSidesCategory && !isDrinkOrDessert && !isCaldos
     };
-    setMenuItems(prev => [...prev, newItem]);
+    setMenuItems(prev => {
+      const next = [...prev, newItem];
+      saveMenuItemOptions(next);
+      return next;
+    });
     setNewlyCreatedItemId(newItem.id);
     setMenuSearch('');
     setMenuStatusFilter('all');
-    addNotification('Nuevo platillo añadido');
-    recordLog('Menú Modificado', `Se añadió el producto "${newItem.name}" a la categoría ${activeCategoryName}`, 'info');
+    addNotification('Nuevo platillo añadido con acompañamientos de salsas y queso', 'success');
+    recordLog('Menú Modificado', `Se añadió el producto "${newItem.name}" a la categoría ${activeCategoryName} con opciones de salsas y queso`, 'info');
   };
 
   const deleteDriver = (driverId: string) => {
@@ -1145,6 +1184,19 @@ export default function AdminView({
                       {viewingOrder.notes}
                     </div>
                   )}
+                  {viewingOrder.deliveredBy && (
+                    <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 text-xs font-bold text-emerald-800 dark:text-emerald-200 flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2">
+                        <UserCheck className="w-4 h-4 shrink-0" />
+                        <span>Entregado por: {viewingOrder.deliveredBy}</span>
+                      </span>
+                      {viewingOrder.deliveredAt && (
+                        <span className="text-[10px] opacity-75 tabular-nums">
+                          {new Date(viewingOrder.deliveredAt).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Super User Management Section */}
@@ -1421,6 +1473,7 @@ export default function AdminView({
             {activeOrders.map(order => {
               const waitTime = Math.floor((currentTime.getTime() - new Date(order.createdAt).getTime()) / 60000);
               const isUrgent = waitTime > 12;
+              const isMostrador = Boolean(order.address?.toLowerCase().includes('mostrador'));
 
               return (
                 <div key={order.id} className={`bg-white dark:bg-gray-800 rounded-[48px] shadow-2xl overflow-hidden flex flex-col border-4 transition-all ${isUrgent ? 'border-amber-400' : 'border-gray-100 dark:border-gray-700'}`}>
@@ -1429,6 +1482,12 @@ export default function AdminView({
                       <div className="flex-1 min-w-0 pr-4">
                         <span className="text-[10px] font-black uppercase tracking-widest opacity-70 block">{order.id}</span>
                         <h4 className="text-2xl font-black tracking-tight mt-1 uppercase leading-none break-words">{order.customerName}</h4>
+                        {isMostrador && (
+                          <div className={`mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-widest shadow-sm ${isUrgent ? 'bg-gray-900 text-amber-400' : 'bg-amber-400 text-gray-950'}`}>
+                            <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
+                            <span>PEDIDO PARA LLEVAR</span>
+                          </div>
+                        )}
                         {order.source === 'tpv' && (
                           <div className="flex items-center gap-2 mt-2">
                             <span className="text-[9px] font-black uppercase tracking-widest bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full inline-block">
@@ -2112,6 +2171,14 @@ export default function AdminView({
                     <div className="inline-flex items-center space-x-1 text-[9px] font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/60 px-2 py-0.5 rounded-lg">
                       <Bike className="w-3 h-3" />
                       <span className="truncate max-w-[110px]">{driver.name}</span>
+                    </div>
+                  ) : null}
+
+                  {/* Delivered By (Local Dispatch) */}
+                  {o.deliveredBy ? (
+                    <div className="inline-flex items-center space-x-1 text-[9px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 px-2 py-0.5 rounded-lg">
+                      <UserCheck className="w-3 h-3" />
+                      <span className="truncate max-w-[130px]">Entregó: {o.deliveredBy}</span>
                     </div>
                   ) : null}
                 </div>
@@ -3437,7 +3504,7 @@ export default function AdminView({
     if (!managingCreditCustomer) return;
     const amount = parseFloat(abonoAmount);
     if (isNaN(amount) || amount <= 0) {
-      addNotification('Ingresa un monto válido para el abono', 'warning');
+      addNotification('Ingresa un monto válido para el abono', 'error');
       return;
     }
 
@@ -3464,7 +3531,7 @@ export default function AdminView({
     setAbonoAmount('');
     setAbonoNotes('');
     addNotification(`Abono de $${amount.toFixed(2)} registrado con éxito`, 'success');
-    playUISound('success');
+    playUISound('confirm');
   };
 
   const handleLiquidateDebt = (method: 'efectivo' | 'transferencia' | 'tarjeta') => {
@@ -3494,14 +3561,14 @@ export default function AdminView({
     setCustomers(prev => prev.map(c => c.id === updated.id ? updated : c));
     setManagingCreditCustomer(updated);
     addNotification(`Deuda de $${debt.toFixed(2)} liquidada por completo`, 'success');
-    playUISound('success');
+    playUISound('confirm');
   };
 
   const handleApplyManualCargo = () => {
     if (!managingCreditCustomer) return;
     const amount = parseFloat(cargoAmount);
     if (isNaN(amount) || amount <= 0) {
-      addNotification('Ingresa un monto válido para el cargo', 'warning');
+      addNotification('Ingresa un monto válido para el cargo', 'error');
       return;
     }
 
@@ -3534,7 +3601,7 @@ export default function AdminView({
   const handleSendWhatsAppCreditStatement = (cust: Customer) => {
     const cleanPhone = (cust.phone || '').replace(/\D/g, '');
     if (!cleanPhone) {
-      addNotification('El cliente no tiene teléfono registrado', 'warning');
+      addNotification('El cliente no tiene teléfono registrado', 'error');
       return;
     }
 
@@ -4604,9 +4671,10 @@ export default function AdminView({
 
     const cartTotal = tpvCart.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
 
-    const addToCart = (item: MenuItem, variationIdx: number, customLabel?: string) => {
-      const variation = item.variations[variationIdx];
+    const addToCart = (item: MenuItem, variationIdx: number, customLabel?: string, customPrice?: number) => {
+      const variation = item.variations[variationIdx] || item.variations[0];
       const finalLabel = customLabel || variation.label;
+      const finalPrice = customPrice !== undefined ? customPrice : variation.price;
       const cartItemId = customLabel ? `${item.id}-${variation.id}-${customLabel}` : `${item.id}-${variation.id}`;
 
       setTpvCart(prev => {
@@ -4618,10 +4686,26 @@ export default function AdminView({
           id: cartItemId,
           name: item.name,
           variationLabel: finalLabel,
-          price: variation.price,
+          price: finalPrice,
           quantity: 1
         }];
       });
+
+      if (isTlayoyoDish(item)) {
+        setTpvTlayoyoSel(prev => {
+          if (!(item.id in prev)) return prev;
+          const next = { ...prev };
+          delete next[item.id];
+          return next;
+        });
+        setTpvTlayoyoError(prev => {
+          if (!(item.id in prev)) return prev;
+          const next = { ...prev };
+          delete next[item.id];
+          return next;
+        });
+      }
+
       playUISound('click');
       addNotification(`${item.name} (${finalLabel}) añadido`, 'success');
     };
@@ -4710,6 +4794,8 @@ export default function AdminView({
       }
 
       setTpvCart([]);
+      setTpvTlayoyoSel({});
+      setTpvTlayoyoError({});
       setTpvCustomerName('');
       setTpvCustomerPhone('');
       setTpvAddress('');
@@ -4759,8 +4845,29 @@ export default function AdminView({
                 return i.categoryId === activeTab;
               }).slice(0, visibleItemsCount).map(item => {
                 if (isTlayoyoDish(item)) {
-                  const sel = tpvTlayoyoSel[item.id] || DEFAULT_TLAYOYO_SELECTION;
-                  const basePrice = item.variations[0]?.price ?? 10;
+                  const sel = tpvTlayoyoSel[item.id] || EMPTY_TLAYOYO_DRAFT;
+                  const isRelleno = isTlayoyoRellenoDish(item);
+                  const rellenoIngredients = isRelleno ? getTlayoyoRellenoIngredients(item) : [];
+                  const selectedRellenos = isRelleno ? (sel.ingredients || []) : [];
+                  const requiresVarChoice = !isRelleno && item.variations.length > 1;
+                  const selectedMultiVarIdx = requiresVarChoice
+                    ? item.variations.findIndex(v => v.id === sel.variationId)
+                    : 0;
+                  const chosenVar = selectedMultiVarIdx >= 0 ? item.variations[selectedMultiVarIdx] : item.variations[0];
+                  const basePrice = isRelleno
+                    ? getTlayoyoRellenoPrice(item, selectedRellenos)
+                    : (chosenVar?.price ?? 10);
+                  const hasSpecificVarLabel = !isRelleno && (
+                    item.variations.length > 1 ||
+                    (chosenVar?.label && chosenVar.label.toLowerCase() !== 'por pieza' && chosenVar.label.toLowerCase() !== 'sencillo')
+                  );
+                  const isRellenoReady = !isRelleno || selectedRellenos.length > 0;
+                  const isVarReady = !requiresVarChoice || selectedMultiVarIdx >= 0;
+                  const isSalsaReady = sel.salsaMode !== null && (sel.salsaMode !== 'con' || sel.salsas.length > 0);
+                  const isCheeseReady = sel.cheese !== null;
+                  const isTlayoyoReady = isRellenoReady && isVarReady && isSalsaReady && isCheeseReady;
+                  const inlineErr = tpvTlayoyoError[item.id];
+
                   return (
                     <div key={item.id} className="bg-gray-50 dark:bg-gray-900/50 rounded-[32px] p-6 border border-transparent hover:border-primary-500 transition-all group space-y-3">
                       <div className="flex items-center justify-between gap-2">
@@ -4768,19 +4875,105 @@ export default function AdminView({
                         <span className="text-xs font-black text-primary-500 shrink-0">${basePrice.toFixed(2)}</span>
                       </div>
 
+                      {isRelleno && (
+                        <div>
+                          <div className="flex items-center justify-between gap-2 mb-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                              Ingredientes (1: $20 · 2: $25):
+                            </span>
+                            {selectedRellenos.length > 0 && (
+                              <span className="text-[10px] font-black text-primary-500">
+                                {selectedRellenos.length}/2 · ${basePrice}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-1.5">
+                            {rellenoIngredients.map(ing => {
+                              const isSelected = selectedRellenos.includes(ing);
+                              return (
+                                <button
+                                  key={ing}
+                                  type="button"
+                                  onClick={() => {
+                                    setTpvTlayoyoSel(prev => {
+                                      const base = prev[item.id] || EMPTY_TLAYOYO_DRAFT;
+                                      return {
+                                        ...prev,
+                                        [item.id]: {
+                                          ...base,
+                                          ingredients: toggleTlayoyoRellenoIngredient(base.ingredients, ing, 2)
+                                        }
+                                      };
+                                    });
+                                    setTpvTlayoyoError(prev => ({ ...prev, [item.id]: '' }));
+                                  }}
+                                  className={`py-1.5 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-primary-500 text-white shadow-sm'
+                                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                                  }`}
+                                >
+                                  {ing}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {hasSpecificVarLabel && item.variations.length > 0 && (
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1.5">Relleno / Variante:</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {item.variations.map(v => {
+                              const isSelected = requiresVarChoice ? sel.variationId === v.id : chosenVar?.id === v.id;
+                              return (
+                                <button
+                                  key={v.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setTpvTlayoyoSel(prev => {
+                                      const base = prev[item.id] || EMPTY_TLAYOYO_DRAFT;
+                                      return {
+                                        ...prev,
+                                        [item.id]: {
+                                          ...base,
+                                          variationId: base.variationId === v.id && requiresVarChoice ? undefined : v.id
+                                        }
+                                      };
+                                    });
+                                    setTpvTlayoyoError(prev => ({ ...prev, [item.id]: '' }));
+                                  }}
+                                  className={`py-1.5 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
+                                    isSelected
+                                      ? 'bg-primary-500 text-white shadow-sm'
+                                      : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                                  }`}
+                                >
+                                  {v.label}{v.price > 0 ? ` $${v.price}` : ''}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       <div>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block mb-1.5">Salsa(s):</span>
                         <div className="flex flex-wrap gap-1.5">
                           {TLAYOYO_SALSAS.map(salsa => {
-                            const isSelected = sel.salsaMode !== 'sin' && sel.salsas.includes(salsa);
+                            const isSelected = sel.salsaMode !== 'sin' && sel.salsaMode !== null && sel.salsas.includes(salsa);
                             return (
                               <button
                                 key={salsa}
                                 type="button"
-                                onClick={() => setTpvTlayoyoSel(prev => ({
-                                  ...prev,
-                                  [item.id]: toggleTlayoyoSalsa(prev[item.id], salsa)
-                                }))}
+                                onClick={() => {
+                                  setTpvTlayoyoSel(prev => ({
+                                    ...prev,
+                                    [item.id]: toggleTlayoyoDraftSalsa(prev[item.id], salsa)
+                                  }));
+                                  setTpvTlayoyoError(prev => ({ ...prev, [item.id]: '' }));
+                                }}
                                 className={`py-1.5 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
                                   isSelected
                                     ? 'bg-primary-500 text-white shadow-sm'
@@ -4793,10 +4986,13 @@ export default function AdminView({
                           })}
                           <button
                             type="button"
-                            onClick={() => setTpvTlayoyoSel(prev => ({
-                              ...prev,
-                              [item.id]: toggleTlayoyoSalsaAparte(prev[item.id])
-                            }))}
+                            onClick={() => {
+                              setTpvTlayoyoSel(prev => ({
+                                ...prev,
+                                [item.id]: toggleTlayoyoDraftSalsaAparte(prev[item.id])
+                              }));
+                              setTpvTlayoyoError(prev => ({ ...prev, [item.id]: '' }));
+                            }}
                             className={`py-1.5 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
                               sel.salsaMode === 'aparte'
                                 ? 'bg-amber-500 text-white shadow-sm'
@@ -4807,10 +5003,13 @@ export default function AdminView({
                           </button>
                           <button
                             type="button"
-                            onClick={() => setTpvTlayoyoSel(prev => ({
-                              ...prev,
-                              [item.id]: setTlayoyoSinSalsa(prev[item.id])
-                            }))}
+                            onClick={() => {
+                              setTpvTlayoyoSel(prev => ({
+                                ...prev,
+                                [item.id]: toggleTlayoyoDraftSinSalsa(prev[item.id])
+                              }));
+                              setTpvTlayoyoError(prev => ({ ...prev, [item.id]: '' }));
+                            }}
                             className={`py-1.5 px-2.5 rounded-xl text-[10px] font-bold uppercase transition-all cursor-pointer ${
                               sel.salsaMode === 'sin'
                                 ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
@@ -4829,10 +5028,13 @@ export default function AdminView({
                             <button
                               key={opt}
                               type="button"
-                              onClick={() => setTpvTlayoyoSel(prev => ({
-                                ...prev,
-                                [item.id]: { ...(prev[item.id] || DEFAULT_TLAYOYO_SELECTION), cheese: opt }
-                              }))}
+                              onClick={() => {
+                                setTpvTlayoyoSel(prev => ({
+                                  ...prev,
+                                  [item.id]: toggleTlayoyoDraftCheese(prev[item.id], opt)
+                                }));
+                                setTpvTlayoyoError(prev => ({ ...prev, [item.id]: '' }));
+                              }}
                               className={`py-1.5 px-1.5 rounded-xl text-[10px] font-bold transition-all cursor-pointer truncate ${
                                 sel.cheese === opt
                                   ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 shadow-sm'
@@ -4845,11 +5047,34 @@ export default function AdminView({
                         </div>
                       </div>
 
+                      {inlineErr && (
+                        <p className="text-[10px] font-bold text-red-500">{inlineErr}</p>
+                      )}
+
                       <button
                         type="button"
                         onClick={() => {
-                          playUISound('click');
-                          addToCart(item, 0, formatTlayoyoVariationLabel(sel));
+                          if (!isTlayoyoReady) {
+                            const msg = !isRellenoReady
+                              ? 'Selecciona 1 ($20) o 2 ($25) ingredientes'
+                              : !isVarReady
+                              ? 'Selecciona una variante o relleno'
+                              : !isSalsaReady && !isCheeseReady
+                              ? 'Selecciona salsa y queso'
+                              : !isSalsaReady
+                              ? 'Falta seleccionar la salsa'
+                              : 'Falta seleccionar el queso';
+                            setTpvTlayoyoError(prev => ({ ...prev, [item.id]: msg }));
+                            playUISound('error');
+                            return;
+                          }
+                          const specs = formatTlayoyoVariationLabel(sel);
+                          const finalLabel = isRelleno
+                            ? `${formatTlayoyoRellenoLabel(selectedRellenos)} · ${specs}`
+                            : hasSpecificVarLabel && chosenVar
+                            ? `${chosenVar.label} · ${specs}`
+                            : specs;
+                          addToCart(item, Math.max(0, selectedMultiVarIdx), finalLabel, basePrice);
                         }}
                         className="w-full flex justify-between items-center p-3 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700 hover:bg-primary-500 dark:hover:bg-primary-500 hover:text-white dark:hover:text-white hover:border-primary-500 dark:hover:border-primary-500 transition-all group cursor-pointer"
                       >
@@ -5098,7 +5323,10 @@ export default function AdminView({
               <p className="text-xs font-black uppercase tracking-widest text-gray-400 mb-0.5">{n.type === 'kitchen' ? 'COCINA' : n.type.toUpperCase()}</p>
               <p className="text-sm font-bold text-gray-800 dark:text-white">{n.message}</p>
             </div>
-            <button onClick={() => setNotifications(prev => prev.filter(notif => notif.id !== n.id))} title="Cerrar notificación" className="text-gray-300 hover:text-gray-500 transition-colors"><X className="w-5 h-5" /></button>
+            <button onClick={() => {
+              notificationsRef.current = notificationsRef.current.filter(notif => notif.id !== n.id);
+              setNotifications(prev => prev.filter(notif => notif.id !== n.id));
+            }} title="Cerrar notificación" className="text-gray-300 hover:text-gray-500 transition-colors"><X className="w-5 h-5" /></button>
           </div>
         ))}
       </div>
@@ -5172,6 +5400,7 @@ export default function AdminView({
                 activeTableOrders={activeTableOrders}
                 setActiveTableOrders={setActiveTableOrders}
                 onPrintTicket={generateTicket}
+                onRecordLog={(entry) => recordLog(entry.action, entry.details, entry.type, entry.user)}
                 onAddOrder={(tableNum, waiterId) => {
                   setTpvDeliveryType('table');
                   setTpvAddress(tableNum.toString());
@@ -5392,7 +5621,11 @@ export default function AdminView({
                       onMoveCategory={moveCategory}
                       onDeleteCategory={(id) => {
                         const found = categories.find((c) => c.id === id);
-                        if (found) setCategoryToDelete(found);
+                        if (found) {
+                          setIsAddingCategory(false);
+                          setCategoryToDelete(found);
+                          playUISound('click');
+                        }
                       }}
                     />
 
@@ -5433,46 +5666,93 @@ export default function AdminView({
                     )}
 
                     {/* Inline Delete Category Confirmation (no browser confirm) */}
-                    {categoryToDelete && (
-                      <div className="mt-3 p-4 rounded-2xl bg-red-50/90 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-200">
-                        <div className="text-sm text-red-900 dark:text-red-200">
-                          <p className="font-bold">
-                            ¿Eliminar la categoría «{categoryToDelete.name}»?
-                          </p>
-                          <p className="text-xs opacity-80 mt-0.5">
-                            Los platillos se conservarán en el catálogo general.
-                          </p>
+                    {categoryToDelete && (() => {
+                      const removedId = categoryToDelete.id;
+                      const removedName = categoryToDelete.name;
+                      const directItemsCount = menuItems.filter((m) => m.categoryId === removedId).length;
+                      const nextCategories = categories.filter((c) => c.id !== removedId);
+                      const fallbackCategory =
+                        nextCategories.find((c) => c.id === 'cat-3') || nextCategories[0];
+
+                      const finalizeCategoryDelete = (mode: 'reassign' | 'delete-items') => {
+                        if (directItemsCount > 0) {
+                          if (mode === 'delete-items') {
+                            setMenuItems((prev) => prev.filter((m) => m.categoryId !== removedId));
+                          } else if (fallbackCategory) {
+                            setMenuItems((prev) =>
+                              prev.map((m) =>
+                                m.categoryId === removedId ? { ...m, categoryId: fallbackCategory.id } : m
+                              )
+                            );
+                          }
+                        }
+
+                        setCategories(nextCategories);
+                        if (activeTab === removedId && nextCategories[0]) {
+                          setActiveTab(nextCategories[0].id);
+                        }
+                        setCategoryToDelete(null);
+                        playUISound('recycle');
+                        addNotification(`Categoría "${removedName}" eliminada`);
+                        recordLog(
+                          'Menú Modificado',
+                          directItemsCount > 0 && mode === 'delete-items'
+                            ? `Se eliminó la categoría "${removedName}" junto con ${directItemsCount} platillo(s)`
+                            : `Se eliminó la categoría "${removedName}"`,
+                          'info'
+                        );
+                      };
+
+                      return (
+                        <div className="mt-3 p-4 rounded-2xl bg-red-50/90 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 flex flex-col lg:flex-row lg:items-center justify-between gap-3 animate-in fade-in duration-200">
+                          <div className="text-sm text-red-900 dark:text-red-200">
+                            <p className="font-bold">
+                              ¿Eliminar la categoría «{removedName}»?
+                            </p>
+                            <p className="text-xs opacity-85 mt-0.5">
+                              {directItemsCount > 0
+                                ? `Tiene ${directItemsCount} platillo${directItemsCount === 1 ? '' : 's'}. Puedes moverlos a «${fallbackCategory?.name || 'otra categoría'}» o eliminarlos junto con la categoría.`
+                                : 'Esta categoría no tiene platillos asignados.'}
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setCategoryToDelete(null)}
+                              className="min-h-[42px] px-4 rounded-xl bg-white dark:bg-[#1a1118] border border-gray-200 dark:border-white/10 text-xs font-bold text-gray-700 dark:text-gray-200 cursor-pointer"
+                            >
+                              Cancelar
+                            </button>
+                            {directItemsCount > 0 && fallbackCategory ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => finalizeCategoryDelete('reassign')}
+                                  className="min-h-[42px] px-4 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:opacity-90 text-xs font-bold cursor-pointer"
+                                >
+                                  Mover platillos y eliminar
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => finalizeCategoryDelete('delete-items')}
+                                  className="min-h-[42px] px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold cursor-pointer"
+                                >
+                                  Eliminar todo ({directItemsCount})
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => finalizeCategoryDelete('reassign')}
+                                className="min-h-[42px] px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold cursor-pointer"
+                              >
+                                Eliminar categoría
+                              </button>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => setCategoryToDelete(null)}
-                            className="min-h-[42px] px-4 rounded-xl bg-white dark:bg-[#1a1118] border border-gray-200 dark:border-white/10 text-xs font-bold text-gray-700 dark:text-gray-200 cursor-pointer"
-                          >
-                            Cancelar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const removedId = categoryToDelete.id;
-                              const removedName = categoryToDelete.name;
-                              setCategories((prev) => {
-                                const next = prev.filter((c) => c.id !== removedId);
-                                if (activeTab === removedId && next[0]) {
-                                  setActiveTab(next[0].id);
-                                }
-                                return next;
-                              });
-                              setCategoryToDelete(null);
-                              addNotification(`Categoría "${removedName}" eliminada`);
-                            }}
-                            className="min-h-[42px] px-4 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold cursor-pointer"
-                          >
-                            Eliminar
-                          </button>
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                   </div>
 
                   {/* Active Category Subheader */}
@@ -5494,20 +5774,44 @@ export default function AdminView({
                       </p>
                     )}
 
-                    {!isReordering && categoryItems.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMenuExpandSignal((prev) => ({
-                            expanded: prev ? !prev.expanded : true,
-                            nonce: Date.now()
-                          }));
-                          playUISound('click');
-                        }}
-                        className="md:hidden min-h-[38px] px-3 rounded-xl text-xs font-bold text-primary-600 dark:text-primary-400 bg-primary-50/70 dark:bg-primary-950/30 cursor-pointer"
-                      >
-                        {menuExpandSignal?.expanded ? 'Contraer' : 'Expandir'}
-                      </button>
+                    {!isReordering && (
+                      <div className="flex items-center gap-2">
+                        {categories.length > 1 && (() => {
+                          const activeCat = categories.find((c) => c.id === activeTab);
+                          if (!activeCat) return null;
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsAddingCategory(false);
+                                setCategoryToDelete(activeCat);
+                                playUISound('click');
+                              }}
+                              title={`Eliminar categoría ${activeCat.name}`}
+                              className="min-h-[38px] px-3 rounded-xl text-xs font-bold text-red-600 dark:text-red-400 bg-red-50/80 dark:bg-red-950/30 hover:bg-red-100 dark:hover:bg-red-950/50 border border-red-200/70 dark:border-red-900/40 inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Eliminar categoría</span>
+                            </button>
+                          );
+                        })()}
+
+                        {categoryItems.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMenuExpandSignal((prev) => ({
+                                expanded: prev ? !prev.expanded : true,
+                                nonce: Date.now()
+                              }));
+                              playUISound('click');
+                            }}
+                            className="md:hidden min-h-[38px] px-3 rounded-xl text-xs font-bold text-primary-600 dark:text-primary-400 bg-primary-50/70 dark:bg-primary-950/30 cursor-pointer"
+                          >
+                            {menuExpandSignal?.expanded ? 'Contraer' : 'Expandir'}
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -5549,33 +5853,52 @@ export default function AdminView({
                         )}
                       </div>
                     </div>
-                  ) : (
-                    <div className="space-y-3 sm:space-y-4">
-                      {displayedItems.map((item) => {
-                        const categoryIdx = categoryItems.findIndex((c) => c.id === item.id);
-                        return (
-                          <MenuItemCard
-                            key={item.id}
-                            item={item}
-                            isReordering={isReordering}
-                            canMoveUp={categoryIdx > 0}
-                            canMoveDown={categoryIdx < categoryItems.length - 1}
-                            onMoveUp={() => moveMenuItem(item.id, 'up')}
-                            onMoveDown={() => moveMenuItem(item.id, 'down')}
-                            defaultExpanded={newlyCreatedItemId === item.id}
-                            expandSignal={menuExpandSignal}
-                            onUpdate={(it) =>
-                              setMenuItems((prev) => prev.map((m) => (m.id === it.id ? it : m)))
-                            }
+                  ) : (() => {
+                    const defaultSideOptions = menuItems
+                      .filter((m) => {
+                        if (!m.isActive) return false;
+                        const cId = (m.categoryId || '').toLowerCase();
+                        const catName = (categories.find((c) => c.id === m.categoryId)?.name || '').toLowerCase();
+                        return cId === 'cat-5' || cId === 'cat-acompanar' || cId.includes('acompañ') || catName.includes('acompañ');
+                      })
+                      .map((m) => m.name);
+
+                    return (
+                      <div className="space-y-3 sm:space-y-4">
+                        {displayedItems.map((item) => {
+                          const categoryIdx = categoryItems.findIndex((c) => c.id === item.id);
+                          return (
+                            <MenuItemCard
+                              key={item.id}
+                              item={item}
+                              categories={categories}
+                              defaultSideOptions={defaultSideOptions}
+                              isReordering={isReordering}
+                              canMoveUp={categoryIdx > 0}
+                              canMoveDown={categoryIdx < categoryItems.length - 1}
+                              onMoveUp={() => moveMenuItem(item.id, 'up')}
+                              onMoveDown={() => moveMenuItem(item.id, 'down')}
+                              defaultExpanded={newlyCreatedItemId === item.id}
+                              expandSignal={menuExpandSignal}
+                            onUpdate={(it) => {
+                              setMenuItems((prev) => prev.map((m) => (m.id === it.id ? it : m)));
+                              if (it.categoryId !== item.categoryId) {
+                                const targetCat = categories.find((c) => c.id === it.categoryId);
+                                const targetName = targetCat?.name || it.categoryId;
+                                addNotification(`"${it.name || 'Platillo'}" asignado a "${targetName}"`);
+                                recordLog('Menú Modificado', `Se asignó "${it.name || 'Platillo'}" a la categoría ${targetName}`, 'info');
+                              }
+                            }}
                             onDelete={() => {
                               setMenuItems((prev) => prev.filter((m) => m.id !== item.id));
                               addNotification(`"${item.name || 'Platillo'}" eliminado`);
                             }}
                           />
-                        );
-                      })}
-                    </div>
-                  )}
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
 
                   {/* Android Material-3 Mobile Bottom Dock (Thumb Zone) */}
                   <nav

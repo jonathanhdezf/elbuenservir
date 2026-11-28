@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     Monitor, Bell, Sun, Moon, Clock, CheckCircle,
-    ChefHat, Lock, ShieldCheck, ArrowRight, X, AlertCircle
+    ChefHat, Lock, ShieldCheck, ArrowRight, X, AlertCircle, ShoppingBag
 } from 'lucide-react';
 import { Order, OrderItem, OrderStatus } from '../types';
 import { soundManager } from '../utils/soundManager';
@@ -163,6 +163,7 @@ export default function MonitorCocina({
                         {activeOrders.map(order => {
                             const waitTime = Math.floor((currentTime.getTime() - new Date(order.createdAt).getTime()) / 60000);
                             const isUrgent = waitTime > 12;
+                            const isMostrador = Boolean(order.address?.toLowerCase().includes('mostrador'));
 
                             return (
                                 <div
@@ -178,7 +179,13 @@ export default function MonitorCocina({
                                                 <h4 className="text-xl md:text-2xl font-black tracking-tight mt-1 uppercase leading-none truncate w-full">
                                                     {order.customerName}
                                                 </h4>
-                                                <div className="mt-2 flex items-center gap-2">
+                                                {isMostrador && (
+                                                    <div className={`mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-[11px] md:text-xs font-black uppercase tracking-widest shadow-sm ${isUrgent ? 'bg-gray-900 text-amber-400' : 'bg-amber-400 text-gray-950'}`}>
+                                                        <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
+                                                        <span>PEDIDO PARA LLEVAR</span>
+                                                    </div>
+                                                )}
+                                                <div className="mt-2 flex items-center gap-2 flex-wrap">
                                                     <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${isUrgent ? 'bg-white/30' : 'bg-primary-500/20 text-primary-400'}`}>
                                                         {order.source === 'tpv' ? 'Local' : 'Online'}
                                                     </span>

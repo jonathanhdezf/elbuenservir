@@ -225,7 +225,15 @@
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
+        const hadController = Boolean(navigator.serviceWorker.controller);
+        let refreshed = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (hadController && !refreshed) {
+            refreshed = true;
+            window.location.reload();
+          }
+        });
+        navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
           .then((reg) => {
             // Force update check
             reg.update();

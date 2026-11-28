@@ -16,16 +16,24 @@ import {
     TlayoyoSalsa,
     TlayoyoCheeseMode,
     isTlayoyoDish,
+    isTlayoyoRellenoDish,
+    getTlayoyoRellenoIngredients,
+    toggleTlayoyoRellenoIngredient,
+    getTlayoyoRellenoPrice,
+    formatTlayoyoRellenoLabel,
     formatTlayoyoVariationLabel
 } from '../utils/tlayoyoConfig';
 
 interface TpvTlayoyoDraft {
+    variationId?: string;
+    ingredients?: string[];
     salsas: TlayoyoSalsa[];
     salsaMode: 'con' | 'aparte' | 'sin' | null;
     cheese: TlayoyoCheeseMode | null;
 }
 
 const EMPTY_TPV_TLAYOYO: TpvTlayoyoDraft = {
+    ingredients: [],
     salsas: [],
     salsaMode: null,
     cheese: null
@@ -900,24 +908,45 @@ export default function TPVView({
                             {visibleItems.map(item => {
                                 if (isTlayoyoDish(item)) {
                                     const sel = tlayoyoSelections[item.id] || EMPTY_TPV_TLAYOYO;
-                                    const baseVar = item.variations[0] || { id: 'm-tlayoyos-v1', label: 'Por pieza', price: 10 };
-                                    const isTlayoyoReady = sel.salsaMode !== null && sel.cheese !== null;
-                                    const resolvedLabel = isTlayoyoReady
+                                    const isRelleno = isTlayoyoRellenoDish(item);
+                                    const rellenoIngredients = isRelleno ? getTlayoyoRellenoIngredients(item) : [];
+                                    const selectedRellenos = isRelleno ? (sel.ingredients || []) : [];
+                                    const baseVar = isRelleno
+                                        ? {
+                                            id: `relleno-${selectedRellenos.join('-').toLowerCase().replace(/\s+/g, '-') || 'base'}`,
+                                            label: formatTlayoyoRellenoLabel(selectedRellenos),
+                                            price: getTlayoyoRellenoPrice(item, selectedRellenos)
+                                          }
+                                        : (item.variations.find(v => v.id === sel.variationId) || item.variations[0] || { id: 'm-tlayoyos-v1', label: 'Por pieza', price: 10 });
+                                    const requiresVarChoice = !isRelleno && item.variations.length > 1;
+                                    const selectedMultiVar = requiresVarChoice ? item.variations.find(v => v.id === sel.variationId) : undefined;
+                                    const hasMultipleVars = !isRelleno && (item.variations.length > 1 || (baseVar.label && baseVar.label.toLowerCase() !== 'por pieza' && baseVar.label.toLowerCase() !== 'sencillo'));
+                                    const isRellenoReady = !isRelleno || selectedRellenos.length > 0;
+                                    const isVarReady = !requiresVarChoice || !!selectedMultiVar;
+                                    const isTlayoyoReady = isRellenoReady && isVarReady && sel.salsaMode !== null && sel.cheese !== null;
+                                    const specsLabel = sel.salsaMode !== null && sel.cheese !== null
                                         ? formatTlayoyoVariationLabel({
                                             salsas: sel.salsas,
                                             salsaMode: sel.salsaMode!,
                                             cheese: sel.cheese!
                                         })
                                         : '';
+                                    const resolvedLabel = isTlayoyoReady
+                                        ? (isRelleno || hasMultipleVars ? `${baseVar.label} · ${specsLabel}` : specsLabel)
+                                        : '';
                                     const inlineErr = tlayoyoError[item.id];
 
                                     const handleTlayoyoAction = (action: 'add1' | 'add3' | 'exact') => {
                                         if (!isTlayoyoReady) {
-                                            const missingMsg = sel.salsaMode === null && sel.cheese === null
-                                                ? 'Selecciona salsa y queso para agregar'
-                                                : sel.salsaMode === null
-                                                    ? 'Falta seleccionar la salsa'
-                                                    : 'Falta seleccionar el queso';
+                                            const missingMsg = !isRellenoReady
+                                                ? 'Selecciona 1 ($20) o 2 ($25) ingredientes'
+                                                : !isVarReady
+                                                    ? 'Selecciona una variante o relleno'
+                                                    : sel.salsaMode === null && sel.cheese === null
+                                                        ? 'Selecciona salsa y queso para agregar'
+                                                        : sel.salsaMode === null
+                                                            ? 'Falta seleccionar la salsa'
+                                                            : 'Falta seleccionar el queso';
                                             setTlayoyoError(prev => ({ ...prev, [item.id]: missingMsg }));
                                             soundManager.play('error');
                                             return;
@@ -944,6 +973,93 @@ export default function TPVView({
                                                     ${baseVar.price.toFixed(2)}
                                                 </span>
                                             </div>
+
+                                            {isRelleno && (
+                                                <div>
+                                                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                                                        <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400">
+                                                            Ingredientes (1: $20 · 2: $25)
+                                                        </span>
+                                                        {selectedRellenos.length > 0 && (
+                                                            <span className="text-[10px] font-black text-primary-600 dark:text-primary-400">
+                                                                {selectedRellenos.length}/2 · ${baseVar.price}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {rellenoIngredients.map(ing => {
+                                                            const isSelected = selectedRellenos.includes(ing);
+                                                            return (
+                                                                <button
+                                                                    key={ing}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setTlayoyoSelections(prev => {
+                                                                            const base = prev[item.id] || EMPTY_TPV_TLAYOYO;
+                                                                            return {
+                                                                                ...prev,
+                                                                                [item.id]: {
+                                                                                    ...base,
+                                                                                    ingredients: toggleTlayoyoRellenoIngredient(base.ingredients, ing, 2)
+                                                                                }
+                                                                            };
+                                                                        });
+                                                                        setTlayoyoError(prev => ({ ...prev, [item.id]: '' }));
+                                                                        soundManager.play('click');
+                                                                    }}
+                                                                    className={`min-h-[34px] px-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                                                                        isSelected
+                                                                            ? 'bg-primary-500 text-white shadow-sm'
+                                                                            : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10 hover:border-primary-300'
+                                                                    }`}
+                                                                >
+                                                                    {ing}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {hasMultipleVars && item.variations.length > 0 && (
+                                                <div>
+                                                    <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block mb-1.5">
+                                                        Relleno / Variante
+                                                    </span>
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {item.variations.map(v => {
+                                                            const isSelected = requiresVarChoice ? sel.variationId === v.id : baseVar.id === v.id;
+                                                            return (
+                                                                <button
+                                                                    key={v.id}
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setTlayoyoSelections(prev => {
+                                                                            const base = prev[item.id] || EMPTY_TPV_TLAYOYO;
+                                                                            return {
+                                                                                ...prev,
+                                                                                [item.id]: {
+                                                                                    ...base,
+                                                                                    variationId: base.variationId === v.id && requiresVarChoice ? undefined : v.id
+                                                                                }
+                                                                            };
+                                                                        });
+                                                                        setTlayoyoError(prev => ({ ...prev, [item.id]: '' }));
+                                                                        soundManager.play('click');
+                                                                    }}
+                                                                    className={`min-h-[34px] px-2.5 rounded-xl text-xs font-bold transition-colors cursor-pointer ${
+                                                                        isSelected
+                                                                            ? 'bg-primary-500 text-white shadow-sm'
+                                                                            : 'bg-gray-50 dark:bg-white/5 text-gray-700 dark:text-gray-300 border border-gray-200/80 dark:border-white/10 hover:border-primary-300'
+                                                                    }`}
+                                                                >
+                                                                    {v.label}{v.price > 0 ? ` $${v.price}` : ''}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
 
                                             <div>
                                                 <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block mb-1.5">

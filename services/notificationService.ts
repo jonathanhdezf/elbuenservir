@@ -94,7 +94,7 @@ class NotificationService {
   public async sendSystemNotification(title: string, options?: NotificationOptions): Promise<void> {
     if (!this.isSupported() || Notification.permission !== 'granted') return;
 
-    const defaultOptions: NotificationOptions = {
+    const defaultOptions: any = {
       icon: '/assets/aistudio/3m_7640444f.jpg',
       badge: '/assets/aistudio/3m_7640444f.jpg',
       vibrate: [200, 100, 200],
@@ -157,7 +157,7 @@ class NotificationService {
     const title = `🔔 ¡Nuevo Pedido #${order.id}!`;
     const body = `${sourceLabel}\n👤 ${order.customerName || 'Cliente'}\n🥘 ${itemsPreview}${moreItems}\n💰 Total: $${order.total.toFixed(2)}${order.address ? `\n📍 ${order.address}` : ''}`;
 
-    const options: NotificationOptions = {
+    const options: any = {
       body,
       icon: '/assets/aistudio/3m_7640444f.jpg',
       badge: '/assets/aistudio/3m_7640444f.jpg',

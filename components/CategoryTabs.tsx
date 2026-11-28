@@ -37,7 +37,7 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({
           <div
             key={cat.id}
             className={`
-              shrink-0 flex items-center gap-1.5 rounded-2xl border transition-all duration-200 select-none min-h-[44px]
+              group shrink-0 flex items-center gap-1.5 rounded-2xl border transition-all duration-200 select-none min-h-[44px]
               ${isActive
                 ? 'bg-primary-500 text-white border-primary-500 shadow-md shadow-primary-500/20'
                 : 'bg-white dark:bg-[#1a1118] text-gray-700 dark:text-gray-200 border-gray-200/80 dark:border-white/10 hover:border-primary-300 dark:hover:border-primary-500/40'
@@ -65,6 +65,25 @@ const CategoryTabs: React.FC<CategoryTabsProps> = ({
                 </span>
               )}
             </button>
+
+            {!isReordering && onDeleteCategory && categories.length > 1 && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeleteCategory(cat.id);
+                }}
+                title={`Eliminar categoría ${cat.name}`}
+                aria-label={`Eliminar categoría ${cat.name}`}
+                className={`w-6 h-6 -mr-1.5 flex items-center justify-center rounded-lg cursor-pointer transition-all ${
+                  isActive
+                    ? 'text-white/85 hover:text-white hover:bg-black/15 opacity-100'
+                    : 'text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 md:opacity-0 md:group-hover:opacity-100'
+                }`}
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
 
             {isReordering && (
               <div

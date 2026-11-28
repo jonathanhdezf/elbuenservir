@@ -207,6 +207,94 @@ export const mapLogToDb = (log: SiteLog) => ({
   type: log.type
 });
 
+const SYNC_BROADCAST_CHANNEL_NAME = 'tlayoyos_3_marias_sync_v1';
+const REALTIME_CHANNEL_NAME = 'tlayoyos-3-marias-realtime';
+const CLIENT_INSTANCE_ID =
+  typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `client-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+type SyncEntity = 'orders' | 'menu_items' | 'categories' | 'customers' | 'drivers' | 'staff';
+
+interface SyncEventPayload {
+  entity: SyncEntity;
+  action: 'upsert' | 'delete';
+  record?: any;
+  id?: string;
+  senderId: string;
+  ts: number;
+}
+
+export interface NormalizedRealtimeChange<T> {
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+  record?: T;
+  id?: string;
+  source: 'postgres' | 'broadcast' | 'local';
+}
+
+export interface SubscribeCallbacks {
+  onOrderChange?: (change: NormalizedRealtimeChange<Order>) => void;
+  onOrderSyncBatch?: (orders: Order[]) => void;
+  onMenuItemChange?: (change: NormalizedRealtimeChange<MenuItem>) => void;
+  onCategoryChange?: (change: NormalizedRealtimeChange<Category>) => void;
+  onCustomerChange?: (change: NormalizedRealtimeChange<Customer>) => void;
+  onDriverChange?: (change: NormalizedRealtimeChange<DeliveryDriver>) => void;
+  onStaffChange?: (change: NormalizedRealtimeChange<Staff>) => void;
+  onRealtimeStatusChange?: (status: 'SUBSCRIBED' | 'RECONNECTING' | 'DISCONNECTED') => void;
+  getRelevantOrderIds?: () => Set<string> | string[] | null | undefined;
+  isOrderRelevant?: (orderId: string, order?: Order, eventType?: 'INSERT' | 'UPDATE' | 'DELETE') => boolean;
+}
+
+let activeRealtimeChannel: ReturnType<typeof supabase.channel> | null = null;
+let isRealtimeSubscribed = false;
+let pendingBroadcastQueue: SyncEventPayload[] = [];
+let localSyncChannel: BroadcastChannel | null = null;
+
+const getLocalSyncChannel = (): BroadcastChannel | null => {
+  if (typeof window === 'undefined' || typeof BroadcastChannel === 'undefined') return null;
+  if (!localSyncChannel) {
+    try {
+      localSyncChannel = new BroadcastChannel(SYNC_BROADCAST_CHANNEL_NAME);
+    } catch {
+      return null;
+    }
+  }
+  return localSyncChannel;
+};
+
+const emitSyncEvent = (event: Omit<SyncEventPayload, 'senderId' | 'ts'>) => {
+  const payload: SyncEventPayload = {
+    ...event,
+    senderId: CLIENT_INSTANCE_ID,
+    ts: Date.now(),
+  };
+
+  // 1. Instant zero-quota sync across tabs in the same browser/device
+  try {
+    getLocalSyncChannel()?.postMessage(payload);
+  } catch {
+    // ignore BroadcastChannel errors
+  }
+
+  // 2. Event-driven Supabase Realtime Broadcast across devices (0 DB queries)
+  if (activeRealtimeChannel && isRealtimeSubscribed) {
+    activeRealtimeChannel
+      .send({
+        type: 'broadcast',
+        event: 'sync_event',
+        payload,
+      })
+      .catch((err) => {
+        console.warn('[Supabase Broadcast] Error sending sync event:', err);
+      });
+  } else {
+    pendingBroadcastQueue.push(payload);
+    if (pendingBroadcastQueue.length > 25) {
+      pendingBroadcastQueue = pendingBroadcastQueue.slice(-25);
+    }
+  }
+};
+
 export const databaseService = {
   // 1. Initial Load & Seed
   async loadAll(
@@ -316,53 +404,434 @@ export const databaseService = {
     }
   },
 
-  // 2. Realtime Subscriptions
-  subscribeToChanges(callbacks: {
-    onOrderChange?: (payload: any) => void;
-    onMenuItemChange?: (payload: any) => void;
-    onCategoryChange?: (payload: any) => void;
-    onCustomerChange?: (payload: any) => void;
-  }) {
-    const channel = supabase.channel('tlayoyos-3-marias-realtime');
+  // Lightweight catch-up query (only called on reconnect/tab wake after cooldown, never polled)
+  async fetchRecentOrders(limit: number = 80): Promise<Order[] | null> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (error || !data) return null;
+      return data.map(mapOrderFromDb);
+    } catch {
+      return null;
+    }
+  },
 
-    if (callbacks.onOrderChange) {
-      channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'orders' },
-        (payload) => callbacks.onOrderChange?.(payload)
-      );
+  // 2. Quota-Safe Realtime Subscriptions (Single Channel: Broadcast + Postgres Changes + Local Tab Sync)
+  subscribeToChanges(callbacks: SubscribeCallbacks) {
+    let isCleanedUp = false;
+    let currentChannel: ReturnType<typeof supabase.channel> | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let reconnectAttempt = 0;
+    let wasDisconnected = false;
+    let lastCatchupAt = Date.now();
+    let catchupInFlight = false;
+
+    const triggerCooldownCatchup = async (minCooldownMs: number) => {
+      if (isCleanedUp || catchupInFlight || !callbacks.onOrderSyncBatch) return;
+      const now = Date.now();
+      if (now - lastCatchupAt < minCooldownMs) return;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+
+      catchupInFlight = true;
+      lastCatchupAt = now;
+      try {
+        const recentOrders = await databaseService.fetchRecentOrders(80);
+        if (!isCleanedUp && recentOrders) {
+          callbacks.onOrderSyncBatch(recentOrders);
+        }
+      } finally {
+        catchupInFlight = false;
+      }
+    };
+
+    const shouldProcessOrderChange = (
+      orderId: string | undefined,
+      order: Order | undefined,
+      eventType: 'INSERT' | 'UPDATE' | 'DELETE'
+    ): boolean => {
+      if (!callbacks.isOrderRelevant && !callbacks.getRelevantOrderIds) {
+        return true;
+      }
+      if (callbacks.isOrderRelevant) {
+        return callbacks.isOrderRelevant(orderId || '', order, eventType);
+      }
+      if (callbacks.getRelevantOrderIds) {
+        const relevantIds = callbacks.getRelevantOrderIds();
+        if (!relevantIds) return true;
+        const set = relevantIds instanceof Set ? relevantIds : new Set(relevantIds);
+        if (eventType === 'DELETE') {
+          return Boolean(orderId && set.has(orderId));
+        }
+        if (orderId && set.has(orderId)) return true;
+        if (eventType === 'INSERT') return true;
+        return false;
+      }
+      return true;
+    };
+
+    const dispatchSyncEvent = (payload: SyncEventPayload, source: 'broadcast' | 'local') => {
+      if (!payload || payload.senderId === CLIENT_INSTANCE_ID) return;
+
+      if (payload.entity === 'orders' && callbacks.onOrderChange) {
+        const orderRecord = payload.record as Order | undefined;
+        const orderId = payload.id || orderRecord?.id;
+        const eventType: 'INSERT' | 'UPDATE' | 'DELETE' =
+          payload.action === 'delete' ? 'DELETE' : 'UPDATE';
+
+        if (!shouldProcessOrderChange(orderId, orderRecord, eventType)) {
+          return;
+        }
+
+        if (payload.action === 'delete') {
+          callbacks.onOrderChange({ eventType: 'DELETE', id: payload.id, source });
+        } else if (payload.record) {
+          callbacks.onOrderChange({ eventType: 'UPDATE', record: payload.record as Order, source });
+        }
+        return;
+      }
+
+      if (payload.entity === 'menu_items' && callbacks.onMenuItemChange) {
+        if (payload.action === 'delete') {
+          callbacks.onMenuItemChange({ eventType: 'DELETE', id: payload.id, source });
+        } else if (payload.record) {
+          callbacks.onMenuItemChange({ eventType: 'UPDATE', record: payload.record as MenuItem, source });
+        }
+        return;
+      }
+
+      if (payload.entity === 'categories' && callbacks.onCategoryChange) {
+        if (payload.action === 'delete') {
+          callbacks.onCategoryChange({ eventType: 'DELETE', id: payload.id, source });
+        } else if (payload.record) {
+          callbacks.onCategoryChange({ eventType: 'UPDATE', record: payload.record as Category, source });
+        }
+        return;
+      }
+
+      if (payload.entity === 'customers' && callbacks.onCustomerChange) {
+        if (payload.action === 'delete') {
+          callbacks.onCustomerChange({ eventType: 'DELETE', id: payload.id, source });
+        } else if (payload.record) {
+          callbacks.onCustomerChange({ eventType: 'UPDATE', record: payload.record as Customer, source });
+        }
+        return;
+      }
+
+      if (payload.entity === 'drivers' && callbacks.onDriverChange) {
+        if (payload.action === 'delete') {
+          callbacks.onDriverChange({ eventType: 'DELETE', id: payload.id, source });
+        } else if (payload.record) {
+          callbacks.onDriverChange({ eventType: 'UPDATE', record: payload.record as DeliveryDriver, source });
+        }
+        return;
+      }
+
+      if (payload.entity === 'staff' && callbacks.onStaffChange) {
+        if (payload.action === 'delete') {
+          callbacks.onStaffChange({ eventType: 'DELETE', id: payload.id, source });
+        } else if (payload.record) {
+          callbacks.onStaffChange({ eventType: 'UPDATE', record: payload.record as Staff, source });
+        }
+      }
+    };
+
+    const flushPendingBroadcasts = (channel: ReturnType<typeof supabase.channel>) => {
+      if (pendingBroadcastQueue.length === 0) return;
+      const queued = [...pendingBroadcastQueue];
+      pendingBroadcastQueue = [];
+      queued.forEach((evt) => {
+        channel
+          .send({ type: 'broadcast', event: 'sync_event', payload: evt })
+          .catch(() => {});
+      });
+    };
+
+    const clearReconnectTimer = () => {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+    };
+
+    const scheduleReconnect = () => {
+      if (isCleanedUp || reconnectTimer) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+
+      const delays = [2000, 4000, 8000, 15000, 30000];
+      const delay = delays[Math.min(reconnectAttempt, delays.length - 1)];
+      reconnectAttempt += 1;
+
+      callbacks.onRealtimeStatusChange?.('RECONNECTING');
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        if (!isCleanedUp) {
+          connectChannel();
+        }
+      }, delay);
+    };
+
+    const connectChannel = () => {
+      if (isCleanedUp) return;
+
+      if (currentChannel) {
+        const old = currentChannel;
+        currentChannel = null;
+        if (activeRealtimeChannel === old) {
+          activeRealtimeChannel = null;
+          isRealtimeSubscribed = false;
+        }
+        supabase.removeChannel(old);
+      }
+
+      const channel = supabase.channel(REALTIME_CHANNEL_NAME, {
+        config: {
+          broadcast: { self: false, ack: false }
+        }
+      });
+
+      currentChannel = channel;
+      activeRealtimeChannel = channel;
+      isRealtimeSubscribed = false;
+
+      // A) Direct low-latency Broadcast (bypasses WAL REPLICA IDENTITY limits, 0 DB quota)
+      channel.on('broadcast', { event: 'sync_event' }, (msg: any) => {
+        if (msg?.payload) {
+          dispatchSyncEvent(msg.payload as SyncEventPayload, 'broadcast');
+        }
+      });
+
+      // B) PostgreSQL WAL changes on the exact same single WebSocket channel
+      if (callbacks.onOrderChange) {
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'orders' },
+          (payload: any) => {
+            const eventType: 'INSERT' | 'UPDATE' | 'DELETE' =
+              payload.eventType === 'DELETE' ? 'DELETE' : payload.eventType === 'INSERT' ? 'INSERT' : 'UPDATE';
+            const orderId = payload.eventType === 'DELETE' ? payload.old?.id : payload.new?.id;
+            const mappedOrder = payload.new ? mapOrderFromDb(payload.new) : undefined;
+
+            if (!shouldProcessOrderChange(orderId, mappedOrder, eventType)) {
+              return;
+            }
+
+            if (payload.eventType === 'DELETE') {
+              callbacks.onOrderChange?.({
+                eventType: 'DELETE',
+                id: payload.old?.id,
+                source: 'postgres'
+              });
+            } else if (payload.new) {
+              callbacks.onOrderChange?.({
+                eventType,
+                record: mappedOrder,
+                source: 'postgres'
+              });
+            }
+          }
+        );
+      }
+
+      if (callbacks.onMenuItemChange) {
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'menu_items' },
+          (payload: any) => {
+            if (payload.eventType === 'DELETE') {
+              callbacks.onMenuItemChange?.({
+                eventType: 'DELETE',
+                id: payload.old?.id,
+                source: 'postgres'
+              });
+            } else if (payload.new) {
+              callbacks.onMenuItemChange?.({
+                eventType: payload.eventType === 'INSERT' ? 'INSERT' : 'UPDATE',
+                record: mapMenuItemFromDb(payload.new),
+                source: 'postgres'
+              });
+            }
+          }
+        );
+      }
+
+      if (callbacks.onCategoryChange) {
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'categories' },
+          (payload: any) => {
+            if (payload.eventType === 'DELETE') {
+              callbacks.onCategoryChange?.({
+                eventType: 'DELETE',
+                id: payload.old?.id,
+                source: 'postgres'
+              });
+            } else if (payload.new) {
+              callbacks.onCategoryChange?.({
+                eventType: payload.eventType === 'INSERT' ? 'INSERT' : 'UPDATE',
+                record: mapCategoryFromDb(payload.new),
+                source: 'postgres'
+              });
+            }
+          }
+        );
+      }
+
+      if (callbacks.onCustomerChange) {
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'customers' },
+          (payload: any) => {
+            if (payload.eventType === 'DELETE') {
+              callbacks.onCustomerChange?.({
+                eventType: 'DELETE',
+                id: payload.old?.id,
+                source: 'postgres'
+              });
+            } else if (payload.new) {
+              callbacks.onCustomerChange?.({
+                eventType: payload.eventType === 'INSERT' ? 'INSERT' : 'UPDATE',
+                record: mapCustomerFromDb(payload.new),
+                source: 'postgres'
+              });
+            }
+          }
+        );
+      }
+
+      if (callbacks.onDriverChange) {
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'delivery_drivers' },
+          (payload: any) => {
+            if (payload.eventType === 'DELETE') {
+              callbacks.onDriverChange?.({
+                eventType: 'DELETE',
+                id: payload.old?.id,
+                source: 'postgres'
+              });
+            } else if (payload.new) {
+              callbacks.onDriverChange?.({
+                eventType: payload.eventType === 'INSERT' ? 'INSERT' : 'UPDATE',
+                record: mapDriverFromDb(payload.new),
+                source: 'postgres'
+              });
+            }
+          }
+        );
+      }
+
+      if (callbacks.onStaffChange) {
+        channel.on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'staff' },
+          (payload: any) => {
+            if (payload.eventType === 'DELETE') {
+              callbacks.onStaffChange?.({
+                eventType: 'DELETE',
+                id: payload.old?.id,
+                source: 'postgres'
+              });
+            } else if (payload.new) {
+              callbacks.onStaffChange?.({
+                eventType: payload.eventType === 'INSERT' ? 'INSERT' : 'UPDATE',
+                record: mapStaffFromDb(payload.new),
+                source: 'postgres'
+              });
+            }
+          }
+        );
+      }
+
+      channel.subscribe((status) => {
+        if (isCleanedUp || currentChannel !== channel) return;
+        console.log('[Supabase Realtime] Status:', status);
+
+        if (status === 'SUBSCRIBED') {
+          isRealtimeSubscribed = true;
+          reconnectAttempt = 0;
+          clearReconnectTimer();
+          callbacks.onRealtimeStatusChange?.('SUBSCRIBED');
+          flushPendingBroadcasts(channel);
+
+          if (wasDisconnected) {
+            wasDisconnected = false;
+            void triggerCooldownCatchup(5000);
+          }
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          isRealtimeSubscribed = false;
+          wasDisconnected = true;
+          callbacks.onRealtimeStatusChange?.('DISCONNECTED');
+          scheduleReconnect();
+        }
+      });
+    };
+
+    // C) Local browser multi-tab BroadcastChannel listener (0 Supabase quota)
+    let tabListenerChannel: BroadcastChannel | null = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        tabListenerChannel = new BroadcastChannel(SYNC_BROADCAST_CHANNEL_NAME);
+        tabListenerChannel.onmessage = (event) => {
+          if (event?.data) {
+            dispatchSyncEvent(event.data as SyncEventPayload, 'local');
+          }
+        };
+      }
+    } catch {
+      tabListenerChannel = null;
     }
 
-    if (callbacks.onMenuItemChange) {
-      channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'menu_items' },
-        (payload) => callbacks.onMenuItemChange?.(payload)
-      );
+    // D) Reconnect & throttled catch-up ONLY when tab wakes up or network returns
+    const handleVisibilityOrOnline = () => {
+      if (isCleanedUp) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+
+      if (!isRealtimeSubscribed) {
+        clearReconnectTimer();
+        reconnectAttempt = 0;
+        connectChannel();
+      }
+      void triggerCooldownCatchup(25000);
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityOrOnline);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', handleVisibilityOrOnline);
     }
 
-    if (callbacks.onCategoryChange) {
-      channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'categories' },
-        (payload) => callbacks.onCategoryChange?.(payload)
-      );
-    }
-
-    if (callbacks.onCustomerChange) {
-      channel.on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'customers' },
-        (payload) => callbacks.onCustomerChange?.(payload)
-      );
-    }
-
-    channel.subscribe((status) => {
-      console.log('[Supabase Realtime] Status:', status);
-    });
+    connectChannel();
 
     return () => {
-      supabase.removeChannel(channel);
+      isCleanedUp = true;
+      clearReconnectTimer();
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityOrOnline);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('online', handleVisibilityOrOnline);
+      }
+      if (tabListenerChannel) {
+        try {
+          tabListenerChannel.close();
+        } catch {
+          // ignore
+        }
+      }
+      if (currentChannel) {
+        if (activeRealtimeChannel === currentChannel) {
+          activeRealtimeChannel = null;
+          isRealtimeSubscribed = false;
+        }
+        supabase.removeChannel(currentChannel);
+        currentChannel = null;
+      }
     };
   },
 
@@ -370,68 +839,110 @@ export const databaseService = {
   async upsertOrder(order: Order) {
     const row = mapOrderToDb(order);
     const { error } = await supabase.from('orders').upsert(row);
-    if (error) console.error('[Database] Error upserting order:', error);
+    if (error) {
+      console.error('[Database] Error upserting order:', error);
+      return;
+    }
+    emitSyncEvent({ entity: 'orders', action: 'upsert', record: order });
   },
 
   async deleteOrder(orderId: string) {
     const { error } = await supabase.from('orders').delete().eq('id', orderId);
-    if (error) console.error('[Database] Error deleting order:', error);
+    if (error) {
+      console.error('[Database] Error deleting order:', error);
+      return;
+    }
+    emitSyncEvent({ entity: 'orders', action: 'delete', id: orderId });
   },
 
   // 4. Menu Items Mutations
   async upsertMenuItem(item: MenuItem) {
     const row = mapMenuItemToDb(item);
     const { error } = await supabase.from('menu_items').upsert(row);
-    if (error) console.error('[Database] Error upserting menu item:', error);
+    if (error) {
+      console.error('[Database] Error upserting menu item:', error);
+      return;
+    }
+    emitSyncEvent({ entity: 'menu_items', action: 'upsert', record: item });
   },
 
   async deleteMenuItem(itemId: string) {
     const { error } = await supabase.from('menu_items').delete().eq('id', itemId);
-    if (error) console.error('[Database] Error deleting menu item:', error);
+    if (error) {
+      console.error('[Database] Error deleting menu item:', error);
+      return;
+    }
+    emitSyncEvent({ entity: 'menu_items', action: 'delete', id: itemId });
   },
 
   // 5. Categories Mutations
   async upsertCategory(cat: Category) {
     const row = mapCategoryToDb(cat);
     const { error } = await supabase.from('categories').upsert(row);
-    if (error) console.error('[Database] Error upserting category:', error);
+    if (error) {
+      console.error('[Database] Error upserting category:', error);
+      return;
+    }
+    emitSyncEvent({ entity: 'categories', action: 'upsert', record: cat });
   },
 
   async deleteCategory(catId: string) {
     const { error } = await supabase.from('categories').delete().eq('id', catId);
-    if (error) console.error('[Database] Error deleting category:', error);
+    if (error) {
+      console.error('[Database] Error deleting category:', error);
+      return;
+    }
+    emitSyncEvent({ entity: 'categories', action: 'delete', id: catId });
   },
 
   // 6. Customers Mutations
   async upsertCustomer(cust: Customer) {
     const row = mapCustomerToDb(cust);
     const { error } = await supabase.from('customers').upsert(row);
-    if (error) console.error('[Database] Error upserting customer:', error);
+    if (error) {
+      console.error('[Database] Error upserting customer:', error);
+      return;
+    }
+    emitSyncEvent({ entity: 'customers', action: 'upsert', record: cust });
   },
 
   async deleteCustomer(custId: string) {
     const { error } = await supabase.from('customers').delete().eq('id', custId);
-    if (error) console.error('[Database] Error deleting customer:', error);
+    if (error) {
+      console.error('[Database] Error deleting customer:', error);
+      return;
+    }
+    emitSyncEvent({ entity: 'customers', action: 'delete', id: custId });
   },
 
   // 7. Drivers Mutations
   async upsertDriver(driver: DeliveryDriver) {
     const row = mapDriverToDb(driver);
     const { error } = await supabase.from('delivery_drivers').upsert(row);
-    if (error) console.error('[Database] Error upserting driver:', error);
+    if (error) {
+      console.error('[Database] Error upserting driver:', error);
+      return;
+    }
+    emitSyncEvent({ entity: 'drivers', action: 'upsert', record: driver });
   },
 
   // 8. Staff Mutations
   async upsertStaff(staffMember: Staff) {
     const row = mapStaffToDb(staffMember);
     const { error } = await supabase.from('staff').upsert(row);
-    if (error) console.error('[Database] Error upserting staff:', error);
+    if (error) {
+      console.error('[Database] Error upserting staff:', error);
+      return;
+    }
+    emitSyncEvent({ entity: 'staff', action: 'upsert', record: staffMember });
   },
 
   // 9. Site Logs
   async insertLog(log: SiteLog) {
     const row = mapLogToDb(log);
-    const { error } = await supabase.from('site_logs').insert(row);
+    const { error } = await supabase
+      .from('site_logs')
+      .upsert(row, { onConflict: 'id', ignoreDuplicates: true });
     if (error) console.error('[Database] Error inserting log:', error);
   }
 };

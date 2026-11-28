@@ -19,14 +19,23 @@ import { FacebookChannelSection } from '../components/FacebookChannelSection';
 import {
   TLAYOYO_SALSAS,
   TLAYOYO_CHEESE_OPTIONS,
-  DEFAULT_TLAYOYO_SELECTION,
-  TlayoyoSelection,
+  EMPTY_TLAYOYO_DRAFT,
+  TlayoyoDraft,
   isTlayoyoDish,
-  toggleTlayoyoSalsa,
-  toggleTlayoyoSalsaAparte,
-  setTlayoyoSinSalsa,
+  isTlayoyoRellenoDish,
+  getTlayoyoRellenoIngredients,
+  toggleTlayoyoRellenoIngredient,
+  getTlayoyoRellenoPrice,
+  formatTlayoyoRellenoLabel,
+  toggleTlayoyoDraftSalsa,
+  toggleTlayoyoDraftSalsaAparte,
+  toggleTlayoyoDraftSinSalsa,
+  toggleTlayoyoDraftCheese,
   formatTlayoyoVariationLabel
 } from '../utils/tlayoyoConfig';
+import { getAccompanimentOptions, getGroupedAccompanimentOptions, getDishSidesList } from '../utils/menuOptions';
+
+export { getAccompanimentOptions };
 
 interface PublicViewProps {
   categories: Category[];
@@ -55,53 +64,6 @@ export interface PublicCartItem {
   categoryId?: string;
   isExtra?: boolean;
 }
-
-export const getAccompanimentOptions = (item: { name: string; categoryId?: string }) => {
-  const n = (item.name || '').toLowerCase();
-  const c = (item.categoryId || '').toLowerCase();
-  const isPozole = n.includes('pozole');
-  const isPancita = n.includes('pancita') || n.includes('menudo');
-  const isCaldo = isPozole || isPancita || n.includes('chilpozo') || n.includes('caldo') || c.includes('caldo');
-
-  if (isPozole) {
-    return [
-      { id: 'sin-cebolla', label: 'Sin cebolla', icon: '🧅' },
-      { id: 'sin-rabanos', label: 'Sin rábanos', icon: '🔴' },
-      { id: 'sin-aguacate', label: 'Sin aguacate', icon: '🥑' },
-      { id: 'sin-oregano', label: 'Sin orégano', icon: '🌿' },
-      { id: 'sin-chile', label: 'Sin picante', icon: '🌶️' },
-      { id: 'limon-aparte', label: 'Limón aparte', icon: '🍋' }
-    ];
-  }
-
-  if (isPancita) {
-    return [
-      { id: 'sin-cebolla', label: 'Sin cebolla', icon: '🧅' },
-      { id: 'sin-rabanos', label: 'Sin rábanos', icon: '🔴' },
-      { id: 'sin-aguacate', label: 'Sin aguacate', icon: '🥑' },
-      { id: 'sin-oregano', label: 'Sin orégano', icon: '🌿' },
-      { id: 'sin-chile', label: 'Sin chile picado', icon: '🌶️' },
-      { id: 'limon-aparte', label: 'Limón aparte', icon: '🍋' }
-    ];
-  }
-
-  if (isCaldo) {
-    return [
-      { id: 'sin-cebolla', label: 'Sin cebolla', icon: '🧅' },
-      { id: 'sin-aguacate', label: 'Sin aguacate', icon: '🥑' },
-      { id: 'sin-rabanos', label: 'Sin rábanos', icon: '🔴' },
-      { id: 'sin-picante', label: 'Sin picante', icon: '🌶️' },
-      { id: 'limon-aparte', label: 'Limón aparte', icon: '🍋' }
-    ];
-  }
-
-  return [
-    { id: 'sin-cebolla', label: 'Sin cebolla', icon: '🧅' },
-    { id: 'sin-aguacate', label: 'Sin aguacate', icon: '🥑' },
-    { id: 'sin-picante', label: 'Sin picante', icon: '🌶️' },
-    { id: 'salsa-aparte', label: 'Salsa aparte', icon: '🥣' }
-  ];
-};
 
 export default function PublicView({ categories, menuItems, customers, orders = [], onAddCustomer, onUpdateCustomer, onAddOrder, onEnterControlPanel, onViewDigitalTicket, isPreview, isDarkMode, setIsDarkMode }: PublicViewProps) {
   const { isInstalled, isIos, showInstructions, setShowInstructions, installApp } = usePwaInstall();
@@ -159,13 +121,17 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   const [pendingDishSides, setPendingDishSides] = useState<Record<string, string[]>>({});
   const [pendingDishVariation, setPendingDishVariation] = useState<Record<string, any>>({});
   const [selectedVariationsByDish, setSelectedVariationsByDish] = useState<Record<string, any>>({});
-  const [pendingTlayoyoSel, setPendingTlayoyoSel] = useState<Record<string, TlayoyoSelection>>({});
+  const [pendingTlayoyoSel, setPendingTlayoyoSel] = useState<Record<string, TlayoyoDraft>>({});
+  const [pendingRellenoIngredients, setPendingRellenoIngredients] = useState<Record<string, string[]>>({});
   const [pendingDishQty, setPendingDishQty] = useState<Record<string, number>>({});
+  const [pendingDishQtyDraft, setPendingDishQtyDraft] = useState<Record<string, string>>({});
+  const [cartQtyDraft, setCartQtyDraft] = useState<Record<string, string>>({});
   const [pendingDishComments, setPendingDishComments] = useState<Record<string, string>>({});
   const [editingCartItemId, setEditingCartItemId] = useState<string | null>(null);
   const [customerComments, setCustomerComments] = useState('');
   const [quickSearch, setQuickSearch] = useState('');
   const [extraModalType, setExtraModalType] = useState<string | null>(null);
+  const [justAddedDishId, setJustAddedDishId] = useState<string | null>(null);
 
   const cartTotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const cartItemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -252,9 +218,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     commentsOverride?: string
   ) => {
     const chosenVar = variationOverride || pendingDishVariation[item.id] || item.variations[0];
-    const resolvedVarLabel = isTlayoyoDish(item) && !variationOverride?.label
-      ? formatTlayoyoVariationLabel(pendingTlayoyoSel[item.id])
-      : chosenVar.label;
+    const resolvedVarLabel = chosenVar.label;
     const qty = qtyOverride || pendingDishQty[item.id] || 1;
     const sidesAllowed = isDishSidesEnabled(item);
     const commentsAllowed = isDishAccompanimentEnabled(item);
@@ -291,13 +255,34 @@ export default function PublicView({ categories, menuItems, customers, orders = 
       return [...prev, newItem];
     });
 
-    setPendingDishQty(prev => ({ ...prev, [item.id]: 1 }));
-    setPendingDishComments(prev => ({ ...prev, [item.id]: '' }));
+    const clearDishKey = <T,>(setter: React.Dispatch<React.SetStateAction<Record<string, T>>>) => {
+      setter(prev => {
+        if (!(item.id in prev)) return prev;
+        const next = { ...prev };
+        delete next[item.id];
+        return next;
+      });
+    };
+
+    clearDishKey(setPendingDishQty);
+    clearDishKey(setPendingDishQtyDraft);
+    clearDishKey(setPendingDishComments);
+    clearDishKey(setPendingDishSides);
+    clearDishKey(setPendingDishVariation);
+    clearDishKey(setSelectedVariationsByDish);
+    clearDishKey(setPendingTlayoyoSel);
+    clearDishKey(setPendingRellenoIngredients);
     soundManager.play('click');
   };
 
   const handleUpdateCartQuantity = (cartItemId: string, delta: number) => {
     soundManager.play('click');
+    setCartQtyDraft(prev => {
+      if (!(cartItemId in prev)) return prev;
+      const next = { ...prev };
+      delete next[cartItemId];
+      return next;
+    });
     setCartItems(prev => prev.map(item => {
       if (item.id === cartItemId) {
         const newQty = item.quantity + delta;
@@ -307,8 +292,45 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     }).filter(Boolean) as PublicCartItem[]);
   };
 
+  const handleSetCartQuantity = (cartItemId: string, quantity: number) => {
+    const safeQty = Math.max(1, Math.min(999, Math.floor(quantity)));
+    setCartItems(prev => prev.map(item =>
+      item.id === cartItemId ? { ...item, quantity: safeQty } : item
+    ));
+  };
+
+  const handlePendingQtyInputChange = (dishId: string, rawValue: string) => {
+    const digitsOnly = rawValue.replace(/\D/g, '').slice(0, 3);
+    setPendingDishQtyDraft(prev => ({ ...prev, [dishId]: digitsOnly }));
+    if (digitsOnly === '') {
+      setPendingDishQty(prev => ({ ...prev, [dishId]: 1 }));
+      return;
+    }
+    const parsed = parseInt(digitsOnly, 10);
+    if (!Number.isNaN(parsed) && parsed >= 1) {
+      setPendingDishQty(prev => ({ ...prev, [dishId]: Math.min(999, parsed) }));
+    }
+  };
+
+  const handleCartQtyInputChange = (cartItemId: string, rawValue: string) => {
+    const digitsOnly = rawValue.replace(/\D/g, '').slice(0, 3);
+    setCartQtyDraft(prev => ({ ...prev, [cartItemId]: digitsOnly }));
+    if (digitsOnly !== '') {
+      const parsed = parseInt(digitsOnly, 10);
+      if (!Number.isNaN(parsed) && parsed >= 1) {
+        handleSetCartQuantity(cartItemId, parsed);
+      }
+    }
+  };
+
   const handleRemoveFromCart = (cartItemId: string) => {
     soundManager.play('click');
+    setCartQtyDraft(prev => {
+      if (!(cartItemId in prev)) return prev;
+      const next = { ...prev };
+      delete next[cartItemId];
+      return next;
+    });
     setCartItems(prev => prev.filter(item => item.id !== cartItemId));
   };
 
@@ -722,6 +744,15 @@ export default function PublicView({ categories, menuItems, customers, orders = 
     }
 
     setCartItems([]);
+    setPendingDishSides({});
+    setPendingDishVariation({});
+    setSelectedVariationsByDish({});
+    setPendingTlayoyoSel({});
+    setPendingRellenoIngredients({});
+    setPendingDishQty({});
+    setPendingDishQtyDraft({});
+    setPendingDishComments({});
+    setCartQtyDraft({});
     setIsOrderModalOpen(false);
     setOrderStep(1);
     setCustomerComments('');
@@ -735,6 +766,12 @@ export default function PublicView({ categories, menuItems, customers, orders = 
   useEffect(() => {
     setVisibleItemsCount(6);
   }, [activeCategory]);
+
+  useEffect(() => {
+    if (categories.length > 0 && !categories.some((c) => c.id === activeCategory)) {
+      setActiveCategory(categories[0].id);
+    }
+  }, [categories, activeCategory]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -1249,8 +1286,8 @@ export default function PublicView({ categories, menuItems, customers, orders = 
       </section>
 
       {/* Menu Section */}
-      <section id="menu" className={`py-24 px-6 relative transition-colors duration-300 ${isPreview ? 'bg-white dark:bg-gray-950' : 'bg-[#FDFDFD] dark:bg-gray-950'}`}>
-        <div className="w-full relative z-10 px-6 md:px-12">
+      <section id="menu" className={`py-16 sm:py-24 px-3 sm:px-6 relative transition-colors duration-300 ${isPreview ? 'bg-white dark:bg-gray-950' : 'bg-[#FDFDFD] dark:bg-gray-950'}`}>
+        <div className="w-full relative z-10 px-1 sm:px-6 md:px-12">
           <div className="text-center mb-20">
             <span className="text-primary-500 font-black uppercase tracking-[0.3em] text-xs mb-4 block">Carta Gastronómica</span>
             <h2 className="text-5xl md:text-7xl font-black mb-8 tracking-tighter dark:text-white">Nuestro <span className="font-serif italic font-normal">Menú</span></h2>
@@ -1282,8 +1319,37 @@ export default function PublicView({ categories, menuItems, customers, orders = 
             {filteredItems.length > 0 ? (
               <>
                 {filteredItems.slice(0, visibleItemsCount).map(item => {
-                  const activeVariation = selectedVariationsByDish[item.id] || item.variations[0];
-                  const currentPrice = activeVariation?.price ?? item.variations[0]?.price ?? 0;
+                  const isTlayoyo = isTlayoyoDish(item);
+                  const isRelleno = isTlayoyoRellenoDish(item);
+                  const rellenoIngredients = isRelleno ? getTlayoyoRellenoIngredients(item) : [];
+                  const selectedRellenos = isRelleno
+                    ? (pendingRellenoIngredients[item.id] ?? [])
+                    : [];
+                  const requiresVarChoice = !isRelleno && item.variations.length > 1;
+                  const activeVariation = requiresVarChoice
+                    ? (selectedVariationsByDish[item.id] || null)
+                    : (selectedVariationsByDish[item.id] || item.variations[0] || null);
+                  const currentPrice = isRelleno
+                    ? getTlayoyoRellenoPrice(item, selectedRellenos)
+                    : (activeVariation?.price ?? item.variations[0]?.price ?? 0);
+                  const tlayoyoSel = isTlayoyo ? (pendingTlayoyoSel[item.id] || EMPTY_TLAYOYO_DRAFT) : EMPTY_TLAYOYO_DRAFT;
+                  const isRellenoReady = !isRelleno || selectedRellenos.length > 0;
+                  const isVarReady = !requiresVarChoice || !!activeVariation;
+                  const isSalsaReady = !isTlayoyo || (tlayoyoSel.salsaMode !== null && (tlayoyoSel.salsaMode !== 'con' || tlayoyoSel.salsas.length > 0));
+                  const isCheeseReady = !isTlayoyo || tlayoyoSel.cheese !== null;
+                  const isCardReady = isRellenoReady && isVarReady && isSalsaReady && isCheeseReady;
+
+                  const missingPrompt = !isRellenoReady
+                    ? 'Elige 1 o 2 ingredientes'
+                    : !isVarReady
+                    ? 'Elige presentación'
+                    : !isSalsaReady && !isCheeseReady
+                    ? 'Elige salsa y queso'
+                    : !isSalsaReady
+                    ? 'Elige salsa'
+                    : !isCheeseReady
+                    ? 'Elige queso'
+                    : '';
 
                   return (
                     <div key={item.id} className="group relative p-6 sm:p-7 rounded-[32px] bg-white dark:bg-gray-900/70 border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl dark:hover:border-gray-700 transition-all duration-300 flex flex-col justify-between">
@@ -1303,17 +1369,109 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                         </p>
 
                         {/* Interactive Variation Selector */}
-                        {isTlayoyoDish(item) ? (() => {
-                          const sel = pendingTlayoyoSel[item.id] || DEFAULT_TLAYOYO_SELECTION;
+                        {isTlayoyo ? (() => {
+                          const sel = tlayoyoSel;
+                          const hasMultipleVars = !isRelleno && (item.variations.length > 1 || (item.variations[0] && item.variations[0].label.toLowerCase() !== 'por pieza' && item.variations[0].label.toLowerCase() !== 'sencillo'));
                           return (
                             <div className="space-y-3 mb-6">
+                              {isRelleno && (
+                                <div className="space-y-1.5">
+                                  <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400">
+                                    <span>Elige 1 o 2 ingredientes:</span>
+                                    <span className="text-primary-600 dark:text-primary-400 font-bold">
+                                      {selectedRellenos.length >= 2
+                                        ? `2 ingredientes · $${currentPrice.toFixed(0)}`
+                                        : selectedRellenos.length === 1
+                                        ? `1 ingrediente · $${currentPrice.toFixed(0)}`
+                                        : '1 ing. $20 · 2 ing. $25'}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {rellenoIngredients.map((ing) => {
+                                      const isSelected = selectedRellenos.includes(ing);
+                                      return (
+                                        <button
+                                          key={ing}
+                                          type="button"
+                                          onClick={() => {
+                                            setPendingRellenoIngredients((prev) => {
+                                              const currentList = prev[item.id] ?? [];
+                                              return {
+                                                ...prev,
+                                                [item.id]: toggleTlayoyoRellenoIngredient(currentList, ing, 2)
+                                              };
+                                            });
+                                            soundManager.play('click');
+                                          }}
+                                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border ${isSelected
+                                            ? 'bg-primary-500 text-white border-primary-500 shadow-sm'
+                                            : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-primary-400'
+                                          }`}
+                                        >
+                                          <span>{ing}</span>
+                                          {isSelected && <Check className="w-3 h-3 text-white stroke-[3]" />}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+                                    1 ingrediente <span className="font-black text-gray-700 dark:text-gray-200">$20</span> · 2 ingredientes combinados <span className="font-black text-primary-600 dark:text-primary-400">$25</span>
+                                  </p>
+                                </div>
+                              )}
+                              {hasMultipleVars && item.variations.length > 0 && (
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400">
+                                    <span>Relleno / Variante:</span>
+                                    {activeVariation && (
+                                      <span className="text-primary-600 dark:text-primary-400 font-bold">
+                                        {activeVariation.label}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {item.variations.map(v => {
+                                      const isSelected = activeVariation?.id === v.id;
+                                      return (
+                                        <button
+                                          key={v.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedVariationsByDish(prev => {
+                                              if (prev[item.id]?.id === v.id && requiresVarChoice) {
+                                                const next = { ...prev };
+                                                delete next[item.id];
+                                                return next;
+                                              }
+                                              return { ...prev, [item.id]: v };
+                                            });
+                                            soundManager.play('click');
+                                          }}
+                                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer border ${isSelected
+                                            ? 'bg-primary-500 text-white border-primary-500 shadow-sm'
+                                            : 'bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-primary-400'
+                                          }`}
+                                        >
+                                          <span>{v.label}</span>
+                                          {v.price > 0 && (
+                                            <span className={isSelected ? 'text-white/90 font-black' : 'text-gray-500 dark:text-gray-400 font-black'}>
+                                              ${v.price.toFixed(0)}
+                                            </span>
+                                          )}
+                                          {isSelected && <Check className="w-3 h-3 text-white stroke-[3]" />}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                               <div className="space-y-1.5">
                                 <span className="text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400 block">
                                   Salsa(s):
                                 </span>
                                 <div className="flex flex-wrap gap-1.5">
                                   {TLAYOYO_SALSAS.map((salsa) => {
-                                    const isSelected = sel.salsaMode !== 'sin' && sel.salsas.includes(salsa);
+                                    const isSelected = sel.salsaMode !== 'sin' && sel.salsaMode !== null && sel.salsas.includes(salsa);
                                     return (
                                       <button
                                         key={salsa}
@@ -1321,7 +1479,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                         onClick={() => {
                                           setPendingTlayoyoSel(prev => ({
                                             ...prev,
-                                            [item.id]: toggleTlayoyoSalsa(prev[item.id], salsa)
+                                            [item.id]: toggleTlayoyoDraftSalsa(prev[item.id], salsa)
                                           }));
                                           soundManager.play('click');
                                         }}
@@ -1341,7 +1499,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                     onClick={() => {
                                       setPendingTlayoyoSel(prev => ({
                                         ...prev,
-                                        [item.id]: toggleTlayoyoSalsaAparte(prev[item.id])
+                                        [item.id]: toggleTlayoyoDraftSalsaAparte(prev[item.id])
                                       }));
                                       soundManager.play('click');
                                     }}
@@ -1358,7 +1516,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                     onClick={() => {
                                       setPendingTlayoyoSel(prev => ({
                                         ...prev,
-                                        [item.id]: setTlayoyoSinSalsa(prev[item.id])
+                                        [item.id]: toggleTlayoyoDraftSinSalsa(prev[item.id])
                                       }));
                                       soundManager.play('click');
                                     }}
@@ -1386,7 +1544,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                         onClick={() => {
                                           setPendingTlayoyoSel(prev => ({
                                             ...prev,
-                                            [item.id]: { ...(prev[item.id] || DEFAULT_TLAYOYO_SELECTION), cheese: cheeseOpt }
+                                            [item.id]: toggleTlayoyoDraftCheese(prev[item.id], cheeseOpt)
                                           }));
                                           soundManager.play('click');
                                         }}
@@ -1407,7 +1565,7 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                         })() : (
                           <div className="space-y-2 mb-6">
                             <div className="flex items-center justify-between text-[11px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400">
-                              <span>Variantes:</span>
+                              <span>{requiresVarChoice ? 'Elige presentación:' : 'Variantes:'}</span>
                               {activeVariation && (
                                 <span className="text-primary-600 dark:text-primary-400 font-bold">
                                   Seleccionada: {activeVariation.label}
@@ -1422,7 +1580,14 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                     key={v.id}
                                     type="button"
                                     onClick={() => {
-                                      setSelectedVariationsByDish(prev => ({ ...prev, [item.id]: v }));
+                                      setSelectedVariationsByDish(prev => {
+                                        if (prev[item.id]?.id === v.id && requiresVarChoice) {
+                                          const next = { ...prev };
+                                          delete next[item.id];
+                                          return next;
+                                        }
+                                        return { ...prev, [item.id]: v };
+                                      });
                                       soundManager.play('click');
                                     }}
                                     title={`Seleccionar variante ${v.label} ($${v.price})`}
@@ -1446,25 +1611,130 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                         )}
                       </div>
 
-                      <button
-                        onClick={() => {
-                          const chosenVar = activeVariation || item.variations[0];
-                          const resolvedVar = isTlayoyoDish(item)
-                            ? { ...chosenVar, label: formatTlayoyoVariationLabel(pendingTlayoyoSel[item.id]) }
-                            : chosenVar;
-                          handleAddDishToCart(item, resolvedVar);
-                          setOrderStep(1);
-                          setIsOrderModalOpen(true);
-                        }}
-                        className="w-full py-3.5 sm:py-4 bg-gray-50 dark:bg-gray-800 hover:bg-primary-500 hover:text-white dark:hover:bg-primary-500 text-gray-700 dark:text-gray-200 rounded-2xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-gray-200 dark:border-gray-700 hover:border-primary-500 dark:hover:border-primary-500 cursor-pointer shadow-sm active:scale-98 group/btn"
-                      >
-                        <Plus className="w-4 h-4 text-primary-500 dark:text-primary-400 group-hover/btn:text-white transition-colors" />
-                        <span>
-                          {isTlayoyoDish(item)
-                            ? `Ordenar (${formatTlayoyoVariationLabel(pendingTlayoyoSel[item.id])})`
-                            : `Ordenar ${activeVariation ? `(${activeVariation.label})` : 'Ahora'}`}
-                        </span>
-                      </button>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 sm:gap-2.5">
+                          <div className="flex items-center bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl p-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const qty = pendingDishQty[item.id] || 1;
+                                setPendingDishQtyDraft(prev => {
+                                  if (!(item.id in prev)) return prev;
+                                  const next = { ...prev };
+                                  delete next[item.id];
+                                  return next;
+                                });
+                                if (qty > 1) setPendingDishQty(prev => ({ ...prev, [item.id]: qty - 1 }));
+                              }}
+                              className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-200/70 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                              title="Menos"
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              aria-label={`Cantidad para ${item.name}`}
+                              value={pendingDishQtyDraft[item.id] ?? String(pendingDishQty[item.id] || 1)}
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => handlePendingQtyInputChange(item.id, e.target.value)}
+                              onBlur={() => setPendingDishQtyDraft(prev => {
+                                if (!(item.id in prev)) return prev;
+                                const next = { ...prev };
+                                delete next[item.id];
+                                return next;
+                              })}
+                              className="w-9 sm:w-10 text-center font-black text-sm text-gray-900 dark:text-white bg-transparent outline-none focus:bg-white dark:focus:bg-gray-900 rounded-lg py-1 tabular-nums"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const qty = pendingDishQty[item.id] || 1;
+                                setPendingDishQtyDraft(prev => {
+                                  if (!(item.id in prev)) return prev;
+                                  const next = { ...prev };
+                                  delete next[item.id];
+                                  return next;
+                                });
+                                setPendingDishQty(prev => ({ ...prev, [item.id]: Math.min(999, qty + 1) }));
+                              }}
+                              className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-200/70 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                              title="Más"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={!isCardReady}
+                            onClick={() => {
+                              if (!isCardReady) return;
+                              const chosenVar = activeVariation || item.variations[0];
+                              const tlayoyoSpecs = formatTlayoyoVariationLabel(tlayoyoSel);
+                              const hasSpecificFilling = item.variations.length > 1 || (chosenVar?.label && chosenVar.label.toLowerCase() !== 'por pieza' && chosenVar.label.toLowerCase() !== 'sencillo');
+                              const resolvedVar = isRelleno
+                                ? {
+                                    id: `relleno-${selectedRellenos.join('-').toLowerCase().replace(/\s+/g, '-')}`,
+                                    label: `${formatTlayoyoRellenoLabel(selectedRellenos)} · ${tlayoyoSpecs}`,
+                                    price: currentPrice
+                                  }
+                                : isTlayoyo
+                                ? {
+                                    ...chosenVar,
+                                    label: hasSpecificFilling ? `${chosenVar.label} · ${tlayoyoSpecs}` : tlayoyoSpecs
+                                  }
+                                : chosenVar;
+                              handleAddDishToCart(item, resolvedVar);
+                              setJustAddedDishId(item.id);
+                              setTimeout(() => {
+                                setJustAddedDishId(prev => (prev === item.id ? null : prev));
+                              }, 1400);
+                            }}
+                            className={`flex-1 min-w-0 py-3 px-3 sm:px-4 rounded-2xl text-xs font-black uppercase tracking-wider transition-all flex items-center justify-center gap-1.5 sm:gap-2 border shadow-sm active:scale-95 ${
+                              !isCardReady
+                                ? 'bg-gray-200 dark:bg-gray-800 text-gray-400 border-gray-200 dark:border-gray-700 cursor-not-allowed'
+                                : justAddedDishId === item.id
+                                ? 'bg-emerald-500 text-white border-emerald-500 cursor-pointer'
+                                : 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white hover:bg-primary-500 dark:hover:bg-primary-500 hover:border-primary-500 dark:hover:border-primary-500 dark:hover:text-white cursor-pointer'
+                            }`}
+                          >
+                            {justAddedDishId === item.id ? (
+                              <>
+                                <Check className="w-4 h-4 stroke-[3]" />
+                                <span>¡Agregado!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="w-4 h-4" />
+                                <span className="truncate">
+                                  {!isCardReady
+                                    ? missingPrompt
+                                    : `Agregar · $${(currentPrice * (pendingDishQty[item.id] || 1)).toFixed(2)}`}
+                                </span>
+                              </>
+                            )}
+                          </button>
+                        </div>
+
+                        {cartItems.some(ci => ci.dishId === item.id) && (
+                          <div className="flex items-center justify-between px-1 text-[11px]">
+                            <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                              En tu pedido: {cartItems.filter(ci => ci.dishId === item.id).reduce((s, ci) => s + ci.quantity, 0)}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOrderStep(3);
+                                setIsOrderModalOpen(true);
+                              }}
+                              className="font-black text-primary-500 hover:underline uppercase tracking-wider cursor-pointer"
+                            >
+                              Ver pedido →
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -1779,21 +2049,18 @@ export default function PublicView({ categories, menuItems, customers, orders = 
               </div>
 
               {/* Modal Content */}
-              <div className="flex-1 overflow-y-auto p-5 sm:p-8 space-y-6 custom-scrollbar">
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar">
 
                 {/* Step 1: Main Dishes (Multi-Selection) */}
                 {orderStep === 1 && (
-                  <div className="space-y-6">
-                    {/* Sofia AI Ordering Banner */}
-                    <div className="p-4 bg-gradient-to-r from-emerald-500/10 via-teal-500/10 to-emerald-500/5 border border-emerald-500/30 rounded-3xl flex items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-white flex items-center justify-center text-lg shadow-md shrink-0">
-                          👩‍🍳
-                        </div>
-                        <div>
-                          <p className="text-xs font-black uppercase tracking-tight text-gray-900 dark:text-white">¿Prefieres ordenar platicando?</p>
-                          <p className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">Sofía IA te atiende por voz o texto y arma tu orden al instante.</p>
-                        </div>
+                  <div className="space-y-4">
+                    {/* Minimalist Sofia AI Ordering Strip */}
+                    <div className="px-3.5 py-2 bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-500/20 rounded-2xl flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Mic className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span className="text-xs font-bold text-gray-700 dark:text-gray-200 truncate">
+                          ¿Prefieres ordenar platicando?
+                        </span>
                       </div>
                       <button
                         type="button"
@@ -1802,9 +2069,9 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                           setIsOrderModalOpen(false);
                           setIsLiveOrderOpen(true);
                         }}
-                        className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 active:scale-95 shadow-md shadow-emerald-500/20 cursor-pointer"
+                        className="px-3 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-[11px] font-black tracking-wide transition-all shrink-0 active:scale-95 cursor-pointer"
                       >
-                        Hablar con Sofía
+                        Sofía IA
                       </button>
                     </div>
 
@@ -1844,7 +2111,21 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                     >
                                       <Minus className="w-3 h-3" />
                                     </button>
-                                    <span className="w-6 text-center font-black text-xs text-gray-900 dark:text-white">{cartItem.quantity}</span>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      aria-label={`Cantidad de ${cartItem.name}`}
+                                      value={cartQtyDraft[cartItem.id] ?? String(cartItem.quantity)}
+                                      onFocus={(e) => e.target.select()}
+                                      onChange={(e) => handleCartQtyInputChange(cartItem.id, e.target.value)}
+                                      onBlur={() => setCartQtyDraft(prev => {
+                                        if (!(cartItem.id in prev)) return prev;
+                                        const next = { ...prev };
+                                        delete next[cartItem.id];
+                                        return next;
+                                      })}
+                                      className="w-9 text-center font-black text-xs text-gray-900 dark:text-white bg-transparent outline-none focus:bg-white dark:focus:bg-gray-800 rounded-md py-0.5 tabular-nums"
+                                    />
                                     <button
                                       type="button"
                                       onClick={() => handleUpdateCartQuantity(cartItem.id, 1)}
@@ -1884,39 +2165,56 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                     onClick={() => setEditingCartItemId(editingCartItemId === cartItem.id ? null : cartItem.id)}
                                     className="text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 flex items-center gap-1 cursor-pointer"
                                   >
-                                    <span>+ Acompañamientos (ej. sin cebolla / rábano)</span>
+                                    <span>
+                                      {isTlayoyoDish({ id: cartItem.dishId, name: cartItem.name })
+                                        ? '+ Acompañamientos (salsas y queso)'
+                                        : '+ Acompañamientos (ej. sin cebolla / rábano)'}
+                                    </span>
                                   </button>
                                 )}
                               </div>
 
                               {editingCartItemId === cartItem.id && (
                                 <div className="p-2.5 bg-gray-50 dark:bg-gray-900/90 rounded-xl space-y-2 border border-gray-200/80 dark:border-gray-700 animate-in fade-in duration-200">
-                                  <div className="flex flex-wrap gap-1">
-                                    {getAccompanimentOptions({ name: cartItem.name, categoryId: cartItem.categoryId }).map(chip => {
-                                      const isSelected = (cartItem.comments || '').toLowerCase().includes(chip.label.toLowerCase());
-                                      return (
-                                        <button
-                                          key={chip.id}
-                                          type="button"
-                                          onClick={() => toggleCartItemCommentChip(cartItem.id, chip.label)}
-                                          className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border cursor-pointer flex items-center gap-1 ${
-                                            isSelected
-                                              ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-amber-400'
-                                          }`}
-                                        >
-                                          <span>{chip.icon}</span>
-                                          <span>{chip.label}</span>
-                                          {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                                        </button>
-                                      );
-                                    })}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {getGroupedAccompanimentOptions(menuItems.find(m => m.id === cartItem.dishId) || { name: cartItem.name, categoryId: cartItem.categoryId }).map(group => (
+                                      <div key={group.id} className="p-2 rounded-lg bg-white/80 dark:bg-gray-800/70 border border-gray-200/60 dark:border-gray-700/60 space-y-1.5">
+                                        <span className="text-[9px] font-black uppercase tracking-wider text-gray-400 block">
+                                          {group.title}
+                                        </span>
+                                        <div className="flex flex-wrap gap-1">
+                                          {group.options.map(chip => {
+                                            const isSelected = (cartItem.comments || '').toLowerCase().includes(chip.label.toLowerCase());
+                                            return (
+                                              <button
+                                                key={chip.id}
+                                                type="button"
+                                                onClick={() => toggleCartItemCommentChip(cartItem.id, chip.label)}
+                                                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border cursor-pointer flex items-center gap-1 ${
+                                                  isSelected
+                                                    ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                                                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-amber-400'
+                                                }`}
+                                              >
+                                                <span>{chip.icon}</span>
+                                                <span>{chip.label}</span>
+                                                {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
                                   <input
                                     type="text"
                                     value={cartItem.comments || ''}
                                     onChange={e => updateCartItemComment(cartItem.id, e.target.value)}
-                                    placeholder="Especificación (ej. sin cebolla, sin rábanos, etc.)"
+                                    placeholder={
+                                      isTlayoyoDish({ id: cartItem.dishId, name: cartItem.name })
+                                        ? 'Especificación (ej. Salsa Verde, Salsa aparte, Con queso...)'
+                                        : 'Especificación (ej. sin cebolla, sin rábanos, etc.)'
+                                    }
                                     className="w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1 text-xs text-gray-800 dark:text-white outline-none focus:border-amber-500"
                                   />
                                 </div>
@@ -1984,7 +2282,16 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                           return true;
                         })
                         .map(item => {
-                          const currentVar = pendingDishVariation[item.id] || item.variations[0];
+                          const isRelleno = isTlayoyoRellenoDish(item);
+                          const rellenoIngredients = isRelleno ? getTlayoyoRellenoIngredients(item) : [];
+                          const selectedRellenos = isRelleno
+                            ? (pendingRellenoIngredients[item.id] ?? [])
+                            : [];
+                          const rellenoPrice = isRelleno ? getTlayoyoRellenoPrice(item, selectedRellenos) : 0;
+                          const requiresVarChoice = !isRelleno && item.variations.length > 1;
+                          const currentVar = requiresVarChoice
+                            ? (pendingDishVariation[item.id] || null)
+                            : (pendingDishVariation[item.id] || item.variations[0] || null);
                           const currentQty = pendingDishQty[item.id] || 1;
                           const currentSides = pendingDishSides[item.id] || [];
 
@@ -1993,120 +2300,76 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                               key={item.id}
                               className="p-5 bg-gray-50 dark:bg-gray-800/80 rounded-3xl border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all space-y-4"
                             >
-                              <div>
-                                <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tight text-base sm:text-lg">
-                                  {item.name}
-                                </h4>
-                                {item.description && (
-                                  <p className="text-xs text-gray-500 dark:text-gray-300 italic mt-0.5">
-                                    {item.description}
-                                  </p>
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <h4 className="font-black text-gray-900 dark:text-white uppercase tracking-tight text-base sm:text-lg">
+                                    {item.name}
+                                  </h4>
+                                  {item.description && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-300 italic mt-0.5">
+                                      {item.description}
+                                    </p>
+                                  )}
+                                </div>
+                                {isRelleno && (
+                                  <span className="text-base font-black text-primary-500 dark:text-primary-400 shrink-0 tabular-nums">
+                                    ${rellenoPrice.toFixed(2)}
+                                  </span>
                                 )}
                               </div>
 
-                              {/* Variations */}
-                              {isTlayoyoDish(item) ? (() => {
-                                const sel = pendingTlayoyoSel[item.id] || DEFAULT_TLAYOYO_SELECTION;
-                                return (
-                                  <div className="space-y-3">
-                                    <div className="space-y-1.5">
-                                      <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400 block">
-                                        1. Salsa(s):
-                                      </span>
-                                      <div className="flex flex-wrap gap-1.5">
-                                        {TLAYOYO_SALSAS.map((salsa) => {
-                                          const isSelected = sel.salsaMode !== 'sin' && sel.salsas.includes(salsa);
-                                          return (
-                                            <button
-                                              key={salsa}
-                                              type="button"
-                                              onClick={() => setPendingTlayoyoSel(prev => ({
-                                                ...prev,
-                                                [item.id]: toggleTlayoyoSalsa(prev[item.id], salsa)
-                                              }))}
-                                              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all cursor-pointer ${
-                                                isSelected
-                                                  ? 'bg-primary-500 text-white border-primary-500 shadow-sm'
-                                                  : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-primary-400'
-                                              }`}
-                                            >
-                                              <span>{salsa}</span>
-                                              {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
-                                            </button>
-                                          );
-                                        })}
-
-                                        <button
-                                          type="button"
-                                          onClick={() => setPendingTlayoyoSel(prev => ({
-                                            ...prev,
-                                            [item.id]: toggleTlayoyoSalsaAparte(prev[item.id])
-                                          }))}
-                                          className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all cursor-pointer ${
-                                            sel.salsaMode === 'aparte'
-                                              ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                                              : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-amber-400'
-                                          }`}
-                                        >
-                                          <span>Aparte</span>
-                                        </button>
-
-                                        <button
-                                          type="button"
-                                          onClick={() => setPendingTlayoyoSel(prev => ({
-                                            ...prev,
-                                            [item.id]: setTlayoyoSinSalsa(prev[item.id])
-                                          }))}
-                                          className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all cursor-pointer ${
-                                            sel.salsaMode === 'sin'
-                                              ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white shadow-sm'
-                                              : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-gray-400'
-                                          }`}
-                                        >
-                                          <span>Sin salsa</span>
-                                        </button>
-                                      </div>
-                                    </div>
-
-                                    <div className="space-y-1.5">
-                                      <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400">
-                                          2. Queso:
-                                        </span>
-                                        <span className="text-xs font-black text-primary-500 tabular-nums">
-                                          ${(currentVar?.price ?? 10).toFixed(2)} c/u
-                                        </span>
-                                      </div>
-                                      <div className="flex flex-wrap gap-1.5">
-                                        {TLAYOYO_CHEESE_OPTIONS.map((cheeseOpt) => {
-                                          const isSelected = sel.cheese === cheeseOpt;
-                                          return (
-                                            <button
-                                              key={cheeseOpt}
-                                              type="button"
-                                              onClick={() => setPendingTlayoyoSel(prev => ({
-                                                ...prev,
-                                                [item.id]: { ...(prev[item.id] || DEFAULT_TLAYOYO_SELECTION), cheese: cheeseOpt }
-                                              }))}
-                                              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all cursor-pointer ${
-                                                isSelected
-                                                  ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-gray-900 dark:border-white shadow-sm'
-                                                  : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-primary-400'
-                                              }`}
-                                            >
-                                              <span>{cheeseOpt}</span>
-                                              {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
+                              {/* Variations or 1-or-2 Relleno Ingredients */}
+                              {isRelleno ? (
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400">
+                                      Elige 1 o 2 ingredientes:
+                                    </span>
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-primary-600 dark:text-primary-400 bg-primary-500/10 px-2.5 py-0.5 rounded-full">
+                                      {selectedRellenos.length >= 2
+                                        ? `2 ingredientes · $${rellenoPrice}`
+                                        : selectedRellenos.length === 1
+                                        ? `1 ingrediente · $${rellenoPrice}`
+                                        : '1 ing. $20 · 2 ing. $25'}
+                                    </span>
                                   </div>
-                                );
-                              })() : (
+                                  <div className="flex flex-wrap gap-2">
+                                    {rellenoIngredients.map(ing => {
+                                      const isSelected = selectedRellenos.includes(ing);
+                                      return (
+                                        <button
+                                          key={ing}
+                                          type="button"
+                                          onClick={() => {
+                                            setPendingRellenoIngredients(prev => {
+                                              const currentList = prev[item.id] ?? [];
+                                              return {
+                                                ...prev,
+                                                [item.id]: toggleTlayoyoRellenoIngredient(currentList, ing, 2)
+                                              };
+                                            });
+                                            soundManager.play('click');
+                                          }}
+                                          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all cursor-pointer ${
+                                            isSelected
+                                              ? 'bg-primary-500 text-white border-primary-500 shadow-sm ring-2 ring-primary-500/30'
+                                              : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:border-primary-400'
+                                          }`}
+                                        >
+                                          <span>{ing}</span>
+                                          {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-400">
+                                    1 ingrediente <span className="font-black text-gray-700 dark:text-gray-200">$20</span> · 2 ingredientes combinados <span className="font-black text-primary-600 dark:text-primary-400">$25</span>
+                                  </p>
+                                </div>
+                              ) : (
                                 <div className="space-y-1.5">
                                   <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400 block">
-                                    Variante:
+                                    {requiresVarChoice ? 'Elige variante:' : 'Variante:'}
                                   </span>
                                   <div className="flex flex-wrap gap-2">
                                     {item.variations.map(v => {
@@ -2115,7 +2378,17 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                         <button
                                           key={v.id}
                                           type="button"
-                                          onClick={() => setPendingDishVariation(prev => ({ ...prev, [item.id]: v }))}
+                                          onClick={() => {
+                                            setPendingDishVariation(prev => {
+                                              if (prev[item.id]?.id === v.id && requiresVarChoice) {
+                                                const next = { ...prev };
+                                                delete next[item.id];
+                                                return next;
+                                              }
+                                              return { ...prev, [item.id]: v };
+                                            });
+                                            soundManager.play('click');
+                                          }}
                                           className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black uppercase tracking-wide border transition-all cursor-pointer ${
                                             isSelected
                                               ? 'bg-primary-500 text-white border-primary-500 shadow-sm ring-2 ring-primary-500/30'
@@ -2133,48 +2406,57 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                               )}
 
                               {/* Free Sides */}
-                              {availableSides.length > 0 && isDishSidesEnabled(item) && (
-                                <div className="space-y-1.5 pt-2 border-t border-gray-200/60 dark:border-gray-700/60">
-                                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                                    <span>Guarniciones incluidas (sin costo extra):</span>
-                                  </span>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {availableSides.map(side => {
-                                      const isChecked = currentSides.includes(side.name);
-                                      return (
-                                        <button
-                                          key={side.id}
-                                          type="button"
-                                          onClick={() => {
-                                            setPendingDishSides(prev => {
-                                              const old = prev[item.id] || [];
-                                              return {
-                                                ...prev,
-                                                [item.id]: isChecked ? old.filter(s => s !== side.name) : [...old, side.name]
-                                              };
-                                            });
-                                          }}
-                                          className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border cursor-pointer flex items-center gap-1.5 ${
-                                            isChecked
-                                              ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
-                                              : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-emerald-400'
-                                          }`}
-                                        >
-                                          <span>{side.name}</span>
-                                          {isChecked ? <Check className="w-3 h-3 stroke-[3]" /> : <Plus className="w-3 h-3 opacity-50" />}
-                                        </button>
-                                      );
-                                    })}
+                              {(() => {
+                                const dishSides = getDishSidesList(item, availableSides.map(s => s.name));
+                                if (dishSides.length === 0 || !isDishSidesEnabled(item)) return null;
+                                return (
+                                  <div className="space-y-1.5 pt-2 border-t border-gray-200/60 dark:border-gray-700/60">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                                      <span>Guarniciones incluidas (sin costo extra):</span>
+                                    </span>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {dishSides.map((sideName, sideIdx) => {
+                                        const isChecked = currentSides.includes(sideName);
+                                        return (
+                                          <button
+                                            key={`${sideName}-${sideIdx}`}
+                                            type="button"
+                                            onClick={() => {
+                                              setPendingDishSides(prev => {
+                                                const old = prev[item.id] || [];
+                                                return {
+                                                  ...prev,
+                                                  [item.id]: isChecked ? old.filter(s => s !== sideName) : [...old, sideName]
+                                                };
+                                              });
+                                            }}
+                                            className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border cursor-pointer flex items-center gap-1.5 ${
+                                              isChecked
+                                                ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+                                                : 'bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-emerald-400'
+                                            }`}
+                                          >
+                                            <span>{sideName}</span>
+                                            {isChecked ? <Check className="w-3 h-3 stroke-[3]" /> : <Plus className="w-3 h-3 opacity-50" />}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                );
+                              })()}
 
                               {/* Acompañamientos & Notas de Preparación (Pozole, Pancita, Caldos, etc.) */}
                               {isDishAccompanimentEnabled(item) && (
                                 <div className="space-y-2 pt-2 border-t border-gray-200/60 dark:border-gray-700/60">
                                   <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-1.5">
                                       <span>Acompañamientos / Especificaciones:</span>
+                                      {isTlayoyoDish(item) && (
+                                        <span className="text-[9px] bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25 px-2 py-0.5 rounded-full font-black">
+                                          Salsas y queso
+                                        </span>
+                                      )}
                                       {(item.name.toLowerCase().includes('pozole') || item.name.toLowerCase().includes('pancita') || item.name.toLowerCase().includes('caldo')) && (
                                         <span className="text-[9px] bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/25 px-2 py-0.5 rounded-full font-black">
                                           ¿Sin cebolla, rábano o aguacate?
@@ -2183,26 +2465,35 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                     </span>
                                   </div>
 
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {getAccompanimentOptions(item).map(chip => {
-                                      const isSelected = (pendingDishComments[item.id] || '').toLowerCase().includes(chip.label.toLowerCase());
-                                      return (
-                                        <button
-                                          key={chip.id}
-                                          type="button"
-                                          onClick={() => toggleDishCommentChip(item.id, chip.label)}
-                                          className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all border cursor-pointer flex items-center gap-1.5 active:scale-95 ${
-                                            isSelected
-                                              ? 'bg-amber-500 text-white border-amber-500 shadow-sm ring-1 ring-amber-500/30'
-                                              : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-amber-400'
-                                          }`}
-                                        >
-                                          <span>{chip.icon}</span>
-                                          <span>{chip.label}</span>
-                                          {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                                        </button>
-                                      );
-                                    })}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                    {getGroupedAccompanimentOptions(item).map(group => (
+                                      <div key={group.id} className="p-2.5 rounded-xl bg-white/80 dark:bg-gray-900/60 border border-gray-200/70 dark:border-gray-700/70 space-y-1.5">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 dark:text-gray-400 block">
+                                          {group.title}
+                                        </span>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {group.options.map(chip => {
+                                            const isSelected = (pendingDishComments[item.id] || '').toLowerCase().includes(chip.label.toLowerCase());
+                                            return (
+                                              <button
+                                                key={chip.id}
+                                                type="button"
+                                                onClick={() => toggleDishCommentChip(item.id, chip.label)}
+                                                className={`px-2.5 py-1.5 rounded-xl text-[11px] font-bold transition-all border cursor-pointer flex items-center gap-1.5 active:scale-95 ${
+                                                  isSelected
+                                                    ? 'bg-amber-500 text-white border-amber-500 shadow-sm ring-1 ring-amber-500/30'
+                                                    : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-700 hover:border-amber-400'
+                                                }`}
+                                              >
+                                                <span>{chip.icon}</span>
+                                                <span>{chip.label}</span>
+                                                {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    ))}
                                   </div>
 
                                   <div className="relative">
@@ -2210,7 +2501,11 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                       type="text"
                                       value={pendingDishComments[item.id] || ''}
                                       onChange={e => setPendingDishComments(prev => ({ ...prev, [item.id]: e.target.value }))}
-                                      placeholder="Instrucción especial (ej. sin cebolla, sin rábanos, sin aguacate...)"
+                                      placeholder={
+                                        isTlayoyoDish(item)
+                                          ? 'Instrucción especial (ej. Salsa Verde, Salsa aparte, Con queso...)'
+                                          : 'Instrucción especial (ej. sin cebolla, sin rábanos, sin aguacate...)'
+                                      }
                                       className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3.5 py-2 text-xs font-medium text-gray-800 dark:text-gray-200 placeholder:text-gray-400 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 transition-all pr-8"
                                     />
                                     {pendingDishComments[item.id] && (
@@ -2233,6 +2528,12 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                   <button
                                     type="button"
                                     onClick={() => {
+                                      setPendingDishQtyDraft(prev => {
+                                        if (!(item.id in prev)) return prev;
+                                        const next = { ...prev };
+                                        delete next[item.id];
+                                        return next;
+                                      });
                                       if (currentQty > 1) setPendingDishQty(prev => ({ ...prev, [item.id]: currentQty - 1 }));
                                     }}
                                     className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
@@ -2240,13 +2541,31 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                   >
                                     <Minus className="w-3.5 h-3.5" />
                                   </button>
-                                  <span className="w-8 text-center font-black text-sm text-gray-900 dark:text-white">
-                                    {currentQty}
-                                  </span>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    aria-label={`Cantidad para ${item.name}`}
+                                    value={pendingDishQtyDraft[item.id] ?? String(currentQty)}
+                                    onFocus={(e) => e.target.select()}
+                                    onChange={(e) => handlePendingQtyInputChange(item.id, e.target.value)}
+                                    onBlur={() => setPendingDishQtyDraft(prev => {
+                                      if (!(item.id in prev)) return prev;
+                                      const next = { ...prev };
+                                      delete next[item.id];
+                                      return next;
+                                    })}
+                                    className="w-11 text-center font-black text-sm text-gray-900 dark:text-white bg-transparent outline-none focus:bg-gray-50 dark:focus:bg-gray-800 rounded-lg py-1 tabular-nums"
+                                  />
                                   <button
                                     type="button"
                                     onClick={() => {
-                                      setPendingDishQty(prev => ({ ...prev, [item.id]: currentQty + 1 }));
+                                      setPendingDishQtyDraft(prev => {
+                                        if (!(item.id in prev)) return prev;
+                                        const next = { ...prev };
+                                        delete next[item.id];
+                                        return next;
+                                      });
+                                      setPendingDishQty(prev => ({ ...prev, [item.id]: Math.min(999, currentQty + 1) }));
                                     }}
                                     className="w-8 h-8 flex items-center justify-center rounded-xl text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                                     title="Más"
@@ -2257,11 +2576,33 @@ export default function PublicView({ categories, menuItems, customers, orders = 
 
                                 <button
                                   type="button"
-                                  onClick={() => handleAddDishToCart(item)}
-                                  className="flex-1 py-3 px-5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-primary-500 dark:hover:bg-primary-500 dark:hover:text-white rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                                  disabled={(isRelleno && selectedRellenos.length === 0) || (requiresVarChoice && !currentVar)}
+                                  onClick={() => {
+                                    if (isRelleno) {
+                                      if (selectedRellenos.length === 0) return;
+                                      handleAddDishToCart(item, {
+                                        id: `relleno-${selectedRellenos.join('-').toLowerCase().replace(/\s+/g, '-')}`,
+                                        label: formatTlayoyoRellenoLabel(selectedRellenos),
+                                        price: rellenoPrice
+                                      });
+                                    } else if (currentVar) {
+                                      handleAddDishToCart(item, currentVar);
+                                    }
+                                  }}
+                                  className={`flex-1 py-3 px-5 rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-md active:scale-95 flex items-center justify-center gap-2 ${
+                                    (isRelleno && selectedRellenos.length === 0) || (requiresVarChoice && !currentVar)
+                                      ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed shadow-none'
+                                      : 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-primary-500 dark:hover:bg-primary-500 dark:hover:text-white cursor-pointer'
+                                  }`}
                                 >
                                   <Plus className="w-4 h-4" />
-                                  <span>Agregar al Pedido</span>
+                                  <span>
+                                    {isRelleno
+                                      ? (selectedRellenos.length === 0 ? 'Elige 1 o 2 ingredientes' : `Agregar · $${(rellenoPrice * currentQty).toFixed(2)}`)
+                                      : requiresVarChoice && !currentVar
+                                      ? 'Elige una variante'
+                                      : 'Agregar al Pedido'}
+                                  </span>
                                 </button>
                               </div>
                             </div>
@@ -2296,7 +2637,10 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                         .filter(item => (isDrinkCategory(item.categoryId) || isDessertCategory(item.categoryId)) && item.isActive)
                         .map(extra => {
                           const isDrink = isDrinkCategory(extra.categoryId);
-                          const currentVar = pendingDishVariation[extra.id] || extra.variations[0];
+                          const hasMultipleVars = extra.variations.length > 1;
+                          const currentVar = hasMultipleVars
+                            ? (pendingDishVariation[extra.id] || null)
+                            : (pendingDishVariation[extra.id] || extra.variations[0] || null);
                           return (
                             <div key={extra.id} className="p-4 bg-gray-50 dark:bg-gray-800/80 rounded-3xl border border-gray-100 dark:border-gray-700 flex flex-col justify-between gap-3">
                               <div>
@@ -2306,13 +2650,20 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                   </span>
                                   <span className="font-black text-gray-900 dark:text-white text-sm uppercase truncate">{extra.name}</span>
                                 </div>
-                                {extra.variations.length > 1 && (
+                                {hasMultipleVars && (
                                   <div className="flex flex-wrap gap-1 mt-2">
                                     {extra.variations.map(v => (
                                       <button
                                         key={v.id}
                                         type="button"
-                                        onClick={() => setPendingDishVariation(prev => ({ ...prev, [extra.id]: v }))}
+                                        onClick={() => setPendingDishVariation(prev => {
+                                          if (prev[extra.id]?.id === v.id) {
+                                            const next = { ...prev };
+                                            delete next[extra.id];
+                                            return next;
+                                          }
+                                          return { ...prev, [extra.id]: v };
+                                        })}
                                         className={`px-2 py-1 rounded-lg text-[10px] font-black border transition-all cursor-pointer ${
                                           currentVar?.id === v.id
                                             ? 'bg-primary-500 text-white border-primary-500'
@@ -2326,18 +2677,76 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                 )}
                               </div>
 
-                              <div className="flex items-center justify-between pt-1 border-t border-gray-200/50 dark:border-gray-700/50">
+                              <div className="flex items-center justify-between gap-2 pt-2 border-t border-gray-200/50 dark:border-gray-700/50">
                                 <span className="font-black text-sm text-primary-500 dark:text-primary-400">
-                                  ${currentVar?.price.toFixed(2)}
+                                  ${(currentVar?.price ?? extra.variations[0]?.price ?? 0).toFixed(2)}
                                 </span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddDishToCart(extra, currentVar, [], 1)}
-                                  className="px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                  <span>Agregar</span>
-                                </button>
+                                <div className="flex items-center gap-1.5">
+                                  <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const qty = pendingDishQty[extra.id] || 1;
+                                        setPendingDishQtyDraft(prev => {
+                                          if (!(extra.id in prev)) return prev;
+                                          const next = { ...prev };
+                                          delete next[extra.id];
+                                          return next;
+                                        });
+                                        if (qty > 1) setPendingDishQty(prev => ({ ...prev, [extra.id]: qty - 1 }));
+                                      }}
+                                      className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
+                                      title="Menos"
+                                    >
+                                      <Minus className="w-3 h-3" />
+                                    </button>
+                                    <input
+                                      type="text"
+                                      inputMode="numeric"
+                                      aria-label={`Cantidad para ${extra.name}`}
+                                      value={pendingDishQtyDraft[extra.id] ?? String(pendingDishQty[extra.id] || 1)}
+                                      onFocus={(e) => e.target.select()}
+                                      onChange={(e) => handlePendingQtyInputChange(extra.id, e.target.value)}
+                                      onBlur={() => setPendingDishQtyDraft(prev => {
+                                        if (!(extra.id in prev)) return prev;
+                                        const next = { ...prev };
+                                        delete next[extra.id];
+                                        return next;
+                                      })}
+                                      className="w-8 text-center font-black text-xs text-gray-900 dark:text-white bg-transparent outline-none tabular-nums"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const qty = pendingDishQty[extra.id] || 1;
+                                        setPendingDishQtyDraft(prev => {
+                                          if (!(extra.id in prev)) return prev;
+                                          const next = { ...prev };
+                                          delete next[extra.id];
+                                          return next;
+                                        });
+                                        setPendingDishQty(prev => ({ ...prev, [extra.id]: Math.min(999, qty + 1) }));
+                                      }}
+                                      className="w-6 h-6 flex items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer"
+                                      title="Más"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    disabled={hasMultipleVars && !currentVar}
+                                    onClick={() => currentVar && handleAddDishToCart(extra, currentVar, [])}
+                                    className={`px-3 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-sm flex items-center gap-1 active:scale-95 ${
+                                      hasMultipleVars && !currentVar
+                                        ? 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed shadow-none'
+                                        : 'bg-primary-500 hover:bg-primary-600 text-white cursor-pointer'
+                                    }`}
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    <span>{hasMultipleVars && !currentVar ? 'Elige opción' : 'Agregar'}</span>
+                                  </button>
+                                </div>
                               </div>
                             </div>
                           );
@@ -2405,7 +2814,21 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                   >
                                     <Minus className="w-3 h-3" />
                                   </button>
-                                  <span className="w-6 text-center font-black text-xs text-gray-900 dark:text-white">{item.quantity}</span>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    aria-label={`Cantidad de ${item.name}`}
+                                    value={cartQtyDraft[item.id] ?? String(item.quantity)}
+                                    onFocus={(e) => e.target.select()}
+                                    onChange={(e) => handleCartQtyInputChange(item.id, e.target.value)}
+                                    onBlur={() => setCartQtyDraft(prev => {
+                                      if (!(item.id in prev)) return prev;
+                                      const next = { ...prev };
+                                      delete next[item.id];
+                                      return next;
+                                    })}
+                                    className="w-9 text-center font-black text-xs text-gray-900 dark:text-white bg-transparent outline-none focus:bg-white dark:focus:bg-gray-900 rounded-md py-0.5 tabular-nums"
+                                  />
                                   <button
                                     type="button"
                                     onClick={() => handleUpdateCartQuantity(item.id, 1)}
@@ -2450,42 +2873,56 @@ export default function PublicView({ categories, menuItems, customers, orders = 
                                   onClick={() => setEditingCartItemId(editingCartItemId === item.id ? null : item.id)}
                                   className="text-xs font-bold text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 cursor-pointer"
                                 >
-                                  <span>+ Agregar especificación (ej. sin cebolla / rábano)</span>
+                                  <span>
+                                    {isTlayoyoDish({ id: item.dishId, name: item.name })
+                                      ? '+ Acompañamientos (salsas y queso)'
+                                      : '+ Agregar especificación (ej. sin cebolla / rábano)'}
+                                  </span>
                                 </button>
                               )}
                             </div>
 
                             {editingCartItemId === item.id && (
                               <div className="p-3 bg-gray-50 dark:bg-gray-800/90 rounded-2xl space-y-2.5 border border-gray-200/80 dark:border-gray-700 animate-in fade-in duration-200">
-                                <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block">
-                                  Acompañamientos frecuentes:
-                                </span>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {getAccompanimentOptions({ name: item.name, categoryId: item.categoryId }).map(chip => {
-                                    const isSelected = (item.comments || '').toLowerCase().includes(chip.label.toLowerCase());
-                                    return (
-                                      <button
-                                        key={chip.id}
-                                        type="button"
-                                        onClick={() => toggleCartItemCommentChip(item.id, chip.label)}
-                                        className={`px-2.5 py-1 rounded-xl text-xs font-bold border cursor-pointer flex items-center gap-1 ${
-                                          isSelected
-                                            ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                                            : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-amber-400'
-                                        }`}
-                                      >
-                                        <span>{chip.icon}</span>
-                                        <span>{chip.label}</span>
-                                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                                      </button>
-                                    );
-                                  })}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                  {getGroupedAccompanimentOptions(menuItems.find(m => m.id === item.dishId) || { name: item.name, categoryId: item.categoryId }).map(group => (
+                                    <div key={group.id} className="p-2.5 rounded-xl bg-white/80 dark:bg-gray-900/60 border border-gray-200/70 dark:border-gray-700/70 space-y-1.5">
+                                      <span className="text-[10px] font-black uppercase tracking-wider text-gray-500 dark:text-gray-400 block">
+                                        {group.title}
+                                      </span>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {group.options.map(chip => {
+                                          const isSelected = (item.comments || '').toLowerCase().includes(chip.label.toLowerCase());
+                                          return (
+                                            <button
+                                              key={chip.id}
+                                              type="button"
+                                              onClick={() => toggleCartItemCommentChip(item.id, chip.label)}
+                                              className={`px-2.5 py-1 rounded-xl text-xs font-bold border cursor-pointer flex items-center gap-1 ${
+                                                isSelected
+                                                  ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                                                  : 'bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-amber-400'
+                                              }`}
+                                            >
+                                              <span>{chip.icon}</span>
+                                              <span>{chip.label}</span>
+                                              {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                                 <input
                                   type="text"
                                   value={item.comments || ''}
                                   onChange={e => updateCartItemComment(item.id, e.target.value)}
-                                  placeholder="Ej. Sin cebolla, sin rábanos, sin aguacate..."
+                                  placeholder={
+                                    isTlayoyoDish({ id: item.dishId, name: item.name })
+                                      ? 'Ej. Salsa Verde, Salsa aparte, Con queso...'
+                                      : 'Ej. Sin cebolla, sin rábanos, sin aguacate...'
+                                  }
                                   className="w-full bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2 text-xs text-gray-900 dark:text-white outline-none focus:border-amber-500"
                                 />
                               </div>
@@ -2530,12 +2967,12 @@ export default function PublicView({ categories, menuItems, customers, orders = 
               </div>
 
               {/* Modal Footer Controls */}
-              <div className="p-6 sm:p-8 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
-                <div className="flex gap-4">
+              <div className="p-4 sm:p-6 border-t border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0">
+                <div className="flex gap-2.5 sm:gap-4">
                   {orderStep > 1 && (
                     <button
                       onClick={() => setOrderStep(prev => prev - 1)}
-                      className="px-6 sm:px-8 py-4 sm:py-5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-gray-200 dark:hover:bg-gray-700 transition-all cursor-pointer"
+                      className="px-4 sm:px-8 py-4 sm:py-5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:text-gray-900 dark:hover:text-white rounded-3xl font-black uppercase text-xs tracking-widest hover:bg-gray-200 dark:hover:bg-gray-700 transition-all cursor-pointer shrink-0"
                     >
                       Regresar
                     </button>

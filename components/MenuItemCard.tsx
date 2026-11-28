@@ -8,12 +8,22 @@ import {
   Utensils,
   ArrowUp,
   ArrowDown,
-  AlertTriangle
+  AlertTriangle,
+  X,
+  RotateCcw
 } from 'lucide-react';
-import { MenuItem, PricingVariation } from '../types';
+import { Category, MenuItem, PricingVariation } from '../types';
+import {
+  getDefaultAccompanimentLabels,
+  getAccompanimentIcon,
+  getDishSidesList,
+  SALSAS_Y_QUESO_ACCOMPANIMENTS
+} from '../utils/menuOptions';
 
 interface MenuItemCardProps {
   item: MenuItem;
+  categories?: Category[];
+  defaultSideOptions?: string[];
   onUpdate: (item: MenuItem) => void;
   onDelete: () => void;
   isReordering?: boolean;
@@ -27,6 +37,8 @@ interface MenuItemCardProps {
 
 const MenuItemCard: React.FC<MenuItemCardProps> = ({
   item,
+  categories = [],
+  defaultSideOptions = [],
   onUpdate,
   onDelete,
   isReordering = false,
@@ -45,6 +57,8 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
     return false;
   });
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [newAccompanimentInput, setNewAccompanimentInput] = useState('');
+  const [newSideInput, setNewSideInput] = useState('');
 
   useEffect(() => {
     if (defaultExpanded) {
@@ -60,6 +74,10 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onUpdate({ ...item, name: e.target.value });
+  };
+
+  const handleCategoryChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    onUpdate({ ...item, categoryId: e.target.value });
   };
 
   const handleDescChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -120,6 +138,51 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
     onUpdate({ ...item, allowSides: !isSidesEnabled });
   };
 
+  const defaultAccompaniments = getDefaultAccompanimentLabels(item);
+  const currentAccompaniments =
+    item.customAccompaniments !== undefined ? item.customAccompaniments : defaultAccompaniments;
+  const currentSides = getDishSidesList(item, defaultSideOptions);
+
+  const handleAddAccompaniment = (labelOverride?: string) => {
+    const trimmed = (labelOverride ?? newAccompanimentInput).trim();
+    if (!trimmed) return;
+    if (currentAccompaniments.some((a) => a.toLowerCase() === trimmed.toLowerCase())) {
+      if (!labelOverride) setNewAccompanimentInput('');
+      return;
+    }
+    onUpdate({ ...item, customAccompaniments: [...currentAccompaniments, trimmed] });
+    if (!labelOverride) setNewAccompanimentInput('');
+  };
+
+  const handleRemoveAccompaniment = (index: number) => {
+    const next = currentAccompaniments.filter((_, i) => i !== index);
+    onUpdate({ ...item, customAccompaniments: next });
+  };
+
+  const handleResetAccompaniments = () => {
+    onUpdate({ ...item, customAccompaniments: undefined });
+  };
+
+  const handleAddSide = (labelOverride?: string) => {
+    const trimmed = (labelOverride ?? newSideInput).trim();
+    if (!trimmed) return;
+    if (currentSides.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
+      if (!labelOverride) setNewSideInput('');
+      return;
+    }
+    onUpdate({ ...item, customSides: [...currentSides, trimmed] });
+    if (!labelOverride) setNewSideInput('');
+  };
+
+  const handleRemoveSide = (index: number) => {
+    const next = currentSides.filter((_, i) => i !== index);
+    onUpdate({ ...item, customSides: next });
+  };
+
+  const handleResetSides = () => {
+    onUpdate({ ...item, customSides: undefined });
+  };
+
   const prices = item.variations.map((v) => Number(v.price) || 0);
   const minPrice = prices.length ? Math.min(...prices) : 0;
   const maxPrice = prices.length ? Math.max(...prices) : 0;
@@ -132,6 +195,8 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
     item.variations.length === 1
       ? item.variations[0].label || '1 presentación'
       : `${item.variations.length} presentaciones`;
+
+  const categoryName = categories.find((c) => c.id === item.categoryId)?.name;
 
   const showEditorBody = !isReordering && isExpanded;
 
@@ -204,6 +269,12 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
             <span className="font-bold text-gray-900 dark:text-gray-200">{priceSummary}</span>
             <span className="mx-1.5 text-gray-300 dark:text-gray-600">·</span>
             <span>{variationSummary}</span>
+            {categoryName && (
+              <>
+                <span className="mx-1.5 text-gray-300 dark:text-gray-600">·</span>
+                <span className="text-primary-600 dark:text-primary-400 font-semibold">{categoryName}</span>
+              </>
+            )}
             {!item.isActive && (
               <>
                 <span className="mx-1.5 text-gray-300 dark:text-gray-600">·</span>
@@ -276,6 +347,32 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
                 />
               </div>
 
+              {categories.length > 0 && (
+                <div>
+                  <label
+                    htmlFor={`category-select-${item.id}`}
+                    className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5 ml-1"
+                  >
+                    Categoría
+                  </label>
+                  <select
+                    id={`category-select-${item.id}`}
+                    value={item.categoryId}
+                    onChange={handleCategoryChange}
+                    className="w-full min-h-[48px] bg-[#FDFBFC] dark:bg-[#110a10] border border-gray-200/90 dark:border-white/10 rounded-2xl focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 px-4 py-2.5 text-sm font-semibold text-gray-900 dark:text-white transition-all outline-none cursor-pointer"
+                  >
+                    {!categories.some((c) => c.id === item.categoryId) && (
+                      <option value={item.categoryId}>Sin categoría</option>
+                    )}
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-1.5 ml-1">
                   Descripción e ingredientes
@@ -319,7 +416,9 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
                       <div className="min-w-0">
                         <p className="text-xs font-bold truncate">Acompañamientos</p>
                         <p className="text-[11px] opacity-75 truncate">
-                          {isAccompanimentsEnabled ? 'Sin cebolla, rábanos...' : 'Desactivado'}
+                          {isAccompanimentsEnabled
+                            ? `${currentAccompaniments.length} ${currentAccompaniments.length === 1 ? 'opción' : 'opciones'}${item.customAccompaniments !== undefined ? ' · Editado' : ''}`
+                            : 'Desactivado'}
                         </p>
                       </div>
                     </div>
@@ -360,7 +459,9 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
                       <div className="min-w-0">
                         <p className="text-xs font-bold truncate">Guarniciones</p>
                         <p className="text-[11px] opacity-75 truncate">
-                          {isSidesEnabled ? 'Arroz, frijoles...' : 'Sin guarnición'}
+                          {isSidesEnabled
+                            ? `${currentSides.length} ${currentSides.length === 1 ? 'opción' : 'opciones'}${item.customSides !== undefined ? ' · Editado' : ''}`
+                            : 'Sin guarnición'}
                         </p>
                       </div>
                     </div>
@@ -377,6 +478,233 @@ const MenuItemCard: React.FC<MenuItemCardProps> = ({
                     </span>
                   </button>
                 </div>
+
+                {/* Editor de Acompañamientos */}
+                {isAccompanimentsEnabled && (
+                  <div className="rounded-2xl border border-amber-200/80 dark:border-amber-800/40 bg-amber-50/40 dark:bg-amber-950/15 p-3 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                        Editar acompañamientos ({currentAccompaniments.length})
+                      </span>
+                      {item.customAccompaniments !== undefined && (
+                        <button
+                          type="button"
+                          onClick={handleResetAccompaniments}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 dark:text-amber-300 hover:underline cursor-pointer"
+                          title="Volver a los acompañamientos sugeridos"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Restablecer</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Plantillas Rápidas (Salsas y Queso como los platillos tradicionales) */}
+                    <div className="flex flex-wrap items-center gap-1.5 pb-0.5">
+                      <span className="text-[10px] font-bold text-amber-900/70 dark:text-amber-400 mr-1">
+                        Cargar plantilla:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onUpdate({ ...item, customAccompaniments: [...SALSAS_Y_QUESO_ACCOMPANIMENTS] })}
+                        className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-white dark:bg-[#110a10] hover:bg-amber-500 hover:text-white dark:hover:bg-amber-500 dark:hover:text-white text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 transition-all cursor-pointer shadow-2xs flex items-center gap-1 active:scale-95"
+                      >
+                        <span>🟢🧀</span>
+                        <span>Salsas y queso</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onUpdate({ ...item, customAccompaniments: ['Sin cebolla', 'Sin rábanos', 'Sin aguacate', 'Sin orégano', 'Sin picante', 'Limón aparte'] })}
+                        className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-white dark:bg-[#110a10] hover:bg-amber-500 hover:text-white dark:hover:bg-amber-500 dark:hover:text-white text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 transition-all cursor-pointer shadow-2xs flex items-center gap-1 active:scale-95"
+                      >
+                        <span>🍲</span>
+                        <span>Caldos / Pozole</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onUpdate({ ...item, customAccompaniments: ['Sin cebolla', 'Sin aguacate', 'Sin picante', 'Salsa aparte'] })}
+                        className="px-2.5 py-1 rounded-xl text-[10px] font-bold bg-white dark:bg-[#110a10] hover:bg-amber-500 hover:text-white dark:hover:bg-amber-500 dark:hover:text-white text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-700/60 transition-all cursor-pointer shadow-2xs flex items-center gap-1 active:scale-95"
+                      >
+                        <span>🥑</span>
+                        <span>Básico</span>
+                      </button>
+                    </div>
+
+                    {currentAccompaniments.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {currentAccompaniments.map((acc, idx) => (
+                          <span
+                            key={`${acc}-${idx}`}
+                            className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-xl text-xs font-semibold bg-white dark:bg-[#110a10] border border-amber-200 dark:border-amber-800/50 text-gray-800 dark:text-gray-200 shadow-xs"
+                          >
+                            <span>{getAccompanimentIcon(acc)}</span>
+                            <span>{acc}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAccompaniment(idx)}
+                              aria-label={`Quitar ${acc}`}
+                              title={`Quitar ${acc}`}
+                              className="w-5 h-5 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-amber-700/80 dark:text-amber-300/80 italic">
+                        Sin opciones rápidas configuradas. Agrega al menos una abajo o deja que el cliente escriba notas.
+                      </p>
+                    )}
+
+                    {item.customAccompaniments !== undefined &&
+                      defaultAccompaniments.some(
+                        (def) => !currentAccompaniments.some((c) => c.toLowerCase() === def.toLowerCase())
+                      ) && (
+                        <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                          <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mr-1">
+                            Sugeridos:
+                          </span>
+                          {defaultAccompaniments
+                            .filter(
+                              (def) => !currentAccompaniments.some((c) => c.toLowerCase() === def.toLowerCase())
+                            )
+                            .map((def) => (
+                              <button
+                                key={def}
+                                type="button"
+                                onClick={() => handleAddAccompaniment(def)}
+                                className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white/70 dark:bg-white/5 border border-dashed border-amber-300 dark:border-amber-700/60 text-amber-800 dark:text-amber-300 hover:bg-amber-100/70 dark:hover:bg-amber-900/30 transition-colors cursor-pointer"
+                              >
+                                + {def}
+                              </button>
+                            ))}
+                        </div>
+                      )}
+
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <input
+                        type="text"
+                        value={newAccompanimentInput}
+                        onChange={(e) => setNewAccompanimentInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddAccompaniment();
+                          }
+                        }}
+                        placeholder="Nuevo acompañamiento (ej. Crema aparte, Salsa habanero...)"
+                        className="flex-1 min-w-0 min-h-[38px] px-3 py-1.5 rounded-xl bg-white dark:bg-[#110a10] border border-amber-200/90 dark:border-amber-800/50 text-xs font-medium text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddAccompaniment()}
+                        disabled={!newAccompanimentInput.trim()}
+                        className="min-h-[38px] px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold inline-flex items-center gap-1 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Agregar</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Editor de Guarniciones */}
+                {isSidesEnabled && (
+                  <div className="rounded-2xl border border-emerald-200/80 dark:border-emerald-800/40 bg-emerald-50/40 dark:bg-emerald-950/15 p-3 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
+                        Editar guarniciones ({currentSides.length})
+                      </span>
+                      {item.customSides !== undefined && (
+                        <button
+                          type="button"
+                          onClick={handleResetSides}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 hover:underline cursor-pointer"
+                          title="Volver a las guarniciones del catálogo"
+                        >
+                          <RotateCcw className="w-3 h-3" />
+                          <span>Restablecer</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {currentSides.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {currentSides.map((side, idx) => (
+                          <span
+                            key={`${side}-${idx}`}
+                            className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-xl text-xs font-semibold bg-white dark:bg-[#110a10] border border-emerald-200 dark:border-emerald-800/50 text-gray-800 dark:text-gray-200 shadow-xs"
+                          >
+                            <span>{side}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSide(idx)}
+                              aria-label={`Quitar ${side}`}
+                              title={`Quitar ${side}`}
+                              className="w-5 h-5 rounded-lg flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80 italic">
+                        Sin guarniciones seleccionables. Agrega guarniciones abajo o restablece las del catálogo.
+                      </p>
+                    )}
+
+                    {defaultSideOptions.some(
+                      (def) => !currentSides.some((s) => s.toLowerCase() === def.toLowerCase())
+                    ) && (
+                      <div className="flex flex-wrap items-center gap-1 pt-0.5">
+                        <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 mr-1">
+                          Del catálogo:
+                        </span>
+                        {defaultSideOptions
+                          .filter(
+                            (def) => !currentSides.some((s) => s.toLowerCase() === def.toLowerCase())
+                          )
+                          .map((def) => (
+                            <button
+                              key={def}
+                              type="button"
+                              onClick={() => handleAddSide(def)}
+                              className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white/70 dark:bg-white/5 border border-dashed border-emerald-300 dark:border-emerald-700/60 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100/70 dark:hover:bg-emerald-900/30 transition-colors cursor-pointer"
+                            >
+                              + {def}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <input
+                        type="text"
+                        value={newSideInput}
+                        onChange={(e) => setNewSideInput(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleAddSide();
+                          }
+                        }}
+                        placeholder="Nueva guarnición (ej. Puré de papa, Ensalada...)"
+                        className="flex-1 min-w-0 min-h-[38px] px-3 py-1.5 rounded-xl bg-white dark:bg-[#110a10] border border-emerald-200/90 dark:border-emerald-800/50 text-xs font-medium text-gray-900 dark:text-white placeholder:text-gray-400 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddSide()}
+                        disabled={!newSideInput.trim()}
+                        className="min-h-[38px] px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1 transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer shrink-0"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Agregar</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
